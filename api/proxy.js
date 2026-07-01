@@ -14,7 +14,6 @@ export default async function handler(req, res) {
   if (type === 'ebay_active') {
     const { query } = req.body;
     const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=10&filter=buyingOptions:{FIXED_PRICE}`;
-    const token = Buffer.from(`${process.env.EBAY_APP_ID}:`).toString('base64');
     const r = await fetch(url, {
       headers: { 'Authorization': `Bearer ${await getEbayToken()}`, 'Content-Type': 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' }
     });
@@ -51,7 +50,7 @@ export default async function handler(req, res) {
 }
 
 async function getEbayToken() {
-  const credentials = Buffer.from(`${process.env.EBAY_APP_ID}:`).toString('base64');
+  const credentials = Buffer.from(`${process.env.EBAY_APP_ID}:${process.env.EBAY_CLIENT_SECRET}`).toString('base64');
   const r = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {
     method: 'POST',
     headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' },
