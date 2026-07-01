@@ -862,38 +862,28 @@ DO NOT invent data. Read ONLY what is clearly on screen.`,
     let visibleCount = 0;
     
     rows.forEach(row => {
-      const cells = row.cells;
-      if (!cells || cells.length < 6) { row.style.display = ''; return; }
+      // Use data attributes for reliable matching
+      const rowBrand = (row.dataset.brand || '').trim();
+      const rowScale = (row.dataset.scale || '').trim();
+      const rowStatus = (row.dataset.status || '').trim();
+      const rowSite = (row.dataset.site || '').trim();
+      const rowName = (row.cells[0] ? row.cells[0].textContent : '').replace('⭐','').toLowerCase().trim();
       
-      // Get clean text from each cell
-      const itemName = cells[0] ? cells[0].textContent.replace('⭐','').trim().toLowerCase() : '';
-      const itemBrand = cells[1] ? cells[1].textContent.trim() : '';
-      const itemScale = cells[2] ? cells[2].textContent.trim() : '';
-      const itemPrice = cells[3] ? cells[3].textContent.trim() : '';
-      
-      // Get status from badge inside cell 4
-      const badge = cells[4] ? cells[4].querySelector('.status-badge') : null;
-      const itemStatus = badge ? badge.textContent.trim() : (cells[4] ? cells[4].textContent.trim() : '');
-      
-      const itemSite = cells[5] ? cells[5].textContent.trim() : '';
-      
-      // Apply filters
-      const matchSearch = !search || itemName.includes(search) || itemBrand.toLowerCase().includes(search);
-      const matchBrand = !brand || itemBrand === brand;
-      const matchScale = !scale || itemScale === scale;
-      const matchStatus = !status || itemStatus === status;
-      const matchSite = !site || itemSite === site;
+      const matchSearch = !search || rowName.includes(search) || rowBrand.toLowerCase().includes(search);
+      const matchBrand = !brand || rowBrand === brand;
+      const matchScale = !scale || rowScale === scale;
+      const matchStatus = !status || rowStatus === status;
+      const matchSite = !site || rowSite === site;
       
       const show = matchSearch && matchBrand && matchScale && matchStatus && matchSite;
       row.style.display = show ? '' : 'none';
       if (show) visibleCount++;
     });
     
-    // Update header count
     const titleEl = document.getElementById('resultsTitle');
     if (titleEl) {
       const total = rows.length;
-      titleEl.textContent = (visibleCount < total)
+      titleEl.textContent = visibleCount < total
         ? '📊 SHOWING ' + visibleCount + ' OF ' + total + ' ITEMS'
         : '📊 ' + total + ' ITEMS EXTRACTED · ' + [...new Set(allItems.map(i=>i.site).filter(Boolean))].join(', ');
     }
