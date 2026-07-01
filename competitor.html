@@ -654,7 +654,7 @@ async function startScan() {
     document.getElementById('loadStatus').textContent = `Counting and extracting every item on screenshot ${i+1}`;
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://shift64diecast-os.vercel.app/api/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
         body: JSON.stringify({
@@ -980,7 +980,7 @@ async function scanCloseup(idx, site, page) {
   btn.textContent = '⏳ Scanning...';
   btn.disabled = true;
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://shift64diecast-os.vercel.app/api/proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
