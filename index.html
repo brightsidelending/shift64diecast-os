@@ -1578,7 +1578,7 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && document.activeElement?.id === 'psSearchInput') runPriceScan();
 });
 
-function runPriceScan() {
+async function runPriceScan() {
   const query = document.getElementById('psSearchInput').value.trim();
   if (!query) return;
   const fees = getTariffs();
@@ -1586,12 +1586,68 @@ function runPriceScan() {
   document.getElementById('psResults').innerHTML = '';
   document.getElementById('psScanBtn').disabled = true;
 
-  setTimeout(() => {
-    const data = lookupDiecast(query);
+  // Try to get real eBay data first
+  let ebayActivePrices = [];
+  let ebaySoldPrices = [];
+  let useRealData = false;
+
+  try {
+    // Fetch active listings
+    const activeRes = await fetch(PROXY_URL + '?type=ebay_active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    const activeData = await activeRes.json();
+    if (activeData.itemSummaries && activeData.itemSummaries.length > 0) {
+      ebayActivePrices = activeData.itemSummaries.map(i => ({
+        title: i.title,
+        price: parseFloat(i.price?.value || 0),
+        currency: i.price?.currency || 'USD',
+        condition: i.condition || 'New'
+      })).filter(i => i.price > 0);
+      useRealData = true;
+    }
+
+    // Fetch sold listings
+    const soldRes = await fetch(PROXY_URL + '?type=ebay_sold', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    const soldData = await soldRes.json();
+    const soldItems = soldData?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || [];
+    if (soldItems.length > 0) {
+      ebaySoldPrices = soldItems.map(i => ({
+        title: i.title?.[0] || query,
+        price: parseFloat(i.sellingStatus?.[0]?.currentPrice?.[0]?.__value__ || 0),
+        condition: i.condition?.[0]?.conditionDisplayName?.[0] || 'Unknown'
+      })).filter(i => i.price > 0);
+      useRealData = true;
+    }
+  } catch(e) {
+    console.log('eBay API error, using estimates:', e);
+  }
+
+  const data = lookupDiecast(query);
+  let wholesale, sold, active;
+
+  if (useRealData && (ebayActivePrices.length > 0 || ebaySoldPrices.length > 0)) {
+    // Use real eBay data
+    const activePriceList = ebayActivePrices.map(i => i.price);
+    const soldPriceList = ebaySoldPrices.map(i => i.price);
+    active = activePriceList.length > 0 ? parseFloat((activePriceList.reduce((a,b)=>a+b,0)/activePriceList.length).toFixed(2)) : data.active;
+    sold = soldPriceList.length > 0 ? parseFloat((soldPriceList.reduce((a,b)=>a+b,0)/soldPriceList.length).toFixed(2)) : data.sold;
+    wholesale = parseFloat((sold * 0.35).toFixed(2));
+  } else {
+    // Fall back to estimates
     const v = 0.95 + Math.random() * 0.1;
-    const wholesale = parseFloat((data.wholesale * v).toFixed(2));
-    const sold = parseFloat((data.sold * v).toFixed(2));
-    const active = parseFloat((data.active * v).toFixed(2));
+    wholesale = parseFloat((data.wholesale * v).toFixed(2));
+    sold = parseFloat((data.sold * v).toFixed(2));
+    active = parseFloat((data.active * v).toFixed(2));
+  }
+
+  {
     const tariffAmt = wholesale * fees.tariff;
     const dutyAmt = wholesale * fees.duty;
     const landed = wholesale + tariffAmt + dutyAmt + fees.ship + fees.broker;
@@ -1602,22 +1658,22 @@ function runPriceScan() {
     const action = marginPct >= 80 ? 'BUY' : marginPct >= 40 ? 'WATCH' : 'PASS';
     const actionColor = action==='BUY'?'var(--green)':action==='WATCH'?'var(--yellow)':'var(--red)';
     const marginColor = marginPct>=80?'var(--green)':marginPct>=40?'var(--yellow)':'var(--red)';
-    const activeListings = [
-      {title:`${query} — New Sealed`,price:active,meta:'Buy It Now · Free Shipping'},
-      {title:`${query} — Brand New`,price:(active*0.92).toFixed(2),meta:'Buy It Now'},
-      {title:`${query} — Limited Release`,price:(active*1.18).toFixed(2),meta:'Top Rated Seller'},
-      {title:`${query} — New in Box`,price:(active*0.97).toFixed(2),meta:'Free Returns'},
+    const activeListings = ebayActivePrices.length > 0 ? ebayActivePrices.slice(0,4).map(i => ({title:i.title,price:i.price,meta:i.condition+' · Live eBay Data'})) : [
+      {title:`${query} — New Sealed`,price:active,meta:'Buy It Now · Estimated'},
+      {title:`${query} — Brand New`,price:(active*0.92).toFixed(2),meta:'Estimated'},
+      {title:`${query} — Limited Release`,price:(active*1.18).toFixed(2),meta:'Estimated'},
+      {title:`${query} — New in Box`,price:(active*0.97).toFixed(2),meta:'Estimated'},
     ];
-    const soldListings = [
-      {title:`${query} — Sold`,price:sold,meta:'Completed · Sealed'},
-      {title:`${query} — Sold`,price:(sold*1.22).toFixed(2),meta:'Chase Variant'},
-      {title:`${query} — Sold`,price:(sold*0.87).toFixed(2),meta:'Good Condition'},
-      {title:`${query} — Sold`,price:(sold*1.05).toFixed(2),meta:'New Sealed'},
+    const soldListings = ebaySoldPrices.length > 0 ? ebaySoldPrices.slice(0,4).map(i => ({title:i.title,price:i.price,meta:i.condition+' · Live eBay Sold'})) : [
+      {title:`${query} — Sold`,price:sold,meta:'Completed · Estimated'},
+      {title:`${query} — Sold`,price:(sold*1.22).toFixed(2),meta:'Estimated'},
+      {title:`${query} — Sold`,price:(sold*0.87).toFixed(2),meta:'Estimated'},
+      {title:`${query} — Sold`,price:(sold*1.05).toFixed(2),meta:'Estimated'},
     ];
     const rl = (items,isSold) => items.map(i=>`<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};">$${parseFloat(i.price).toFixed(2)}</div></div>`).join('');
     document.getElementById('psResults').innerHTML = `
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
-        <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">📊 MARKET ANALYSIS · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
+        <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">${useRealData?'🟢 LIVE EBAY DATA':'🤖 AI ESTIMATE'} · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
         <div style="font-size:14px;line-height:1.6;">${action==='BUY'?`Strong buy. ${data.soldCount} units sold in last 30 days. True landed cost $${landed.toFixed(2)} vs avg sell $${sold.toFixed(2)} = ${marginPct}% net margin.`:action==='WATCH'?`Watch this. ${data.soldCount} sold recently. ${marginPct}% margin is acceptable but negotiate harder on wholesale price.`:`Thin margins at ${marginPct}%. Find a higher demand model or negotiate lower wholesale.`}</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
@@ -1658,7 +1714,7 @@ function runPriceScan() {
       </div>`;
     document.getElementById('psLoading').style.display = 'none';
     document.getElementById('psScanBtn').disabled = false;
-  }, 1000);
+  }
 }
 
 // ===== BUSINESS MODULE FUNCTIONS =====
