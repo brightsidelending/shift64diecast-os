@@ -213,7 +213,9 @@
     <div class="filter-bar" id="filterBar" style="display:none;">
       <div class="filter-label">🔍 Filter:</div>
       <input class="filter-input filter-search" id="filterSearch" placeholder="Search items..." oninput="filterTable()" />
-      <select class="filter-select" id="filterBrand" onchange="filterTable()"><option value="">All Brands</option></select>
+      <select class="filter-select" id="filterBrand" onchange="filterTable()">
+        <option value="">All Brands</option>
+      </select>
       <select class="filter-select" id="filterScale" onchange="filterTable()">
         <option value="">All Scales</option>
         <option value="1/64">1/64</option>
@@ -222,13 +224,15 @@
       </select>
       <select class="filter-select" id="filterStatus" onchange="filterTable()">
         <option value="">All Status</option>
-        <option value="In Stock">🟢 In Stock</option>
-        <option value="Out of Stock">🔴 Out of Stock</option>
-        <option value="Pre-Order">🔵 Pre-Order</option>
-        <option value="Low Stock">🟡 Low Stock</option>
+        <option value="In Stock">In Stock</option>
+        <option value="Out of Stock">Out of Stock</option>
+        <option value="Pre-Order">Pre-Order</option>
+        <option value="Low Stock">Low Stock</option>
       </select>
-      <select class="filter-select" id="filterSite" onchange="filterTable()"><option value="">All Sites</option></select>
-      <button class="btn-filter-clear" onclick="clearFilters()">Clear Filters</button>
+      <select class="filter-select" id="filterSite" onchange="filterTable()">
+        <option value="">All Sites</option>
+      </select>
+      <button class="btn-filter-clear" onclick="clearFilters()">✕ Clear Filters</button>
     </div>
 
     <!-- STATS -->
@@ -656,7 +660,7 @@
     let unclearItems = [];
     for (let i = 0; i < screenshots.length; i++) {
       document.getElementById('loadingTitle').textContent = `Processing page ${i+1} of ${screenshots.length}...`;
-      document.getElementById('loadingStatus').textContent = `Extracting items from screenshot ${i+1}...`;
+      document.getElementById('loadingStatus').textContent = `Reading every item on screenshot ${i+1}. This may take a moment...`;
       try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -664,31 +668,40 @@
           body: JSON.stringify({
             model: 'claude-sonnet-4-6',
             max_tokens: 4000,
-            system: `You are a strict diecast product data extractor. Your ONLY job is to read text that is CLEARLY VISIBLE on this screenshot. 
+            system: `You are a strict diecast product data extractor. Your ONLY job is to read text EXACTLY as it appears on this screenshot.
 
-STRICT RULES - Follow exactly:
-1. ONLY extract items where you can clearly read the product name from the screenshot text
-2. NEVER invent, guess, or fill in product names you cannot clearly see
-3. NEVER use your training knowledge to fill in missing details
-4. Read scale EXACTLY as printed: 1/64, 1/18, 1/43 - never guess
-5. Read price EXACTLY as shown - never estimate
-6. Read status EXACTLY as shown: In Stock, Out of Stock, Pre-Order, Low Stock
-7. If ANY field is unclear or partially visible, mark confidence as "low"
-8. If a product name is not clearly readable, do NOT include it as a confirmed item
+STEP 1: Count every product card or row you can see on screen. Each product image with a name and price = 1 item.
 
-Return ONLY this exact JSON structure, no markdown, no explanation:
+STEP 2: For EACH item you counted, attempt to read it.
+
+STRICT RULES:
+1. Read product names EXACTLY as written on screen - every word, every character
+2. Read scale EXACTLY as shown: 1/64, 1/18, 1/43 - if it says 1:64 that means 1/64
+3. Read price EXACTLY as shown - the exact number on screen
+4. Read status EXACTLY: In Stock, Out of Stock, Pre-Order, Low Stock, Add to Cart = In Stock
+5. NEVER skip an item without flagging it
+6. If you can see an item exists but cannot read ALL details clearly = put it in unclear
+7. If you can read name AND price clearly = put it in confirmed
+8. Every single item you counted in Step 1 MUST appear in either confirmed OR unclear
+
+Return ONLY this exact JSON, no markdown, no explanation:
 {
+  "total_counted": 12,
   "confirmed": [
-    {"name":"EXACT text from screenshot","brand":"brand if clearly visible or null","scale":"1/64 or 1/18 or 1/43 or null","price":19.99,"currency":"USD","status":"In Stock or Out of Stock or Pre-Order or Low Stock or Unknown","model_number":"exactly as shown or null","notes":"Limited Edition or Chase or null","confidence":"high"}
+    {"name":"EXACT product name from screen","brand":"brand name or null","scale":"1/64 or 1/18 or 1/43 or null","price":22.00,"currency":"USD","status":"In Stock or Out of Stock or Pre-Order or Low Stock","model_number":"model # or null","notes":"Limited Edition or Chase or null"}
   ],
   "unclear": [
-    {"partial_name":"whatever partial text was visible","reason":"why it could not be read clearly e.g. image blocked text, text too small, cut off","confidence":"low"}
+    {"partial_name":"any partial text visible for this item","reason":"specific reason - e.g. text cut off, image too small, price not visible","position":"describe where on screen e.g. bottom right, row 2 col 3"}
   ]
 }
 
-confirmed = items where name AND price are clearly readable
-unclear = anything you could not read with full confidence
-Return empty arrays if nothing found. DO NOT GUESS.`,
+CRITICAL RULES:
+- total_counted MUST equal the number of product cards/rows you can see on screen
+- confirmed.length + unclear.length MUST equal total_counted
+- If you can see a product image and price exists but text is unclear = put in unclear
+- NEVER silently skip any item
+- If in doubt about any item = put it in unclear, never skip it
+DO NOT invent data. Read ONLY what is clearly on screen.`,
             messages: [{
               role: 'user',
               content: [
@@ -708,11 +721,31 @@ Return empty arrays if nothing found. DO NOT GUESS.`,
         if (Array.isArray(parsed)) {
           newItems = [...newItems, ...parsed.map(item => ({ ...item, site, page: i+1, dateScanned: today }))];
         } else if (parsed.confirmed || parsed.unclear) {
+          const totalCounted = parsed.total_counted || 0;
+          const confirmedCount = (parsed.confirmed || []).length;
+          const unclearCount = (parsed.unclear || []).length;
+          
           if (parsed.confirmed && Array.isArray(parsed.confirmed)) {
             newItems = [...newItems, ...parsed.confirmed.map(item => ({ ...item, site, page: i+1, dateScanned: today }))];
           }
           if (parsed.unclear && Array.isArray(parsed.unclear) && parsed.unclear.length > 0) {
             unclearItems = [...unclearItems, ...parsed.unclear.map(item => ({ ...item, site, page: i+1, dateScanned: today }))];
+          }
+          
+          // If total counted is more than confirmed + unclear, create placeholder unclear items for missing ones
+          const accountedFor = confirmedCount + unclearCount;
+          if (totalCounted > accountedFor) {
+            const missing = totalCounted - accountedFor;
+            for (let m = 0; m < missing; m++) {
+              unclearItems.push({
+                partial_name: 'Item not captured',
+                reason: 'Item was visible on screen but could not be read. Try a close-up screenshot of this item.',
+                position: 'Unknown position on page ' + (i+1),
+                site,
+                page: i+1,
+                dateScanned: today
+              });
+            }
           }
         }
       } catch(err) {
@@ -723,7 +756,12 @@ Return empty arrays if nothing found. DO NOT GUESS.`,
 
     allItems = [...allItems, ...newItems];
     renderResults(newItems, site);
-    if (unclearItems.length > 0) renderUnclearItems(unclearItems);
+    if (unclearItems.length > 0) {
+      renderUnclearItems(unclearItems);
+      showToast('⚠️ ' + unclearItems.length + ' items need your review below the results.');
+    } else {
+      showToast('✅ All items extracted successfully!');
+    }
     updateIntel();
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('scanBtn').disabled = false;
@@ -758,12 +796,13 @@ Return empty arrays if nothing found. DO NOT GUESS.`,
     document.getElementById('statAvgPrice').textContent = '$' + (allItems.map(i=>parseFloat(i.price)).filter(p=>!isNaN(p)).reduce((a,b,_,arr)=>a+b/arr.length,0)).toFixed(2);
     document.getElementById('statsBar').style.display = 'grid';
 
-    // Update filters
+    // Update filters with exact values from extracted data
     const brandSel = document.getElementById('filterBrand');
-    const allBrands = [...new Set(allItems.map(i=>i.brand).filter(Boolean))];
+    const allBrands = [...new Set(allItems.map(i=>(i.brand||'').trim()).filter(Boolean))].sort();
     brandSel.innerHTML = '<option value="">All Brands</option>' + allBrands.map(b=>`<option value="${b}">${b}</option>`).join('');
+    
     const siteSel = document.getElementById('filterSite');
-    const allSites = [...new Set(allItems.map(i=>i.site).filter(Boolean))];
+    const allSites = [...new Set(allItems.map(i=>(i.site||'').trim()).filter(Boolean))].sort();
     siteSel.innerHTML = '<option value="">All Sites</option>' + allSites.map(s=>`<option value="${s}">${s}</option>`).join('');
     document.getElementById('filterBar').style.display = 'flex';
     document.getElementById('exportBtn').style.display = 'block';
@@ -777,7 +816,7 @@ Return empty arrays if nothing found. DO NOT GUESS.`,
     document.getElementById('resultsArea').innerHTML = `
       <div class="results-wrap">
         <div class="results-header">
-          <div class="results-title">📊 ${allItems.length} ITEMS EXTRACTED · ${[...new Set(allItems.map(i=>i.site))].join(', ')}</div>
+          <div class="results-title" id="resultsTitle">📊 ${allItems.length} ITEMS EXTRACTED · ${[...new Set(allItems.map(i=>i.site))].join(', ')}</div>
           <div style="font-size:12px;color:var(--gray);">⭐ = Lowest price · Sorted by price</div>
         </div>
         <table>
@@ -817,20 +856,29 @@ Return empty arrays if nothing found. DO NOT GUESS.`,
     const status = document.getElementById('filterStatus').value.trim();
     const site = document.getElementById('filterSite').value.trim();
     
-    const rows = document.querySelectorAll('#resultsBody tr');
+    const tbody = document.getElementById('resultsBody');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr'));
     let visibleCount = 0;
     
     rows.forEach(row => {
       const cells = row.cells;
-      if (!cells || cells.length < 6) return;
+      if (!cells || cells.length < 6) { row.style.display = ''; return; }
       
-      const itemName = (cells[0]?.textContent || '').toLowerCase().replace('⭐ ','').trim();
-      const itemBrand = (cells[1]?.textContent || '').trim();
-      const itemScale = (cells[2]?.textContent || '').trim();
-      const itemStatus = (cells[4]?.querySelector('.status-badge')?.textContent || cells[4]?.textContent || '').trim();
-      const itemSite = (cells[5]?.textContent || '').trim();
+      // Get clean text from each cell
+      const itemName = cells[0] ? cells[0].textContent.replace('⭐','').trim().toLowerCase() : '';
+      const itemBrand = cells[1] ? cells[1].textContent.trim() : '';
+      const itemScale = cells[2] ? cells[2].textContent.trim() : '';
+      const itemPrice = cells[3] ? cells[3].textContent.trim() : '';
       
-      const matchSearch = !search || itemName.includes(search);
+      // Get status from badge inside cell 4
+      const badge = cells[4] ? cells[4].querySelector('.status-badge') : null;
+      const itemStatus = badge ? badge.textContent.trim() : (cells[4] ? cells[4].textContent.trim() : '');
+      
+      const itemSite = cells[5] ? cells[5].textContent.trim() : '';
+      
+      // Apply filters
+      const matchSearch = !search || itemName.includes(search) || itemBrand.toLowerCase().includes(search);
       const matchBrand = !brand || itemBrand === brand;
       const matchScale = !scale || itemScale === scale;
       const matchStatus = !status || itemStatus === status;
@@ -841,21 +889,22 @@ Return empty arrays if nothing found. DO NOT GUESS.`,
       if (show) visibleCount++;
     });
     
-    // Update count
-    const countEl = document.querySelector('.results-header .results-title');
-    if (countEl) {
+    // Update header count
+    const titleEl = document.getElementById('resultsTitle');
+    if (titleEl) {
       const total = rows.length;
-      countEl.textContent = visibleCount < total 
-        ? '📊 SHOWING ' + visibleCount + ' OF ' + total + ' ITEMS' 
-        : '📊 ' + total + ' ITEMS EXTRACTED · ' + [...new Set(allItems.map(i=>i.site))].join(', ');
+      titleEl.textContent = (visibleCount < total)
+        ? '📊 SHOWING ' + visibleCount + ' OF ' + total + ' ITEMS'
+        : '📊 ' + total + ' ITEMS EXTRACTED · ' + [...new Set(allItems.map(i=>i.site).filter(Boolean))].join(', ');
     }
   }
 
   function clearFilters() {
-    ['filterSearch','filterBrand','filterScale','filterStatus','filterSite'].forEach(id => {
-      const el = document.getElementById(id);
-      el.value = '';
-    });
+    document.getElementById('filterSearch').value = '';
+    document.getElementById('filterBrand').selectedIndex = 0;
+    document.getElementById('filterScale').selectedIndex = 0;
+    document.getElementById('filterStatus').selectedIndex = 0;
+    document.getElementById('filterSite').selectedIndex = 0;
     filterTable();
   }
 
