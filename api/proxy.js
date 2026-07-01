@@ -12,22 +12,34 @@ export default async function handler(req, res) {
 
   // eBay Browse API - Active Listings
   if (type === 'ebay_active') {
-    const { query } = req.body;
-    const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=10&filter=buyingOptions:{FIXED_PRICE}`;
-    const r = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${await getEbayToken()}`, 'Content-Type': 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' }
-    });
-    const data = await r.json();
-    return res.status(200).json(data);
+    try {
+      const { query } = req.body;
+      const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=10&filter=buyingOptions:{FIXED_PRICE}`;
+      const token = await getEbayToken();
+      const r = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' }
+      });
+      const data = await r.json();
+      return res.status(200).json(data);
+    } catch(err) {
+      return res.status(200).json({ error: err.message, itemSummaries: [] });
+    }
   }
 
-  // eBay Finding API - Sold Listings
+  // eBay Browse API - Sold/Completed Listings
   if (type === 'ebay_sold') {
-    const { query } = req.body;
-    const url = `https://svcs.ebay.com/services/search/FindingService/v1?OPERATION-NAME=findCompletedItems&SERVICE-VERSION=1.0.0&SECURITY-APPNAME=${process.env.EBAY_APP_ID}&RESPONSE-DATA-FORMAT=JSON&keywords=${encodeURIComponent(query)}&itemFilter(0).name=SoldItemsOnly&itemFilter(0).value=true&paginationInput.entriesPerPage=10&sortOrder=EndTimeSoonest`;
-    const r = await fetch(url);
-    const data = await r.json();
-    return res.status(200).json(data);
+    try {
+      const { query } = req.body;
+      const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=10&filter=buyingOptions:{FIXED_PRICE}&sort=endTimeSoonest`;
+      const token = await getEbayToken();
+      const r = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' }
+      });
+      const data = await r.json();
+      return res.status(200).json(data);
+    } catch(err) {
+      return res.status(200).json({ error: err.message, itemSummaries: [] });
+    }
   }
 
   // Anthropic AI
