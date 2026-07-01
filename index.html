@@ -11,154 +11,186 @@
     --black: #0A0A0A; --dark: #111318; --card: #16191F;
     --border: #252830; --red: #E02B2B; --red-dim: #7A1515;
     --gold: #C9A84C; --white: #F0F0F0; --gray: #8A8F9E;
-    --green: #2ECC71; --yellow: #F1C40F; --orange: #E67E22;
+    --green: #2ECC71; --yellow: #F1C40F; --orange: #E67E22; --blue: #4A90D9;
   }
   body { background: var(--black); color: var(--white); font-family: 'Inter', sans-serif; min-height: 100vh; }
 
-  .header {
-    background: var(--dark); border-bottom: 2px solid var(--red);
-    padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
-  }
+  .header { background: var(--dark); border-bottom: 2px solid var(--red); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
   .logo { font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 2px; }
   .logo span { color: var(--red); }
   .tagline { font-size: 11px; color: var(--gold); letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; }
-  .status-pill { background: #0D2B0D; border: 1px solid var(--green); color: var(--green); font-size: 11px; padding: 4px 12px; border-radius: 20px; letter-spacing: 1px; }
+  .status-pill { background: #0D2B0D; border: 1px solid var(--green); color: var(--green); font-size: 11px; padding: 4px 12px; border-radius: 20px; }
 
-  .nav { background: var(--dark); border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; }
-  .nav-tab { padding: 14px 24px; font-size: 13px; font-weight: 500; color: var(--gray); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; background: none; border-top: none; border-left: none; border-right: none; }
+  .nav { background: var(--dark); border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; overflow-x: auto; }
+  .nav-tab { padding: 14px 20px; font-size: 13px; font-weight: 500; color: var(--gray); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; background: none; border-top: none; border-left: none; border-right: none; white-space: nowrap; }
   .nav-tab:hover { color: var(--white); }
   .nav-tab.active { color: var(--red); border-bottom-color: var(--red); }
 
-  .main { padding: 32px; max-width: 1300px; margin: 0 auto; }
+  .main { padding: 24px 32px; max-width: 1400px; margin: 0 auto; }
   .section { display: none; }
   .section.active { display: block; }
 
-  /* API KEY BANNER */
-  .api-banner {
-    background: #1A1200; border: 1px solid var(--gold); border-radius: 10px;
-    padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px;
-  }
+  /* API BANNER */
+  .api-banner { background: #1A1200; border: 1px solid var(--gold); border-radius: 10px; padding: 14px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px; }
   .api-banner.connected { background: #0D2B0D; border-color: var(--green); }
   .api-label { font-size: 12px; color: var(--gold); font-weight: 600; white-space: nowrap; }
   .api-banner.connected .api-label { color: var(--green); }
-  .api-input {
-    flex: 1; background: var(--black); border: 1px solid var(--border); border-radius: 6px;
-    padding: 10px 14px; color: var(--white); font-size: 13px; font-family: 'Inter', sans-serif; outline: none;
-  }
+  .api-input { flex: 1; background: var(--black); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; color: var(--white); font-size: 13px; font-family: 'Inter', sans-serif; outline: none; }
   .api-input:focus { border-color: var(--gold); }
-  .btn-connect {
-    background: var(--gold); color: var(--black); border: none; border-radius: 6px;
-    padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
-    font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; white-space: nowrap;
-  }
-  .btn-connect:hover { background: #B8962A; }
-  .api-status { font-size: 12px; color: var(--green); white-space: nowrap; }
+  .btn-connect { background: var(--gold); color: var(--black); border: none; border-radius: 6px; padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; white-space: nowrap; }
+  .api-status { font-size: 12px; color: var(--green); }
 
   /* SCANNER */
-  .scanner-hero { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 20px; }
+  .scanner-hero { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
   .scanner-title { font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
   .scanner-sub { color: var(--gray); font-size: 13px; margin-bottom: 20px; }
   .search-row { display: flex; gap: 12px; }
   .search-input { flex: 1; background: var(--black); border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; color: var(--white); font-size: 15px; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s; }
   .search-input:focus { border-color: var(--red); }
   .search-input::placeholder { color: var(--gray); }
-  .btn-scan { background: var(--red); color: white; border: none; border-radius: 8px; padding: 14px 28px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; transition: background 0.2s; white-space: nowrap; }
+  .btn-scan { background: var(--red); color: white; border: none; border-radius: 8px; padding: 14px 28px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; white-space: nowrap; }
   .btn-scan:hover { background: #B52222; }
   .btn-scan:disabled { background: var(--red-dim); cursor: not-allowed; }
   .quick-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
   .tag { background: var(--black); border: 1px solid var(--border); color: var(--gray); padding: 6px 14px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
   .tag:hover { border-color: var(--gold); color: var(--gold); }
 
-  /* RESULTS SPLIT VIEW */
-  .results-split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  /* TARIFF SETTINGS BAR */
+  .tariff-bar { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; }
+  .tariff-bar-title { font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700; color: var(--gold); letter-spacing: 1px; margin-bottom: 12px; text-transform: uppercase; }
+  .tariff-inputs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .tariff-field label { font-size: 10px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px; }
+  .tariff-input { width: 100%; background: var(--black); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; color: var(--white); font-size: 13px; font-family: 'Inter', sans-serif; outline: none; }
+  .tariff-input:focus { border-color: var(--gold); }
+
+  /* RESULTS SPLIT */
+  .results-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .results-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-  .panel-title { font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 1px; }
-  .panel-live { font-size: 11px; color: var(--green); }
-  .panel-sold { font-size: 11px; color: var(--gold); }
-  .listing-item { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; transition: background 0.15s; }
+  .panel-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 1px; }
+  .listing-item { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   .listing-item:last-child { border-bottom: none; }
   .listing-item:hover { background: rgba(255,255,255,0.02); }
-  .listing-title { font-size: 13px; color: var(--white); margin-bottom: 4px; }
+  .listing-title { font-size: 13px; color: var(--white); margin-bottom: 3px; }
   .listing-meta { font-size: 11px; color: var(--gray); }
-  .listing-price { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; color: var(--white); text-align: right; }
+  .listing-price { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; text-align: right; }
   .listing-condition { font-size: 11px; color: var(--gray); text-align: right; margin-top: 2px; }
   .sold-price { color: var(--green); }
   .active-price { color: var(--gold); }
 
-  /* MARGIN BOX */
-  .margin-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
-  .margin-title { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; color: var(--gold); letter-spacing: 1px; margin-bottom: 16px; text-transform: uppercase; }
-  .margin-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
-  .margin-stat { text-align: center; }
-  .margin-value { font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 700; }
-  .margin-label { font-size: 11px; color: var(--gray); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  /* TRUE MARGIN BOX - THE BIG ONE */
+  .margin-master { background: var(--card); border: 2px solid var(--gold); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+  .margin-master-title { font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: 700; color: var(--gold); letter-spacing: 2px; margin-bottom: 20px; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+  .margin-master-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  /* COST BREAKDOWN */
+  .cost-breakdown { background: var(--black); border-radius: 10px; padding: 20px; }
+  .cost-title { font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; font-weight: 600; }
+  .cost-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .cost-line:last-child { border-bottom: none; }
+  .cost-line.total { border-top: 2px solid var(--gold); margin-top: 8px; padding-top: 12px; font-weight: 700; font-size: 15px; color: var(--gold); }
+  .cost-line.profit { border-top: none; padding-top: 4px; font-weight: 700; font-size: 15px; }
+  .cost-label { color: var(--gray); }
+  .cost-label.highlight { color: var(--white); }
+  .cost-value { font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700; }
+  .cost-note { font-size: 10px; color: var(--gray); margin-top: 2px; }
+
+  /* MARGIN STATS */
+  .margin-stats { background: var(--black); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .big-stat { text-align: center; padding: 16px; background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
+  .big-stat-value { font-family: 'Rajdhani', sans-serif; font-size: 42px; font-weight: 700; line-height: 1; }
+  .big-stat-label { font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; }
+  .stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .small-stat { text-align: center; padding: 12px; background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
+  .small-stat-value { font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 700; }
+  .small-stat-label { font-size: 10px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+  /* DELIVERY TRACKER */
+  .delivery-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .delivery-title { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; color: var(--blue); letter-spacing: 1px; margin-bottom: 16px; }
+  .delivery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .delivery-option { background: var(--black); border: 1px solid var(--border); border-radius: 8px; padding: 14px; cursor: pointer; transition: all 0.2s; }
+  .delivery-option:hover { border-color: var(--blue); }
+  .delivery-option.selected { border-color: var(--blue); background: #0D1520; }
+  .delivery-method { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .delivery-time { font-size: 12px; color: var(--yellow); margin-bottom: 4px; }
+  .delivery-cost { font-size: 12px; color: var(--gray); }
+
+  /* NEGOTIATION BOX */
+  .negotiation-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .neg-title { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; color: var(--orange); letter-spacing: 1px; margin-bottom: 16px; }
+  .neg-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .neg-stat { background: var(--black); border-radius: 8px; padding: 14px; text-align: center; }
+  .neg-value { font-family: 'Rajdhani', sans-serif; font-size: 24px; font-weight: 700; }
+  .neg-label { font-size: 10px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .neg-script { background: #1A1200; border: 1px solid var(--orange); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.7; color: var(--white); }
+  .neg-script-title { font-size: 10px; color: var(--orange); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: 600; }
 
   /* AI INSIGHT */
-  .insight-box { background: #0D1520; border: 1px solid #1A3A5C; border-radius: 10px; padding: 18px 20px; margin-bottom: 20px; }
-  .insight-label { font-size: 10px; color: #4A90D9; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
+  .insight-box { background: #0D1520; border: 1px solid #1A3A5C; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; }
+  .insight-label { font-size: 10px; color: var(--blue); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
   .insight-text { font-size: 14px; color: var(--white); line-height: 1.6; }
 
   /* LOADING */
   .loading { text-align: center; padding: 48px; color: var(--gray); display: none; }
   .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .loading-steps { font-size: 12px; color: var(--gray); margin-top: 8px; }
 
   /* EMPTY STATE */
   .empty-state { text-align: center; padding: 60px 32px; color: var(--gray); }
   .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
   .empty-title { font-family: 'Rajdhani', sans-serif; font-size: 20px; color: var(--white); margin-bottom: 8px; }
 
-  /* INVENTORY */
-  .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
-  .table-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  /* TABLES */
+  .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+  .table-header { padding: 18px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   .table-title { font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 1px; }
   .btn-add { background: var(--red); color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
   table { width: 100%; border-collapse: collapse; }
-  th { background: #0E1015; padding: 12px 20px; text-align: left; font-size: 11px; color: var(--gray); letter-spacing: 1px; text-transform: uppercase; font-weight: 500; }
-  td { padding: 14px 20px; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--white); }
+  th { background: #0E1015; padding: 11px 16px; text-align: left; font-size: 11px; color: var(--gray); letter-spacing: 1px; text-transform: uppercase; font-weight: 500; }
+  td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--white); }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: rgba(255,255,255,0.02); }
+
   .status-badge { padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-  .status-incoming { background: #0D2233; color: #4A90D9; }
+  .status-incoming { background: #0D2233; color: var(--blue); }
   .status-stock { background: #0D2B0D; color: var(--green); }
   .status-low { background: #2B2200; color: var(--yellow); }
   .status-sold { background: #2B0D0D; color: var(--red); }
+  .status-negotiating { background: #1A1200; color: var(--orange); }
 
-  /* SUPPLIERS */
-  .supplier-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  /* SUPPLIER CARDS */
+  .supplier-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
   .supplier-info h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
   .supplier-info p { font-size: 12px; color: var(--gray); }
-  .supplier-actions { display: flex; gap: 8px; }
+  .supplier-actions { display: flex; gap: 8px; align-items: center; }
   .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--gray); border-radius: 6px; padding: 8px 14px; font-size: 12px; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; }
   .btn-outline:hover { border-color: var(--red); color: var(--white); }
   .btn-primary { background: var(--red); border: none; color: white; border-radius: 6px; padding: 8px 14px; font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 600; }
 
   /* ACCOUNTING */
-  .stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
   .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
   .stat-label { font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
   .stat-value { font-family: 'Rajdhani', sans-serif; font-size: 30px; font-weight: 700; }
-  .stat-change { font-size: 12px; margin-top: 6px; }
 
   .green { color: var(--green); }
   .yellow { color: var(--yellow); }
   .red-text { color: var(--red); }
   .gold { color: var(--gold); }
+  .blue { color: var(--blue); }
+  .orange { color: var(--orange); }
 
   /* MODAL */
   .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; }
   .modal-overlay.open { display: flex; }
-  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; width: 500px; max-width: 90vw; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 28px; width: 500px; max-width: 90vw; max-height: 90vh; overflow-y: auto; }
   .modal h2 { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; margin-bottom: 20px; }
-  .form-group { margin-bottom: 16px; }
+  .form-group { margin-bottom: 14px; }
   .form-label { font-size: 12px; color: var(--gray); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
   .form-input { width: 100%; background: var(--black); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; color: var(--white); font-size: 14px; font-family: 'Inter', sans-serif; outline: none; }
   .form-input:focus { border-color: var(--red); }
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-
-  .no-results { padding: 32px; text-align: center; color: var(--gray); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -175,6 +207,8 @@
   <button class="nav-tab active" onclick="showTab('scanner', this)">🔍 Price Scanner</button>
   <button class="nav-tab" onclick="showTab('inventory', this)">📦 Inventory</button>
   <button class="nav-tab" onclick="showTab('suppliers', this)">🤝 Suppliers</button>
+  <button class="nav-tab" onclick="showTab('negotiation', this)">💬 Negotiation</button>
+  <button class="nav-tab" onclick="showTab('delivery', this)">🚢 Delivery</button>
   <button class="nav-tab" onclick="showTab('accounting', this)">💰 Accounting</button>
 </div>
 
@@ -183,41 +217,70 @@
   <!-- PRICE SCANNER -->
   <div id="scanner" class="section active">
 
-    <!-- eBay API KEY BANNER -->
     <div class="api-banner" id="apiBanner">
       <div class="api-label">⚡ EBAY API KEY</div>
-      <input class="api-input" id="ebayApiKey" type="text" placeholder="Paste your eBay App ID (Client ID) here to enable live data..." />
+      <input class="api-input" id="ebayApiKey" type="text" placeholder="Paste your eBay App ID here to enable live data..." />
       <button class="btn-connect" onclick="connectEbay()">CONNECT</button>
     </div>
 
+    <!-- TARIFF SETTINGS -->
+    <div class="tariff-bar">
+      <div class="tariff-bar-title">⚙️ Import Cost Settings — Adjust to match your shipment</div>
+      <div class="tariff-inputs">
+        <div class="tariff-field">
+          <label>Section 301 Tariff %</label>
+          <input class="tariff-input" id="t_tariff" type="number" value="25" min="0" max="100" />
+        </div>
+        <div class="tariff-field">
+          <label>Customs Duty %</label>
+          <input class="tariff-input" id="t_duty" type="number" value="6.8" min="0" max="100" step="0.1" />
+        </div>
+        <div class="tariff-field">
+          <label>Ship Cost Per Unit $</label>
+          <input class="tariff-input" id="t_ship" type="number" value="1.50" min="0" step="0.10" />
+        </div>
+        <div class="tariff-field">
+          <label>Broker Fee Per Unit $</label>
+          <input class="tariff-input" id="t_broker" type="number" value="0.50" min="0" step="0.10" />
+        </div>
+        <div class="tariff-field">
+          <label>eBay Fee %</label>
+          <input class="tariff-input" id="t_ebay" type="number" value="13.25" min="0" max="100" step="0.25" />
+        </div>
+        <div class="tariff-field">
+          <label>PayPal/CC Fee %</label>
+          <input class="tariff-input" id="t_payment" type="number" value="3" min="0" max="10" step="0.25" />
+        </div>
+      </div>
+    </div>
+
     <div class="scanner-hero">
-      <div class="scanner-title">MARKET PRICE SCANNER</div>
-      <div class="scanner-sub">Type any model. See what's listed NOW and what has SOLD. Real margin intelligence.</div>
+      <div class="scanner-title">MARKET PRICE SCANNER + TRUE MARGIN CALCULATOR</div>
+      <div class="scanner-sub">Type any model. See live prices, real landed cost, and true margin after ALL fees.</div>
       <div class="search-row">
         <input class="search-input" id="searchInput" type="text" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Inno64 Ferrari F40..." />
-        <button class="btn-scan" id="scanBtn" onclick="runScan()">SCAN PRICES</button>
+        <button class="btn-scan" id="scanBtn" onclick="runScan()">SCAN + CALCULATE</button>
       </div>
       <div class="quick-tags">
-        <span class="tag" onclick="quickSearch('MiniGT Porsche 911 GT3')">MiniGT Porsche 911 GT3</span>
+        <span class="tag" onclick="quickSearch('MiniGT Porsche 911 GT3')">MiniGT Porsche 911</span>
         <span class="tag" onclick="quickSearch('Pop Race Ferrari F40 1/64')">Pop Race Ferrari F40</span>
         <span class="tag" onclick="quickSearch('Inno64 Lamborghini Huracan')">Inno64 Lamborghini</span>
-        <span class="tag" onclick="quickSearch('LCD Models McLaren')">LCD Models McLaren</span>
+        <span class="tag" onclick="quickSearch('LCD Models McLaren 1/18')">LCD Models McLaren</span>
         <span class="tag" onclick="quickSearch('DCM Pagani Huayra 1/18')">DCM Pagani</span>
-        <span class="tag" onclick="quickSearch('Demon King diecast')">Demon King</span>
+        <span class="tag" onclick="quickSearch('Demon King diecast exotic')">Demon King</span>
       </div>
     </div>
 
     <div class="loading" id="loadingState">
       <div class="spinner"></div>
-      <div>Scanning live market data...</div>
-      <div class="loading-steps" id="loadingStep">Connecting to eBay...</div>
+      <div>Scanning market and calculating true margins...</div>
     </div>
 
     <div id="resultsArea">
       <div class="empty-state">
         <div class="empty-icon">🏎️</div>
         <div class="empty-title">Ready to Scan</div>
-        <div>Enter a model name to see live listings, sold prices, and margin analysis.</div>
+        <div>Adjust your import settings above then scan any model to see your TRUE margin after all fees.</div>
       </div>
     </div>
   </div>
@@ -232,15 +295,16 @@
       <table>
         <thead>
           <tr>
-            <th>Model</th><th>Brand</th><th>Scale</th><th>Cost</th>
-            <th>Sell Price</th><th>Margin</th><th>Qty</th><th>ETA</th><th>Status</th>
+            <th>Model</th><th>Brand</th><th>Scale</th><th>Wholesale $</th>
+            <th>Landed Cost</th><th>Sell Price</th><th>True Margin</th>
+            <th>Qty</th><th>ETA</th><th>Status</th>
           </tr>
         </thead>
         <tbody id="inventoryBody">
-          <tr><td>Porsche 911 GT3 RS #55</td><td>MiniGT</td><td>1/64</td><td>$8.50</td><td>$22.00</td><td class="green">+159%</td><td>24</td><td>Jul 15</td><td><span class="status-badge status-incoming">INCOMING</span></td></tr>
-          <tr><td>Ferrari F40 Red</td><td>Pop Race</td><td>1/64</td><td>$9.00</td><td>$28.00</td><td class="green">+211%</td><td>12</td><td>In Stock</td><td><span class="status-badge status-stock">IN STOCK</span></td></tr>
-          <tr><td>Lamborghini Huracan STO</td><td>Inno64</td><td>1/64</td><td>$10.50</td><td>$24.00</td><td class="green">+129%</td><td>3</td><td>In Stock</td><td><span class="status-badge status-low">LOW STOCK</span></td></tr>
-          <tr><td>McLaren Senna GTR</td><td>LCD Models</td><td>1/18</td><td>$45.00</td><td>$110.00</td><td class="green">+144%</td><td>0</td><td>-</td><td><span class="status-badge status-sold">SOLD OUT</span></td></tr>
+          <tr><td>Porsche 911 GT3 RS #55</td><td>MiniGT</td><td>1/64</td><td>$8.50</td><td>$12.25</td><td>$22.00</td><td class="green">+80%</td><td>24</td><td>Jul 15, 2026</td><td><span class="status-badge status-incoming">INCOMING</span></td></tr>
+          <tr><td>Ferrari F40 Red</td><td>Pop Race</td><td>1/64</td><td>$9.00</td><td>$13.10</td><td>$28.00</td><td class="green">+114%</td><td>12</td><td>In Stock</td><td><span class="status-badge status-stock">IN STOCK</span></td></tr>
+          <tr><td>Lamborghini Huracan STO</td><td>Inno64</td><td>1/64</td><td>$10.50</td><td>$15.20</td><td>$24.00</td><td class="green">+58%</td><td>3</td><td>In Stock</td><td><span class="status-badge status-low">LOW STOCK</span></td></tr>
+          <tr><td>McLaren Senna GTR</td><td>LCD Models</td><td>1/18</td><td>$45.00</td><td>$63.50</td><td>$110.00</td><td class="green">+73%</td><td>0</td><td>-</td><td><span class="status-badge status-sold">SOLD OUT</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -248,35 +312,132 @@
 
   <!-- SUPPLIERS -->
   <div id="suppliers" class="section">
-    <div class="insight-box" style="margin-bottom:24px;">
+    <div class="insight-box">
       <div class="insight-label">⚡ Outreach Status</div>
       <div class="insight-text">3 wholesale inquiry emails sent. Awaiting responses from RCMart, Network Shuttle, and CarLoverDieCast. Follow up if no response within 7 days.</div>
     </div>
     <div class="supplier-card">
-      <div class="supplier-info"><h3>RCMart</h3><p>Hong Kong &nbsp;·&nbsp; sales@rcmart.com &nbsp;·&nbsp; Email sent June 2026</p></div>
-      <div class="supplier-actions"><span class="status-badge status-incoming" style="padding:6px 12px;">AWAITING RESPONSE</span><button class="btn-outline">Follow Up</button></div>
+      <div class="supplier-info"><h3>RCMart</h3><p>Hong Kong · sales@rcmart.com · Email sent June 2026</p></div>
+      <div class="supplier-actions"><span class="status-badge status-incoming" style="padding:6px 12px;">AWAITING</span><button class="btn-outline">Follow Up</button></div>
     </div>
     <div class="supplier-card">
-      <div class="supplier-info"><h3>Network Shuttle</h3><p>Hong Kong &nbsp;·&nbsp; sales@network-shuttle.com &nbsp;·&nbsp; Email sent June 2026</p></div>
-      <div class="supplier-actions"><span class="status-badge status-incoming" style="padding:6px 12px;">AWAITING RESPONSE</span><button class="btn-outline">Follow Up</button></div>
+      <div class="supplier-info"><h3>Network Shuttle</h3><p>Hong Kong · sales@network-shuttle.com · Email sent June 2026</p></div>
+      <div class="supplier-actions"><span class="status-badge status-incoming" style="padding:6px 12px;">AWAITING</span><button class="btn-outline">Follow Up</button></div>
     </div>
     <div class="supplier-card">
-      <div class="supplier-info"><h3>CarLoverDieCast</h3><p>Dongguan, China &nbsp;·&nbsp; cldc.sale &nbsp;·&nbsp; Email sent June 2026</p></div>
-      <div class="supplier-actions"><span class="status-badge status-incoming" style="padding:6px 12px;">AWAITING RESPONSE</span><button class="btn-outline">Follow Up</button></div>
+      <div class="supplier-info"><h3>CarLoverDieCast</h3><p>Dongguan, China · cldc.sale · Email sent June 2026</p></div>
+      <div class="supplier-actions"><span class="status-badge status-incoming" style="padding:6px 12px;">AWAITING</span><button class="btn-outline">Follow Up</button></div>
     </div>
     <div class="supplier-card">
-      <div class="supplier-info"><h3>M&amp;J Toys</h3><p>California, USA &nbsp;·&nbsp; Contact TBD &nbsp;·&nbsp; On radar</p></div>
+      <div class="supplier-info"><h3>M&amp;J Toys</h3><p>California, USA · Contact TBD · On radar</p></div>
       <div class="supplier-actions"><button class="btn-primary">Send Inquiry</button></div>
+    </div>
+  </div>
+
+  <!-- NEGOTIATION -->
+  <div id="negotiation" class="section">
+    <div class="insight-box">
+      <div class="insight-label">🔑 China Negotiation Strategy</div>
+      <div class="insight-text">In China the catalog price is never the real price. Always counter. Bigger orders get better prices. Longer relationships get even better prices. Never accept the first number.</div>
+    </div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="table-title">NEGOTIATION TRACKER</div>
+        <button class="btn-add" onclick="openModal('addNegModal')">+ ADD NEGOTIATION</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Supplier</th><th>Product</th><th>MOQ</th><th>Their Price</th><th>Our Counter</th><th>Final Price</th><th>Savings/Unit</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="negBody">
+          <tr><td>CarLoverDieCast</td><td>MiniGT Assorted</td><td>100 units</td><td>$10.00</td><td>$7.50</td><td>TBD</td><td>TBD</td><td><span class="status-badge status-negotiating">NEGOTIATING</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="negotiation-box">
+      <div class="neg-title">🤖 AI NEGOTIATION SCRIPT GENERATOR</div>
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <input class="form-input" id="negSupplier" placeholder="Supplier name" style="flex:1" />
+        <input class="form-input" id="negProduct" placeholder="Product" style="flex:1" />
+        <input class="form-input" id="negTheirPrice" placeholder="Their price $" type="number" style="width:130px" />
+        <input class="form-input" id="negTargetPrice" placeholder="Your target $" type="number" style="width:130px" />
+        <input class="form-input" id="negMOQ" placeholder="MOQ units" type="number" style="width:120px" />
+        <button class="btn-primary" onclick="generateNegScript()" style="white-space:nowrap;padding:10px 16px;">Generate Script</button>
+      </div>
+      <div id="negScriptOutput" style="display:none">
+        <div class="neg-script-title">📧 NEGOTIATION EMAIL SCRIPT</div>
+        <div class="neg-script" id="negScriptText"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELIVERY -->
+  <div id="delivery" class="section">
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="table-title">DELIVERY TIMELINE TRACKER</div>
+        <button class="btn-add" onclick="openModal('addDeliveryModal')">+ ADD SHIPMENT</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Shipment</th><th>Supplier</th><th>Method</th><th>Order Date</th><th>Ship Date</th><th>Est. Arrival</th><th>Units</th><th>Total Cost</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="deliveryBody">
+          <tr><td colspan="9" style="text-align:center;color:var(--gray);padding:40px;">No shipments yet. Add your first order above.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="delivery-box">
+      <div class="delivery-title">🚢 SHIPPING METHOD COMPARISON</div>
+      <div class="delivery-grid">
+        <div class="delivery-option selected" onclick="selectShipping(this)">
+          <div class="delivery-method">🚢 Sea Freight</div>
+          <div class="delivery-time">25 to 45 days transit</div>
+          <div class="delivery-cost">~$0.50 to $1.50 per unit</div>
+          <div class="cost-note" style="margin-top:8px;font-size:11px;color:var(--gray)">Best for large orders 200+ units</div>
+        </div>
+        <div class="delivery-option" onclick="selectShipping(this)">
+          <div class="delivery-method">✈️ Air Freight</div>
+          <div class="delivery-time">7 to 14 days transit</div>
+          <div class="delivery-cost">~$3.00 to $6.00 per unit</div>
+          <div class="cost-note" style="margin-top:8px;font-size:11px;color:var(--gray)">Best for mid orders 50 to 200 units</div>
+        </div>
+        <div class="delivery-option" onclick="selectShipping(this)">
+          <div class="delivery-method">📦 Express DHL/FedEx</div>
+          <div class="delivery-time">3 to 7 days transit</div>
+          <div class="delivery-cost">~$8.00 to $15.00 per unit</div>
+          <div class="cost-note" style="margin-top:8px;font-size:11px;color:var(--gray)">Best for small urgent orders under 50 units</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="insight-box">
+      <div class="insight-label">📋 Import Timeline — Full Process</div>
+      <div class="insight-text">
+        Day 1: Place order with supplier.<br>
+        Day 3 to 7: Supplier production and packing.<br>
+        Day 7 to 10: Goods leave China port.<br>
+        Day 35 to 55: Arrive at U.S. port (sea freight).<br>
+        Day 55 to 60: Customs clearance (2 to 5 days).<br>
+        Day 60 to 65: Delivered to your door.<br><br>
+        Always add 15 day buffer for delays. Never promise customers inventory until it clears customs.
+      </div>
     </div>
   </div>
 
   <!-- ACCOUNTING -->
   <div id="accounting" class="section">
     <div class="stat-cards">
-      <div class="stat-card"><div class="stat-label">Total Revenue</div><div class="stat-value green" id="statRevenue">$0.00</div><div class="stat-change" style="color:var(--gray)">Pre-launch</div></div>
-      <div class="stat-card"><div class="stat-label">Inventory Cost</div><div class="stat-value gold" id="statCost">$0.00</div><div class="stat-change" style="color:var(--gray)">No orders yet</div></div>
-      <div class="stat-card"><div class="stat-label">Gross Profit</div><div class="stat-value green" id="statProfit">$0.00</div><div class="stat-change" style="color:var(--gray)">Awaiting sales</div></div>
-      <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-value gold" id="statCount">0</div><div class="stat-change" style="color:var(--gray)">Target: 150%+ margin</div></div>
+      <div class="stat-card"><div class="stat-label">Total Revenue</div><div class="stat-value green" id="statRevenue">$0.00</div></div>
+      <div class="stat-card"><div class="stat-label">True COGS</div><div class="stat-value gold" id="statCost">$0.00</div></div>
+      <div class="stat-card"><div class="stat-label">Gross Profit</div><div class="stat-value green" id="statProfit">$0.00</div></div>
+      <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-value gold" id="statCount">0</div></div>
     </div>
     <div class="table-wrap">
       <div class="table-header">
@@ -284,9 +445,9 @@
         <button class="btn-add" onclick="openModal('addTransactionModal')">+ LOG TRANSACTION</button>
       </div>
       <table>
-        <thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Supplier / Platform</th><th>Cost</th><th>Revenue</th><th>Profit</th></tr></thead>
+        <thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Supplier/Platform</th><th>Cost</th><th>Revenue</th><th>Profit</th></tr></thead>
         <tbody id="transactionBody">
-          <tr><td colspan="7" style="text-align:center;color:var(--gray);padding:40px;">No transactions yet. First purchase will appear here.</td></tr>
+          <tr><td colspan="7" style="text-align:center;color:var(--gray);padding:40px;">No transactions yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -294,15 +455,16 @@
 
 </div>
 
-<!-- ADD ITEM MODAL -->
+<!-- MODALS -->
 <div class="modal-overlay" id="addItemModal">
   <div class="modal">
     <h2>ADD INVENTORY ITEM</h2>
     <div class="form-group"><label class="form-label">Model Name</label><input class="form-input" id="itemName" placeholder="e.g. Porsche 911 GT3 RS" /></div>
     <div class="form-group"><label class="form-label">Brand</label><input class="form-input" id="itemBrand" placeholder="e.g. MiniGT" /></div>
     <div class="form-group"><label class="form-label">Scale</label><input class="form-input" id="itemScale" placeholder="1/64 or 1/18" /></div>
-    <div class="form-group"><label class="form-label">Cost Per Unit ($)</label><input class="form-input" id="itemCost" type="number" placeholder="0.00" /></div>
-    <div class="form-group"><label class="form-label">Sell Price ($)</label><input class="form-input" id="itemSell" type="number" placeholder="0.00" /></div>
+    <div class="form-group"><label class="form-label">Wholesale Cost $</label><input class="form-input" id="itemCost" type="number" placeholder="0.00" /></div>
+    <div class="form-group"><label class="form-label">True Landed Cost $ (after all fees)</label><input class="form-input" id="itemLanded" type="number" placeholder="0.00" /></div>
+    <div class="form-group"><label class="form-label">Sell Price $</label><input class="form-input" id="itemSell" type="number" placeholder="0.00" /></div>
     <div class="form-group"><label class="form-label">Quantity</label><input class="form-input" id="itemQty" type="number" placeholder="0" /></div>
     <div class="form-group"><label class="form-label">Expected Arrival Date</label><input class="form-input" id="itemETA" type="date" /></div>
     <div class="modal-actions">
@@ -312,19 +474,58 @@
   </div>
 </div>
 
-<!-- ADD TRANSACTION MODAL -->
+<div class="modal-overlay" id="addNegModal">
+  <div class="modal">
+    <h2>ADD NEGOTIATION</h2>
+    <div class="form-group"><label class="form-label">Supplier</label><input class="form-input" id="negSupplierModal" /></div>
+    <div class="form-group"><label class="form-label">Product</label><input class="form-input" id="negProductModal" /></div>
+    <div class="form-group"><label class="form-label">MOQ</label><input class="form-input" id="negMOQModal" type="number" /></div>
+    <div class="form-group"><label class="form-label">Their Price $</label><input class="form-input" id="negTheirModal" type="number" /></div>
+    <div class="form-group"><label class="form-label">Our Counter $</label><input class="form-input" id="negCounterModal" type="number" /></div>
+    <div class="form-group"><label class="form-label">Final Agreed Price $</label><input class="form-input" id="negFinalModal" type="number" placeholder="Leave blank if still negotiating" /></div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeModal('addNegModal')">Cancel</button>
+      <button class="btn-primary" onclick="addNegotiation()">ADD</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addDeliveryModal">
+  <div class="modal">
+    <h2>ADD SHIPMENT</h2>
+    <div class="form-group"><label class="form-label">Shipment Name</label><input class="form-input" id="shipName" placeholder="e.g. MiniGT Order #1" /></div>
+    <div class="form-group"><label class="form-label">Supplier</label><input class="form-input" id="shipSupplier" /></div>
+    <div class="form-group"><label class="form-label">Shipping Method</label>
+      <select class="form-input" id="shipMethod">
+        <option>Sea Freight (25-45 days)</option>
+        <option>Air Freight (7-14 days)</option>
+        <option>Express DHL/FedEx (3-7 days)</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Order Date</label><input class="form-input" id="shipOrderDate" type="date" /></div>
+    <div class="form-group"><label class="form-label">Expected Ship Date</label><input class="form-input" id="shipDate" type="date" /></div>
+    <div class="form-group"><label class="form-label">Estimated Arrival</label><input class="form-input" id="shipArrival" type="date" /></div>
+    <div class="form-group"><label class="form-label">Total Units</label><input class="form-input" id="shipUnits" type="number" /></div>
+    <div class="form-group"><label class="form-label">Total Cost $</label><input class="form-input" id="shipCost" type="number" /></div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeModal('addDeliveryModal')">Cancel</button>
+      <button class="btn-primary" onclick="addShipment()">ADD SHIPMENT</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="addTransactionModal">
   <div class="modal">
     <h2>LOG TRANSACTION</h2>
     <div class="form-group"><label class="form-label">Type</label>
       <select class="form-input" id="txType">
         <option>Purchase (Cost)</option><option>Sale (Revenue)</option>
-        <option>Shipping Cost</option><option>Other Expense</option>
+        <option>Tariff/Import Fee</option><option>Shipping Cost</option><option>Other Expense</option>
       </select>
     </div>
-    <div class="form-group"><label class="form-label">Item Description</label><input class="form-input" id="txItem" placeholder="e.g. MiniGT Porsche 911 x12 units" /></div>
-    <div class="form-group"><label class="form-label">Supplier / Platform</label><input class="form-input" id="txSupplier" placeholder="e.g. RCMart, eBay" /></div>
-    <div class="form-group"><label class="form-label">Amount ($)</label><input class="form-input" id="txAmount" type="number" placeholder="0.00" /></div>
+    <div class="form-group"><label class="form-label">Item</label><input class="form-input" id="txItem" /></div>
+    <div class="form-group"><label class="form-label">Supplier / Platform</label><input class="form-input" id="txSupplier" /></div>
+    <div class="form-group"><label class="form-label">Amount $</label><input class="form-input" id="txAmount" type="number" /></div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeModal('addTransactionModal')">Cancel</button>
       <button class="btn-primary" onclick="addTransaction()">LOG IT</button>
@@ -345,11 +546,11 @@
 
   function connectEbay() {
     const key = document.getElementById('ebayApiKey').value.trim();
-    if (!key) { alert('Please paste your eBay App ID first.'); return; }
+    if (!key) return;
     ebayAppId = key;
     const banner = document.getElementById('apiBanner');
     banner.classList.add('connected');
-    banner.innerHTML = `<div class="api-label">✅ EBAY CONNECTED</div><div class="api-status">Live data active · App ID: ${key.substring(0,12)}...</div>`;
+    banner.innerHTML = `<div class="api-label">✅ EBAY CONNECTED</div><div class="api-status">Live data active · ${key.substring(0,12)}...</div>`;
   }
 
   function quickSearch(term) {
@@ -357,24 +558,43 @@
     runScan();
   }
 
-  async function setLoadingStep(msg) {
-    document.getElementById('loadingStep').textContent = msg;
+  function getTariffSettings() {
+    return {
+      tariff: parseFloat(document.getElementById('t_tariff').value) / 100 || 0.25,
+      duty: parseFloat(document.getElementById('t_duty').value) / 100 || 0.068,
+      ship: parseFloat(document.getElementById('t_ship').value) || 1.50,
+      broker: parseFloat(document.getElementById('t_broker').value) || 0.50,
+      ebayFee: parseFloat(document.getElementById('t_ebay').value) / 100 || 0.1325,
+      paymentFee: parseFloat(document.getElementById('t_payment').value) / 100 || 0.03,
+    };
+  }
+
+  function calcTrueLandedCost(wholesale, fees) {
+    const tariffAmt = wholesale * fees.tariff;
+    const dutyAmt = wholesale * fees.duty;
+    const landed = wholesale + tariffAmt + dutyAmt + fees.ship + fees.broker;
+    return { tariffAmt, dutyAmt, landed };
+  }
+
+  function calcTrueMargin(landed, sellPrice, fees) {
+    const ebayAmt = sellPrice * fees.ebayFee;
+    const paymentAmt = sellPrice * fees.paymentFee;
+    const totalFees = landed + ebayAmt + paymentAmt;
+    const profit = sellPrice - totalFees;
+    const marginPct = Math.round((profit / landed) * 100);
+    return { ebayAmt, paymentAmt, profit, marginPct, totalFees };
   }
 
   async function fetchEbayListings(query, completed) {
+    if (!ebayAppId) return [];
     const op = completed ? 'findCompletedItems' : 'findItemsByKeywords';
-    const filters = completed
-      ? '&itemFilter(0).name=SoldItemsOnly&itemFilter(0).value=true'
-      : '&itemFilter(0).name=ListingType&itemFilter(0).value=FixedPrice&itemFilter(1).name=ListingType&itemFilter(1).value=AuctionWithBIN';
-    const url = `https://svcs.ebay.com/services/search/FindingService/v1?OPERATION-NAME=${op}&SERVICE-VERSION=1.0.0&SECURITY-APPNAME=${ebayAppId}&RESPONSE-DATA-FORMAT=JSON&callback=?&keywords=${encodeURIComponent(query)}&paginationInput.entriesPerPage=10&sortOrder=${completed ? 'EndTimeSoonest' : 'PricePlusShippingLowest'}${filters}`;
-
+    const filters = completed ? '&itemFilter(0).name=SoldItemsOnly&itemFilter(0).value=true' : '';
+    const url = `https://svcs.ebay.com/services/search/FindingService/v1?OPERATION-NAME=${op}&SERVICE-VERSION=1.0.0&SECURITY-APPNAME=${ebayAppId}&RESPONSE-DATA-FORMAT=JSON&callback=?&keywords=${encodeURIComponent(query)}&paginationInput.entriesPerPage=8${filters}`;
     return new Promise((resolve) => {
       const cbName = 'ebay_cb_' + Date.now();
       window[cbName] = function(data) {
         delete window[cbName];
-        const items = data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item
-          || data?.findItemsByKeywordsResponse?.[0]?.searchResult?.[0]?.item
-          || [];
+        const items = data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || data?.findItemsByKeywordsResponse?.[0]?.searchResult?.[0]?.item || [];
         resolve(items);
       };
       const script = document.createElement('script');
@@ -388,6 +608,7 @@
   async function runScan() {
     const query = document.getElementById('searchInput').value.trim();
     if (!query) return;
+    const fees = getTariffSettings();
 
     document.getElementById('loadingState').style.display = 'block';
     document.getElementById('resultsArea').innerHTML = '';
@@ -395,21 +616,14 @@
 
     try {
       let activeItems = [], soldItems = [];
-
       if (ebayAppId) {
-        await setLoadingStep('Fetching live eBay listings...');
         activeItems = await fetchEbayListings(query, false);
-        await setLoadingStep('Fetching sold eBay listings...');
         soldItems = await fetchEbayListings(query, true);
-        await setLoadingStep('Analyzing with AI...');
-      } else {
-        await setLoadingStep('No eBay API key. Using AI estimates...');
       }
 
-      // Get AI analysis
-      const ebayContext = ebayAppId && (activeItems.length || soldItems.length)
-        ? `Live eBay active listings (${activeItems.length}): ${activeItems.slice(0,5).map(i => `$${i.sellingStatus?.[0]?.currentPrice?.[0]?.__value__}`).join(', ')}. Sold listings (${soldItems.length}): ${soldItems.slice(0,5).map(i => `$${i.sellingStatus?.[0]?.currentPrice?.[0]?.__value__}`).join(', ')}.`
-        : 'No live eBay data available. Use your knowledge.';
+      const ebayContext = activeItems.length || soldItems.length
+        ? `Live eBay active: ${activeItems.slice(0,5).map(i => `$${i.sellingStatus?.[0]?.currentPrice?.[0]?.__value__}`).join(', ')}. Sold: ${soldItems.slice(0,5).map(i => `$${i.sellingStatus?.[0]?.currentPrice?.[0]?.__value__}`).join(', ')}.`
+        : 'No live eBay data. Use your knowledge.';
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -417,110 +631,146 @@
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 1000,
-          system: `You are a diecast market analyst for Shift64Diecast. Return ONLY a valid JSON object, no markdown, no backticks. Format:
-{"model":"full model name","avg_active_price":24.99,"avg_sold_price":22.50,"lowest_active":18.99,"highest_sold":35.00,"total_active_listings":47,"total_sold_30_days":23,"china_wholesale_est":8.50,"landed_cost_est":11.00,"best_sell_price":24.99,"margin_pct":127,"verdict":"2-3 sentence buying verdict with specific action.","action":"BUY"}
-Action: BUY, WATCH, or PASS. China wholesale est = 30-40% of avg sold. Landed cost = wholesale + 25% shipping. Be realistic and specific about this diecast model.`,
-          messages: [{ role: 'user', content: `Analyze diecast model: "${query}". ${ebayContext}` }]
+          system: `You are a diecast market analyst for Shift64Diecast. Return ONLY valid JSON, no markdown, no backticks:
+{"model":"full model name","avg_active_price":24.99,"avg_sold_price":22.50,"lowest_active":18.99,"highest_sold":35.00,"total_active_listings":47,"total_sold_30_days":23,"china_wholesale_est":8.50,"best_sell_price":24.99,"demand":"HIGH","verdict":"2-3 sentence buying verdict.","negotiation_tip":"One specific tip for negotiating with Chinese suppliers on this product.","action":"BUY"}
+Action: BUY, WATCH, or PASS. China wholesale = 30-40% of avg sold price. Be realistic.`,
+          messages: [{ role: 'user', content: `Analyze: "${query}". ${ebayContext}` }]
         })
       });
 
       const data = await response.json();
       const text = data.content.map(i => i.text || '').join('');
-      const clean = text.replace(/```json|```/g, '').trim();
-      const result = JSON.parse(clean);
-      renderResults(result, activeItems, soldItems, !!ebayAppId);
+      const result = JSON.parse(text.replace(/```json|```/g, '').trim());
+
+      // Calculate true costs
+      const { tariffAmt, dutyAmt, landed } = calcTrueLandedCost(result.china_wholesale_est, fees);
+      const { ebayAmt, paymentAmt, profit, marginPct, totalFees } = calcTrueMargin(landed, result.best_sell_price, fees);
+
+      renderResults(result, activeItems, soldItems, !!ebayAppId, fees, { tariffAmt, dutyAmt, landed, ebayAmt, paymentAmt, profit, marginPct });
 
     } catch (err) {
-      document.getElementById('resultsArea').innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">⚠️</div>
-          <div class="empty-title">Scan Error</div>
-          <div style="color:var(--gray)">Could not complete scan. Check your connection and try again.</div>
-        </div>`;
+      document.getElementById('resultsArea').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Scan Error</div><div>Try again.</div></div>`;
     }
 
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('scanBtn').disabled = false;
   }
 
-  function renderResults(r, activeItems, soldItems, isLive) {
+  function renderResults(r, activeItems, soldItems, isLive, fees, calc) {
     const actionColor = r.action === 'BUY' ? 'green' : r.action === 'WATCH' ? 'yellow' : 'red-text';
-    const dataSource = isLive ? '🟢 LIVE EBAY DATA' : '🤖 AI ESTIMATE · Connect eBay API for live data';
+    const marginColor = calc.marginPct >= 100 ? 'green' : calc.marginPct >= 50 ? 'yellow' : 'red-text';
+    const profitColor = calc.profit > 0 ? 'green' : 'red-text';
 
     const renderListings = (items, isSold) => {
       if (!items || items.length === 0) {
-        const label = isSold ? 'sold' : 'active';
         const price = isSold ? r.avg_sold_price : r.avg_active_price;
         const count = isSold ? r.total_sold_30_days : r.total_active_listings;
-        return `
-          <div class="listing-item">
-            <div><div class="listing-title">AI Estimate · ${count} ${label} listings</div><div class="listing-meta">Based on market knowledge</div></div>
-            <div><div class="listing-price ${isSold ? 'sold-price' : 'active-price'}">~$${price?.toFixed(2)}</div><div class="listing-condition">Average</div></div>
-          </div>`;
+        return `<div class="listing-item"><div><div class="listing-title">AI Estimate · ${count} ${isSold?'sold':'active'} listings</div><div class="listing-meta">Based on market knowledge</div></div><div><div class="listing-price ${isSold?'sold-price':'active-price'}">~$${price?.toFixed(2)}</div></div></div>`;
       }
-      return items.slice(0, 6).map(item => {
+      return items.slice(0,6).map(item => {
         const title = item.title?.[0] || 'Unknown';
         const price = parseFloat(item.sellingStatus?.[0]?.currentPrice?.[0]?.__value__ || 0);
-        const condition = item.condition?.[0]?.conditionDisplayName?.[0] || 'Unknown';
-        const shipping = item.shippingInfo?.[0]?.shippingServiceCost?.[0]?.__value__;
-        const shipText = shipping ? (parseFloat(shipping) === 0 ? 'Free shipping' : `+$${parseFloat(shipping).toFixed(2)} ship`) : '';
-        return `
-          <div class="listing-item">
-            <div style="flex:1;padding-right:12px">
-              <div class="listing-title">${title.length > 55 ? title.substring(0,55)+'...' : title}</div>
-              <div class="listing-meta">${condition} ${shipText ? '· ' + shipText : ''}</div>
-            </div>
-            <div>
-              <div class="listing-price ${isSold ? 'sold-price' : 'active-price'}">$${price.toFixed(2)}</div>
-              <div class="listing-condition">${isSold ? 'SOLD' : 'Listed'}</div>
-            </div>
-          </div>`;
+        const condition = item.condition?.[0]?.conditionDisplayName?.[0] || '';
+        return `<div class="listing-item"><div style="flex:1;padding-right:12px"><div class="listing-title">${title.length>55?title.substring(0,55)+'...':title}</div><div class="listing-meta">${condition}</div></div><div><div class="listing-price ${isSold?'sold-price':'active-price'}">$${price.toFixed(2)}</div><div class="listing-condition">${isSold?'SOLD':'Listed'}</div></div></div>`;
       }).join('');
     };
 
     document.getElementById('resultsArea').innerHTML = `
       <div class="insight-box">
-        <div class="insight-label">${dataSource}</div>
+        <div class="insight-label">${isLive ? '🟢 LIVE EBAY DATA' : '🤖 AI ESTIMATE'} · ${r.model}</div>
         <div class="insight-text">${r.verdict}</div>
       </div>
+
       <div class="results-split">
         <div class="results-panel">
-          <div class="panel-header">
-            <div class="panel-title">🟡 ACTIVE LISTINGS</div>
-            <div class="panel-live">${isLive ? 'Live Now' : 'Estimated'} · ${r.total_active_listings} listings</div>
-          </div>
+          <div class="panel-header"><div class="panel-title">🟡 ACTIVE LISTINGS</div><span style="font-size:11px;color:var(--gold)">${r.total_active_listings} listings</span></div>
           ${renderListings(activeItems, false)}
         </div>
         <div class="results-panel">
-          <div class="panel-header">
-            <div class="panel-title">🟢 SOLD LISTINGS</div>
-            <div class="panel-sold">${isLive ? 'Last 30 days' : 'Estimated'} · ${r.total_sold_30_days} sold</div>
-          </div>
+          <div class="panel-header"><div class="panel-title">🟢 SOLD LISTINGS</div><span style="font-size:11px;color:var(--green)">${r.total_sold_30_days} sold / 30 days</span></div>
           ${renderListings(soldItems, true)}
         </div>
       </div>
-      <div class="margin-box">
-        <div class="margin-title">📊 Margin Intelligence · ${r.model}</div>
-        <div class="margin-grid">
-          <div class="margin-stat">
-            <div class="margin-value gold">$${r.china_wholesale_est?.toFixed(2)}</div>
-            <div class="margin-label">China Wholesale</div>
+
+      <div class="margin-master">
+        <div class="margin-master-title">
+          💰 TRUE MARGIN BREAKDOWN — ${r.model}
+          <span class="${actionColor}" style="font-size:28px">${r.action}</span>
+        </div>
+        <div class="margin-master-grid">
+          <div class="cost-breakdown">
+            <div class="cost-title">📦 Full Cost Stack (Per Unit)</div>
+            <div class="cost-line">
+              <div><div class="cost-label highlight">China Wholesale</div></div>
+              <div class="cost-value gold">$${r.china_wholesale_est.toFixed(2)}</div>
+            </div>
+            <div class="cost-line">
+              <div><div class="cost-label">Section 301 Tariff (${(fees.tariff*100).toFixed(0)}%)</div><div class="cost-note">On wholesale value</div></div>
+              <div class="cost-value red-text">+$${calc.tariffAmt.toFixed(2)}</div>
+            </div>
+            <div class="cost-line">
+              <div><div class="cost-label">Customs Duty (${(fees.duty*100).toFixed(1)}%)</div><div class="cost-note">HTS code rate</div></div>
+              <div class="cost-value red-text">+$${calc.dutyAmt.toFixed(2)}</div>
+            </div>
+            <div class="cost-line">
+              <div><div class="cost-label">Shipping Per Unit</div><div class="cost-note">Sea/air freight estimate</div></div>
+              <div class="cost-value red-text">+$${fees.ship.toFixed(2)}</div>
+            </div>
+            <div class="cost-line">
+              <div><div class="cost-label">Broker + Handling</div><div class="cost-note">Customs clearance</div></div>
+              <div class="cost-value red-text">+$${fees.broker.toFixed(2)}</div>
+            </div>
+            <div class="cost-line total">
+              <div class="cost-label highlight">TRUE LANDED COST</div>
+              <div class="cost-value gold">$${calc.landed.toFixed(2)}</div>
+            </div>
+            <div class="cost-line" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+              <div><div class="cost-label highlight">Best Sell Price</div></div>
+              <div class="cost-value green">$${r.best_sell_price.toFixed(2)}</div>
+            </div>
+            <div class="cost-line">
+              <div><div class="cost-label">eBay Fee (${(fees.ebayFee*100).toFixed(2)}%)</div></div>
+              <div class="cost-value red-text">-$${calc.ebayAmt.toFixed(2)}</div>
+            </div>
+            <div class="cost-line">
+              <div><div class="cost-label">Payment Fee (${(fees.paymentFee*100).toFixed(0)}%)</div></div>
+              <div class="cost-value red-text">-$${calc.paymentAmt.toFixed(2)}</div>
+            </div>
+            <div class="cost-line profit">
+              <div class="cost-label highlight">NET PROFIT PER UNIT</div>
+              <div class="cost-value ${profitColor}">$${calc.profit.toFixed(2)}</div>
+            </div>
           </div>
-          <div class="margin-stat">
-            <div class="margin-value" style="color:#4A90D9">$${r.landed_cost_est?.toFixed(2)}</div>
-            <div class="margin-label">Landed Cost</div>
-          </div>
-          <div class="margin-stat">
-            <div class="margin-value gold">$${r.avg_sold_price?.toFixed(2)}</div>
-            <div class="margin-label">Avg Sold Price</div>
-          </div>
-          <div class="margin-stat">
-            <div class="margin-value green">$${r.best_sell_price?.toFixed(2)}</div>
-            <div class="margin-label">Best Sell Price</div>
-          </div>
-          <div class="margin-stat">
-            <div class="margin-value ${actionColor}">${r.action} +${r.margin_pct}%</div>
-            <div class="margin-label">Recommendation</div>
+
+          <div class="margin-stats">
+            <div class="big-stat">
+              <div class="big-stat-value ${marginColor}">${calc.marginPct}%</div>
+              <div class="big-stat-label">True Net Margin</div>
+            </div>
+            <div class="stat-row">
+              <div class="small-stat">
+                <div class="small-stat-value gold">$${r.china_wholesale_est.toFixed(2)}</div>
+                <div class="small-stat-label">Wholesale</div>
+              </div>
+              <div class="small-stat">
+                <div class="small-stat-value blue">$${calc.landed.toFixed(2)}</div>
+                <div class="small-stat-label">Landed Cost</div>
+              </div>
+            </div>
+            <div class="stat-row">
+              <div class="small-stat">
+                <div class="small-stat-value green">$${r.best_sell_price.toFixed(2)}</div>
+                <div class="small-stat-label">Sell Price</div>
+              </div>
+              <div class="small-stat">
+                <div class="small-stat-value ${profitColor}">$${calc.profit.toFixed(2)}</div>
+                <div class="small-stat-label">Net Profit</div>
+              </div>
+            </div>
+            <div class="insight-box" style="margin:0">
+              <div class="insight-label">🤝 Negotiation Tip</div>
+              <div class="insight-text" style="font-size:13px">${r.negotiation_tip}</div>
+            </div>
           </div>
         </div>
       </div>`;
@@ -528,12 +778,40 @@ Action: BUY, WATCH, or PASS. China wholesale est = 30-40% of avg sold. Landed co
 
   document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') runScan(); });
 
+  async function generateNegScript() {
+    const supplier = document.getElementById('negSupplier').value.trim();
+    const product = document.getElementById('negProduct').value.trim();
+    const theirPrice = document.getElementById('negTheirPrice').value;
+    const targetPrice = document.getElementById('negTargetPrice').value;
+    const moq = document.getElementById('negMOQ').value;
+    if (!supplier || !product) return;
+
+    document.getElementById('negScriptOutput').style.display = 'block';
+    document.getElementById('negScriptText').textContent = 'Generating script...';
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 600,
+        system: 'You write professional but firm negotiation emails to Chinese diecast suppliers on behalf of Shift64Diecast, a U.S.-based premium diecast reseller. Keep it respectful, professional, and strategic. Reference relationship building and volume potential. Write in English. Be specific about numbers.',
+        messages: [{ role: 'user', content: `Write a negotiation email to ${supplier} for ${product}. Their price: $${theirPrice}. Our target: $${targetPrice}. MOQ: ${moq} units. We want better pricing and are willing to commit to volume. From: Eric, Founder of Shift64Diecast, Shift64diecast@gmail.com` }]
+      })
+    });
+
+    const data = await response.json();
+    document.getElementById('negScriptText').textContent = data.content[0].text;
+  }
+
   function openModal(id) { document.getElementById(id).classList.add('open'); }
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }); });
 
-  document.querySelectorAll('.modal-overlay').forEach(m => {
-    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
-  });
+  function selectShipping(el) {
+    document.querySelectorAll('.delivery-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+  }
 
   function addItem() {
     const name = document.getElementById('itemName').value.trim();
@@ -541,16 +819,53 @@ Action: BUY, WATCH, or PASS. China wholesale est = 30-40% of avg sold. Landed co
     const brand = document.getElementById('itemBrand').value.trim();
     const scale = document.getElementById('itemScale').value.trim();
     const cost = parseFloat(document.getElementById('itemCost').value) || 0;
+    const landed = parseFloat(document.getElementById('itemLanded').value) || 0;
     const sell = parseFloat(document.getElementById('itemSell').value) || 0;
     const qty = parseInt(document.getElementById('itemQty').value) || 0;
     const eta = document.getElementById('itemETA').value || '-';
-    const margin = cost > 0 ? Math.round(((sell - cost) / cost) * 100) : 0;
+    const margin = landed > 0 ? Math.round(((sell - landed) / landed) * 100) : 0;
     const status = qty === 0 ? 'SOLD OUT' : qty < 5 ? 'LOW STOCK' : 'IN STOCK';
     const cls = { 'SOLD OUT': 'status-sold', 'LOW STOCK': 'status-low', 'IN STOCK': 'status-stock' };
     const row = document.createElement('tr');
-    row.innerHTML = `<td>${name}</td><td>${brand}</td><td>${scale}</td><td>$${cost.toFixed(2)}</td><td>$${sell.toFixed(2)}</td><td class="green">+${margin}%</td><td>${qty}</td><td>${eta}</td><td><span class="status-badge ${cls[status]}">${status}</span></td>`;
+    row.innerHTML = `<td>${name}</td><td>${brand}</td><td>${scale}</td><td>$${cost.toFixed(2)}</td><td>$${landed.toFixed(2)}</td><td>$${sell.toFixed(2)}</td><td class="green">+${margin}%</td><td>${qty}</td><td>${eta}</td><td><span class="status-badge ${cls[status]}">${status}</span></td>`;
     document.getElementById('inventoryBody').appendChild(row);
     closeModal('addItemModal');
+  }
+
+  function addNegotiation() {
+    const supplier = document.getElementById('negSupplierModal').value.trim();
+    if (!supplier) return;
+    const product = document.getElementById('negProductModal').value.trim();
+    const moq = document.getElementById('negMOQModal').value;
+    const their = parseFloat(document.getElementById('negTheirModal').value) || 0;
+    const counter = parseFloat(document.getElementById('negCounterModal').value) || 0;
+    const final = document.getElementById('negFinalModal').value;
+    const savings = final ? `$${(their - parseFloat(final)).toFixed(2)}` : 'TBD';
+    const finalDisplay = final ? `$${parseFloat(final).toFixed(2)}` : 'TBD';
+    const status = final ? 'status-stock' : 'status-negotiating';
+    const statusText = final ? 'AGREED' : 'NEGOTIATING';
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${supplier}</td><td>${product}</td><td>${moq} units</td><td>$${their.toFixed(2)}</td><td>$${counter.toFixed(2)}</td><td>${finalDisplay}</td><td class="green">${savings}</td><td><span class="status-badge ${status}">${statusText}</span></td>`;
+    document.getElementById('negBody').appendChild(row);
+    closeModal('addNegModal');
+  }
+
+  function addShipment() {
+    const name = document.getElementById('shipName').value.trim();
+    if (!name) return;
+    const supplier = document.getElementById('shipSupplier').value.trim();
+    const method = document.getElementById('shipMethod').value;
+    const orderDate = document.getElementById('shipOrderDate').value;
+    const shipDate = document.getElementById('shipDate').value;
+    const arrival = document.getElementById('shipArrival').value;
+    const units = document.getElementById('shipUnits').value;
+    const cost = parseFloat(document.getElementById('shipCost').value) || 0;
+    const tbody = document.getElementById('deliveryBody');
+    if (tbody.querySelector('td[colspan]')) tbody.innerHTML = '';
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${name}</td><td>${supplier}</td><td>${method.split('(')[0].trim()}</td><td>${orderDate}</td><td>${shipDate}</td><td>${arrival}</td><td>${units}</td><td>$${cost.toFixed(2)}</td><td><span class="status-badge status-incoming">IN TRANSIT</span></td>`;
+    tbody.appendChild(row);
+    closeModal('addDeliveryModal');
   }
 
   function addTransaction() {
@@ -561,15 +876,13 @@ Action: BUY, WATCH, or PASS. China wholesale est = 30-40% of avg sold. Landed co
     const amount = parseFloat(document.getElementById('txAmount').value) || 0;
     const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const isSale = type.includes('Sale');
-    const isCost = !isSale;
-    if (isSale) totalRevenue += amount;
-    if (isCost) totalCost += amount;
+    if (isSale) totalRevenue += amount; else totalCost += amount;
     txCount++;
     const profit = totalRevenue - totalCost;
     const tbody = document.getElementById('transactionBody');
     if (tbody.querySelector('td[colspan]')) tbody.innerHTML = '';
     const row = document.createElement('tr');
-    row.innerHTML = `<td>${today}</td><td>${type}</td><td>${item}</td><td>${supplier}</td><td>${isCost ? '$'+amount.toFixed(2) : '-'}</td><td class="green">${isSale ? '$'+amount.toFixed(2) : '-'}</td><td class="${profit >= 0 ? 'green' : 'red-text'}">$${profit.toFixed(2)}</td>`;
+    row.innerHTML = `<td>${today}</td><td>${type}</td><td>${item}</td><td>${supplier}</td><td>${!isSale?'$'+amount.toFixed(2):'-'}</td><td class="green">${isSale?'$'+amount.toFixed(2):'-'}</td><td class="${profit>=0?'green':'red-text'}">$${profit.toFixed(2)}</td>`;
     tbody.appendChild(row);
     document.getElementById('statRevenue').textContent = '$' + totalRevenue.toFixed(2);
     document.getElementById('statCost').textContent = '$' + totalCost.toFixed(2);
