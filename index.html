@@ -1616,12 +1616,12 @@ async function runPriceScan() {
       body: JSON.stringify({ query })
     });
     const soldData = await soldRes.json();
-    const soldItems = soldData?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || [];
+    const soldItems = soldData?.itemSummaries || [];
     if (soldItems.length > 0) {
       ebaySoldPrices = soldItems.map(i => ({
-        title: i.title?.[0] || query,
-        price: parseFloat(i.sellingStatus?.[0]?.currentPrice?.[0]?.__value__ || 0),
-        condition: i.condition?.[0]?.conditionDisplayName?.[0] || 'Unknown'
+        title: i.title || query,
+        price: parseFloat(i.price?.value || 0),
+        condition: i.condition || 'Unknown'
       })).filter(i => i.price > 0);
       useRealData = true;
     }
