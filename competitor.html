@@ -199,6 +199,7 @@
     <div class="scan-controls">
       <button class="btn-scan" id="scanBtn" onclick="scanAll()" disabled>🔍 EXTRACT ALL ITEMS</button>
       <button class="btn-export" onclick="exportCSV()" id="exportBtn" style="display:none">⬇️ EXPORT CSV</button>
+      <button class="btn-export" onclick="saveData()" style="border-color:var(--gold);color:var(--gold);">💾 SAVE ALL DATA</button>
       <button class="btn-clear" onclick="clearAll()">✕ Clear All</button>
     </div>
 
@@ -255,6 +256,7 @@
       <div class="collection-title">🏎️ Eric's Personal Collection</div>
       <div style="display:flex;gap:10px;">
         <button class="btn-sm" onclick="openModal('addEricModal')" style="background:var(--red);">+ ADD MANUALLY</button>
+        <button class="btn-sm" onclick="saveData()" style="background:var(--gold);color:var(--black);">💾 SAVE</button>
       </div>
     </div>
 
@@ -287,6 +289,7 @@
       <div class="collection-title">🏎️ Khai's Personal Collection</div>
       <div style="display:flex;gap:10px;">
         <button class="btn-sm" onclick="openModal('addKhaiModal')" style="background:var(--blue);">+ ADD MANUALLY</button>
+        <button class="btn-sm" onclick="saveData()" style="background:var(--gold);color:var(--black);">💾 SAVE</button>
       </div>
     </div>
 
@@ -555,6 +558,7 @@
   let selectedSite = 'RCMart';
   let screenshots = [];
   let allItems = [];
+  let unclearItems = [];
   let ericCollection = [];
   let khaiCollection = [];
 
@@ -649,6 +653,7 @@
     document.getElementById('scanBtn').disabled = true;
 
     let newItems = [];
+    let unclearItems = [];
     for (let i = 0; i < screenshots.length; i++) {
       document.getElementById('loadingTitle').textContent = `Processing page ${i+1} of ${screenshots.length}...`;
       document.getElementById('loadingStatus').textContent = `Extracting items from screenshot ${i+1}...`;
@@ -659,9 +664,31 @@
           body: JSON.stringify({
             model: 'claude-sonnet-4-6',
             max_tokens: 4000,
-            system: `You are a diecast market intelligence analyst. Extract ALL products from this competitor website screenshot. Return ONLY a valid JSON array, no markdown, no explanation:
-[{"name":"full product name","brand":"MiniGT/Pop Race/Inno64/LCD/Kaido House/Tarmac Works/etc","scale":"1/64 or 1/18 or 1/43 or Unknown","price":19.99,"currency":"USD","status":"In Stock or Out of Stock or Pre-Order or Low Stock or Unknown","model_number":"model # or null","notes":"Limited Edition/Chase/Exclusive or null"}]
-Extract EVERY visible item. Return [] if none found.`,
+            system: `You are a strict diecast product data extractor. Your ONLY job is to read text that is CLEARLY VISIBLE on this screenshot. 
+
+STRICT RULES - Follow exactly:
+1. ONLY extract items where you can clearly read the product name from the screenshot text
+2. NEVER invent, guess, or fill in product names you cannot clearly see
+3. NEVER use your training knowledge to fill in missing details
+4. Read scale EXACTLY as printed: 1/64, 1/18, 1/43 - never guess
+5. Read price EXACTLY as shown - never estimate
+6. Read status EXACTLY as shown: In Stock, Out of Stock, Pre-Order, Low Stock
+7. If ANY field is unclear or partially visible, mark confidence as "low"
+8. If a product name is not clearly readable, do NOT include it as a confirmed item
+
+Return ONLY this exact JSON structure, no markdown, no explanation:
+{
+  "confirmed": [
+    {"name":"EXACT text from screenshot","brand":"brand if clearly visible or null","scale":"1/64 or 1/18 or 1/43 or null","price":19.99,"currency":"USD","status":"In Stock or Out of Stock or Pre-Order or Low Stock or Unknown","model_number":"exactly as shown or null","notes":"Limited Edition or Chase or null","confidence":"high"}
+  ],
+  "unclear": [
+    {"partial_name":"whatever partial text was visible","reason":"why it could not be read clearly e.g. image blocked text, text too small, cut off","confidence":"low"}
+  ]
+}
+
+confirmed = items where name AND price are clearly readable
+unclear = anything you could not read with full confidence
+Return empty arrays if nothing found. DO NOT GUESS.`,
             messages: [{
               role: 'user',
               content: [
@@ -674,9 +701,19 @@ Extract EVERY visible item. Return [] if none found.`,
         if (!response.ok) throw new Error('API error');
         const data = await response.json();
         const text = data.content.map(c => c.text || '').join('');
-        const items = JSON.parse(text.replace(/```json|```/g, '').trim());
-        if (Array.isArray(items)) {
-          newItems = [...newItems, ...items.map(item => ({ ...item, site, page: i+1, dateScanned: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) }))];
+        const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+        const today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+        
+        // Handle both old array format and new confirmed/unclear format
+        if (Array.isArray(parsed)) {
+          newItems = [...newItems, ...parsed.map(item => ({ ...item, site, page: i+1, dateScanned: today }))];
+        } else if (parsed.confirmed || parsed.unclear) {
+          if (parsed.confirmed && Array.isArray(parsed.confirmed)) {
+            newItems = [...newItems, ...parsed.confirmed.map(item => ({ ...item, site, page: i+1, dateScanned: today }))];
+          }
+          if (parsed.unclear && Array.isArray(parsed.unclear) && parsed.unclear.length > 0) {
+            unclearItems = [...unclearItems, ...parsed.unclear.map(item => ({ ...item, site, page: i+1, dateScanned: today }))];
+          }
         }
       } catch(err) {
         const fallback = generateFallback(site, i+1);
@@ -686,6 +723,7 @@ Extract EVERY visible item. Return [] if none found.`,
 
     allItems = [...allItems, ...newItems];
     renderResults(newItems, site);
+    if (unclearItems.length > 0) renderUnclearItems(unclearItems);
     updateIntel();
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('scanBtn').disabled = false;
@@ -773,21 +811,44 @@ Extract EVERY visible item. Return [] if none found.`,
   }
 
   function filterTable() {
-    const search = document.getElementById('filterSearch').value.toLowerCase();
-    const brand = document.getElementById('filterBrand').value;
-    const scale = document.getElementById('filterScale').value;
-    const status = document.getElementById('filterStatus').value;
-    const site = document.getElementById('filterSite').value;
-    document.querySelectorAll('#resultsBody tr').forEach(row => {
-      const text = row.textContent.toLowerCase();
-      row.style.display = (
-        (!search || text.includes(search)) &&
-        (!brand || row.cells[1]?.textContent.trim() === brand) &&
-        (!scale || row.cells[2]?.textContent.trim() === scale) &&
-        (!status || row.cells[4]?.textContent.trim() === status) &&
-        (!site || row.cells[5]?.textContent.trim() === site)
-      ) ? '' : 'none';
+    const search = document.getElementById('filterSearch').value.toLowerCase().trim();
+    const brand = document.getElementById('filterBrand').value.trim();
+    const scale = document.getElementById('filterScale').value.trim();
+    const status = document.getElementById('filterStatus').value.trim();
+    const site = document.getElementById('filterSite').value.trim();
+    
+    const rows = document.querySelectorAll('#resultsBody tr');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+      const cells = row.cells;
+      if (!cells || cells.length < 6) return;
+      
+      const itemName = (cells[0]?.textContent || '').toLowerCase().replace('⭐ ','').trim();
+      const itemBrand = (cells[1]?.textContent || '').trim();
+      const itemScale = (cells[2]?.textContent || '').trim();
+      const itemStatus = (cells[4]?.querySelector('.status-badge')?.textContent || cells[4]?.textContent || '').trim();
+      const itemSite = (cells[5]?.textContent || '').trim();
+      
+      const matchSearch = !search || itemName.includes(search);
+      const matchBrand = !brand || itemBrand === brand;
+      const matchScale = !scale || itemScale === scale;
+      const matchStatus = !status || itemStatus === status;
+      const matchSite = !site || itemSite === site;
+      
+      const show = matchSearch && matchBrand && matchScale && matchStatus && matchSite;
+      row.style.display = show ? '' : 'none';
+      if (show) visibleCount++;
     });
+    
+    // Update count
+    const countEl = document.querySelector('.results-header .results-title');
+    if (countEl) {
+      const total = rows.length;
+      countEl.textContent = visibleCount < total 
+        ? '📊 SHOWING ' + visibleCount + ' OF ' + total + ' ITEMS' 
+        : '📊 ' + total + ' ITEMS EXTRACTED · ' + [...new Set(allItems.map(i=>i.site))].join(', ');
+    }
   }
 
   function clearFilters() {
@@ -860,6 +921,7 @@ Extract EVERY visible item. Return [] if none found.`,
     const item = { name, brand, scale, paid, shipping, total, from, condition, date, notes, askPrice, soldPrice, soldOn, soldDate, profit, saleStatus };
     if (who === 'eric') { ericCollection.push(item); updateCollectionStats('eric'); }
     else { khaiCollection.push(item); updateCollectionStats('khai'); }
+    setTimeout(saveData, 100);
 
     const tbody = document.getElementById(`${who}Body`);
     if (tbody.querySelector('td[colspan]')) tbody.innerHTML = '';
@@ -922,6 +984,279 @@ Extract EVERY visible item. Return [] if none found.`,
       </div>`:''}`;
   }
 
+  // UNCLEAR ITEMS HANDLER
+  function renderUnclearItems(items) {
+    // Remove existing unclear section if any
+    const existing = document.getElementById('unclearSection');
+    if (existing) existing.remove();
+
+    const section = document.createElement('div');
+    section.id = 'unclearSection';
+    section.style.cssText = 'background:#1A1200;border:2px solid var(--yellow);border-radius:12px;padding:20px;margin-bottom:20px;';
+
+    section.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <div style="font-size:24px;">⚠️</div>
+        <div>
+          <div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--yellow);letter-spacing:1px;">${items.length} ITEM${items.length>1?'S':''} COULD NOT BE READ CLEARLY</div>
+          <div style="font-size:13px;color:var(--gray);margin-top:3px;">For each item below choose to enter manually or paste a close-up screenshot for a second attempt.</div>
+        </div>
+      </div>
+      <div id="unclearItemsList">
+        ${items.map((item, idx) => `
+          <div id="unclear_${idx}" style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
+              <div>
+                <div style="font-weight:600;font-size:14px;color:var(--yellow);">⚠️ Unclear Item ${idx+1}</div>
+                <div style="font-size:12px;color:var(--gray);margin-top:4px;">Partial text seen: <span style="color:var(--white);">"${item.partial_name || 'Nothing readable'}"</span></div>
+                <div style="font-size:12px;color:var(--gray);">Reason: ${item.reason || 'Could not read clearly'} · Page ${item.page || 1}</div>
+              </div>
+              <button onclick="dismissUnclear(${idx})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:18px;">✕</button>
+            </div>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              
+              <!-- OPTION 1: MANUAL ENTRY -->
+              <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:14px;">
+                <div style="font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Option 1 — Enter Manually</div>
+                <input id="u${idx}_name" placeholder="Product name" style="width:100%;background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--white);font-size:13px;font-family:Inter,sans-serif;outline:none;margin-bottom:8px;" value="${item.partial_name||''}" />
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                  <input id="u${idx}_price" placeholder="Price $" type="number" style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--white);font-size:13px;font-family:Inter,sans-serif;outline:none;width:100%;" />
+                  <select id="u${idx}_scale" style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--white);font-size:13px;font-family:Inter,sans-serif;outline:none;width:100%;">
+                    <option value="">Scale</option>
+                    <option value="1/64">1/64</option>
+                    <option value="1/18">1/18</option>
+                    <option value="1/43">1/43</option>
+                  </select>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                  <input id="u${idx}_brand" placeholder="Brand" style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--white);font-size:13px;font-family:Inter,sans-serif;outline:none;width:100%;" />
+                  <select id="u${idx}_status" style="background:var(--dark);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--white);font-size:13px;font-family:Inter,sans-serif;outline:none;width:100%;">
+                    <option value="In Stock">In Stock</option>
+                    <option value="Out of Stock">Out of Stock</option>
+                    <option value="Pre-Order">Pre-Order</option>
+                    <option value="Low Stock">Low Stock</option>
+                  </select>
+                </div>
+                <button onclick="addManualUnclear(${idx},'${item.site||selectedSite}',${item.page||1})" style="width:100%;background:var(--blue);color:white;border:none;border-radius:6px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:Rajdhani,sans-serif;letter-spacing:1px;">✅ ADD TO TABLE</button>
+              </div>
+
+              <!-- OPTION 2: CLOSE-UP SCREENSHOT -->
+              <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:14px;">
+                <div style="font-size:11px;color:var(--orange);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Option 2 — Paste Close-Up Screenshot</div>
+                <div style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;margin-bottom:10px;transition:all 0.2s;" id="closeupZone_${idx}" onclick="document.getElementById('closeupInput_${idx}').click()">
+                  <div id="closeupPreview_${idx}" style="display:none;"><img id="closeupImg_${idx}" style="max-width:100%;max-height:120px;border-radius:6px;" /></div>
+                  <div id="closeupPrompt_${idx}">
+                    <div style="font-size:24px;margin-bottom:6px;">📸</div>
+                    <div style="font-size:12px;color:var(--gray);">Click or CTRL+V for close-up</div>
+                  </div>
+                </div>
+                <input type="file" id="closeupInput_${idx}" accept="image/*" style="display:none" onchange="handleCloseup(event,${idx},'${item.site||selectedSite}',${item.page||1})" />
+                <button id="closeupScanBtn_${idx}" onclick="scanCloseup(${idx},'${item.site||selectedSite}',${item.page||1})" disabled style="width:100%;background:var(--orange);color:white;border:none;border-radius:6px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:Rajdhani,sans-serif;letter-spacing:1px;opacity:0.5;">🔍 SCAN CLOSE-UP</button>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+
+    // Insert before results
+    const resultsArea = document.getElementById('resultsArea');
+    resultsArea.parentNode.insertBefore(section, resultsArea);
+
+    // Setup paste handlers for each unclear item
+    items.forEach((item, idx) => {
+      const zone = document.getElementById(`closeupZone_${idx}`);
+      if (zone) {
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--orange)'; });
+        zone.addEventListener('dragleave', () => zone.style.borderColor = 'var(--border)');
+        zone.addEventListener('drop', e => {
+          e.preventDefault();
+          const file = e.dataTransfer.files[0];
+          if (file && file.type.startsWith('image/')) processCloseupFile(file, idx, item.site||selectedSite, item.page||1);
+        });
+      }
+    });
+  }
+
+  // Global paste handler for close-up - tracks which item is focused
+  let activeCloseupIdx = null;
+  document.addEventListener('paste', function(pasteEvent) {
+    // Check if we're pasting into a closeup zone
+    const items = pasteEvent.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        // Check if any closeup zone is active
+        if (activeCloseupIdx !== null) {
+          processCloseupFile(file, activeCloseupIdx, selectedSite, 1);
+          activeCloseupIdx = null;
+        } else {
+          // Normal screenshot paste
+          addScreenshot(file);
+          showToast('✅ Screenshot pasted! Add more or hit Extract All Items.');
+        }
+        break;
+      }
+    }
+  });
+
+  function handleCloseup(event, idx, site, page) {
+    const file = event.target.files[0];
+    if (file) processCloseupFile(file, idx, site, page);
+  }
+
+  function processCloseupFile(file, idx, site, page) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById(`closeupImg_${idx}`).src = e.target.result;
+      document.getElementById(`closeupPreview_${idx}`).style.display = 'block';
+      document.getElementById(`closeupPrompt_${idx}`).style.display = 'none';
+      const btn = document.getElementById(`closeupScanBtn_${idx}`);
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.dataset.base64 = e.target.result.split(',')[1];
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function scanCloseup(idx, site, page) {
+    const btn = document.getElementById(`closeupScanBtn_${idx}`);
+    const base64 = btn.dataset.base64;
+    if (!base64) return;
+
+    btn.textContent = '⏳ Scanning...';
+    btn.disabled = true;
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 500,
+          system: `You are reading a close-up screenshot of a single diecast product. Extract the exact product details you can clearly see. Return ONLY this JSON, no markdown:
+{"name":"exact product name as written","brand":"brand name","scale":"1/64 or 1/18 or 1/43 or null","price":19.99,"currency":"USD","status":"In Stock or Out of Stock or Pre-Order or Low Stock","model_number":"model # or null","notes":"any special notes or null","success":true}
+If you still cannot read the product name clearly, return: {"success":false,"reason":"explanation"}`,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64 } },
+              { type: 'text', text: 'Read this close-up diecast product screenshot exactly.' }
+            ]
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const text = data.content.map(c => c.text||'').join('');
+      const result = JSON.parse(text.replace(/```json|```/g,'').trim());
+
+      if (result.success === false) {
+        btn.textContent = '❌ Still unclear - Enter manually';
+        btn.style.background = 'var(--red)';
+        btn.disabled = true;
+        showToast('⚠️ Still could not read item. Please enter manually.');
+      } else {
+        // Add to main table
+        const today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+        const item = { ...result, site, page, dateScanned: today };
+        allItems.push(item);
+        renderResults(allItems, site);
+        dismissUnclear(idx);
+        showToast('✅ Item successfully read from close-up screenshot!');
+      }
+    } catch(e) {
+      btn.textContent = '❌ Error - Enter manually';
+      btn.style.background = 'var(--red)';
+      btn.disabled = true;
+    }
+  }
+
+  function addManualUnclear(idx, site, page) {
+    const name = document.getElementById(`u${idx}_name`).value.trim();
+    if (!name) { showToast('⚠️ Please enter a product name.'); return; }
+    const price = parseFloat(document.getElementById(`u${idx}_price`).value) || null;
+    const scale = document.getElementById(`u${idx}_scale`).value;
+    const brand = document.getElementById(`u${idx}_brand`).value.trim();
+    const status = document.getElementById(`u${idx}_status`).value;
+    const today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const item = { name, brand, scale, price, currency:'USD', status, site, page, dateScanned: today, confidence:'manual' };
+    allItems.push(item);
+    renderResults(allItems, site);
+    dismissUnclear(idx);
+    showToast('✅ Item added manually to table.');
+  }
+
+  function dismissUnclear(idx) {
+    const el = document.getElementById(`unclear_${idx}`);
+    if (el) {
+      el.style.opacity = '0';
+      el.style.transition = 'opacity 0.3s';
+      setTimeout(() => {
+        el.remove();
+        // Check if all unclear items are dismissed
+        const list = document.getElementById('unclearItemsList');
+        if (list && list.children.length === 0) {
+          const section = document.getElementById('unclearSection');
+          if (section) section.remove();
+        }
+      }, 300);
+    }
+  }
+
+  // SAVE AND LOAD DATA
+  function saveData() {
+    try {
+      localStorage.setItem('shift64_allItems', JSON.stringify(allItems));
+      localStorage.setItem('shift64_ericCollection', JSON.stringify(ericCollection));
+      localStorage.setItem('shift64_khaiCollection', JSON.stringify(khaiCollection));
+      localStorage.setItem('shift64_ericWantList', JSON.stringify(ericWantList));
+      localStorage.setItem('shift64_khaiWantList', JSON.stringify(khaiWantList));
+      showToast('✅ Data saved successfully');
+    } catch(e) { showToast('⚠️ Could not save data'); }
+  }
+
+  function loadData() {
+    try {
+      const items = localStorage.getItem('shift64_allItems');
+      const eric = localStorage.getItem('shift64_ericCollection');
+      const khai = localStorage.getItem('shift64_khaiCollection');
+      const ericWant = localStorage.getItem('shift64_ericWantList');
+      const khaiWant = localStorage.getItem('shift64_khaiWantList');
+      if (items) { allItems = JSON.parse(items); if (allItems.length) restoreResults(); }
+      if (eric) { ericCollection = JSON.parse(eric); if (ericCollection.length) restoreCollection('eric'); }
+      if (khai) { khaiCollection = JSON.parse(khai); if (khaiCollection.length) restoreCollection('khai'); }
+      if (ericWant) { ericWantList = JSON.parse(ericWant); renderWantList('eric'); }
+      if (khaiWant) { khaiWantList = JSON.parse(khaiWant); renderWantList('khai'); }
+    } catch(e) { console.log('No saved data'); }
+  }
+
+  function restoreResults() {
+    renderResults(allItems, [...new Set(allItems.map(i=>i.site))].join(', '));
+    document.getElementById('statsBar').style.display = 'grid';
+    document.getElementById('filterBar').style.display = 'flex';
+    document.getElementById('exportBtn').style.display = 'block';
+  }
+
+  function restoreCollection(who) {
+    const coll = who === 'eric' ? ericCollection : khaiCollection;
+    const tbody = document.getElementById(who+'Body');
+    tbody.innerHTML = '';
+    coll.forEach(item => {
+      const row = document.createElement('tr');
+      const profit = item.profit;
+      const saleStatus = item.saleStatus || 'Keeping';
+      row.innerHTML = `<td>${item.name}</td><td>${item.brand||'-'}</td><td>${item.scale||'-'}</td><td class="gold">$${parseFloat(item.paid||0).toFixed(2)}</td><td>${item.shipping>0?'$'+parseFloat(item.shipping).toFixed(2):'-'}</td><td class="green">$${parseFloat(item.total||0).toFixed(2)}</td><td style="color:var(--gray);font-size:12px;">${item.from||'-'}</td><td class="gold">${item.askPrice>0?'$'+parseFloat(item.askPrice).toFixed(2):'-'}</td><td class="green">${item.soldPrice>0?'$'+parseFloat(item.soldPrice).toFixed(2):'-'}</td><td style="color:var(--gray);font-size:12px;">${item.soldOn||'-'}</td><td class="${profit>0?'green':profit<0?'red-text':'gray'}">${profit!=null?(profit>=0?'+':'')+' $'+Math.abs(profit).toFixed(2):'-'}</td><td><span class="status-badge ${saleStatus==='Sold'?'in-stock':saleStatus==='For Sale'?'preorder':'low-stock'}">${saleStatus}</span></td><td style="color:var(--gold);font-size:12px;">${item.notes||'-'}</td>`;
+      tbody.appendChild(row);
+    });
+    updateCollectionStats(who);
+  }
+
+  // Auto-save when data changes
+  const origAddToCollection = addToCollection;
+
+  // Load data on startup
+  window.addEventListener('load', loadData);
+
   function showToast(msg) {
     const toast = document.createElement('div');
     toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#0D2B0D;border:1px solid var(--green);color:var(--green);padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;font-family:Rajdhani,sans-serif;letter-spacing:1px;max-width:300px;';
@@ -983,6 +1318,7 @@ Extract EVERY visible item. Return [] if none found.`,
     else khaiWantList.push(item);
 
     renderWantList(who);
+    setTimeout(saveData, 100);
     closeModal('add'+who.charAt(0).toUpperCase()+who.slice(1)+'WantModal');
   }
 
