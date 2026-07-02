@@ -75,7 +75,10 @@ body{background:var(--black);color:var(--white);font-family:'Inter',sans-serif;m
 .stat-val{font-family:'Rajdhani',sans-serif;font-size:28px;font-weight:700}
 .stat-lbl{font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
 /* TABLE */
-.tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px}
+.tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow-x:auto;margin-bottom:16px}
+.buy-signal{display:inline-block;background:linear-gradient(90deg,var(--gold),var(--orange));color:#141414;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;padding:4px 10px;border-radius:5px;white-space:nowrap;box-shadow:0 0 10px rgba(201,168,76,0.45)}
+tr.buy-row td{background:rgba(201,168,76,0.08)!important}
+tr.buy-row td:first-child{border-left:3px solid var(--gold)}
 .tbl-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
 .tbl-title{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px}
 .tbl-sub{font-size:12px;color:var(--gray)}
@@ -738,9 +741,95 @@ Return ONLY this JSON (no markdown, no explanation):
 }
 
 // ============================================================
+// eBay AUTO-COMPARISON (price vs eBay avg, demand score, buy signal)
+// ============================================================
+let _cmpIdCounter = 0;
+function ensureIds() {
+  allItems.forEach(i => { if (typeof i._id === 'number' && i._id > _cmpIdCounter) _cmpIdCounter = i._id; });
+  allItems.forEach(i => { if (i._id == null) i._id = ++_cmpIdCounter; });
+}
+function compareInfo(item) {
+  const price = parseFloat(item.price);
+  if (item.ebayAvg == null || isNaN(price)) return null;
+  const diff = price - item.ebayAvg;           // negative = competitor cheaper than eBay
+  const pct = item.ebayAvg ? (diff / item.ebayAvg) * 100 : 0;
+  let color, label, kind;
+  if (Math.abs(pct) <= 10) { color = 'var(--yellow)'; label = '≈ Even'; kind = 'even'; }
+  else if (diff < 0) { color = 'var(--green)'; label = 'Good deal'; kind = 'good'; }
+  else { color = 'var(--red)'; label = 'Overpriced'; kind = 'over'; }
+  return { diff, pct, color, label, kind };
+}
+function demandLevel(c) { return c > 20 ? 'High' : c >= 10 ? 'Medium' : 'Low'; }
+function isBuySignal(item) {
+  const info = compareInfo(item);
+  return !!(info && info.kind === 'good' && item.ebayCount != null && item.ebayCount > 20);
+}
+function compCellHtml(item) {
+  if (item.ebayChecked !== true) return '<span style="color:var(--gray);font-size:11px;">checking…</span>';
+  const info = compareInfo(item);
+  if (!info) return '<span style="color:var(--gray);font-size:11px;">n/a</span>';
+  const sign = info.diff >= 0 ? '+' : '−';
+  return `<div style="font-size:12px;line-height:1.4;"><span style="color:${info.color};font-weight:700;">${info.label}</span><br><span style="color:var(--gray);">eBay $${item.ebayAvg.toFixed(2)} · ${sign}$${Math.abs(info.diff).toFixed(2)}</span></div>`;
+}
+function demCellHtml(item) {
+  if (item.ebayChecked !== true) return '<span style="color:var(--gray);font-size:11px;">…</span>';
+  if (item.ebayCount == null) return '<span style="color:var(--gray);font-size:11px;">n/a</span>';
+  const lvl = demandLevel(item.ebayCount);
+  const cls = lvl === 'High' ? 'b-instock' : lvl === 'Medium' ? 'b-lowstock' : 'b-outstock';
+  return `<span class="badge ${cls}">${lvl}</span> <span style="color:var(--gray);font-size:11px;">${item.ebayCount}</span>`;
+}
+function sigCellHtml(item) {
+  return isBuySignal(item) ? '<span class="buy-signal">🔥 BUY SIGNAL</span>' : '';
+}
+function updateRowCells(item) {
+  const c = document.getElementById('cmp_' + item._id); if (c) c.innerHTML = compCellHtml(item);
+  const d = document.getElementById('dem_' + item._id); if (d) d.innerHTML = demCellHtml(item);
+  const s = document.getElementById('sig_' + item._id); if (s) s.innerHTML = sigCellHtml(item);
+  const row = document.getElementById('row_' + item._id); if (row) row.classList.toggle('buy-row', isBuySignal(item));
+}
+function showCompareStatus(text) {
+  let el = document.getElementById('cmpStatus');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'cmpStatus';
+    el.style.cssText = 'position:fixed;bottom:16px;left:16px;background:var(--card);border:1px solid var(--blue);color:var(--blue);padding:8px 14px;border-radius:8px;font-size:12px;font-family:Inter,sans-serif;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,0.45);';
+    document.body.appendChild(el);
+  }
+  el.textContent = text; el.style.display = 'block';
+}
+function hideCompareStatus() {
+  const el = document.getElementById('cmpStatus');
+  if (el) { el.textContent = '✅ eBay comparison complete'; setTimeout(() => { el.style.display = 'none'; }, 1800); }
+}
+async function autoCompareEbay() {
+  ensureIds();
+  const pending = allItems.filter(i => i.ebayChecked !== true && i.name);
+  if (!pending.length) return;
+  showCompareStatus('🔍 Comparing ' + pending.length + ' item' + (pending.length > 1 ? 's' : '') + ' with eBay…');
+  let done = 0;
+  for (const item of pending) {
+    try {
+      const res = await fetch(PROXY_URL + '?type=ebay_active', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: item.name }) });
+      const data = await res.json();
+      const summaries = (data && data.itemSummaries) || [];
+      const prices = summaries.map(s => parseFloat(s.price?.value || 0)).filter(p => p > 0);
+      item.ebayAvg = prices.length ? parseFloat((prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2)) : null;
+      item.ebayCount = (typeof data.total === 'number') ? data.total : prices.length;
+    } catch (e) { item.ebayAvg = null; item.ebayCount = null; }
+    item.ebayChecked = true;
+    updateRowCells(item);
+    done++;
+    showCompareStatus('🔍 Comparing with eBay… ' + done + '/' + pending.length);
+  }
+  hideCompareStatus();
+  saveData();
+}
+
+// ============================================================
 // RENDER RESULTS
 // ============================================================
 function renderResults() {
+  ensureIds();
   if (!allItems.length) {
     document.getElementById('resultsDiv').innerHTML = '<div class="empty"><div class="empty-icon">🏎️</div><div class="empty-title">No Items Yet</div></div>';
     return;
@@ -785,7 +874,7 @@ function renderResults() {
   const rows = sorted.map(item => {
     const price = parseFloat(item.price);
     const isLowest = !isNaN(price) && price === minPrice;
-    return `<tr 
+    return `<tr id="row_${item._id}" class="${isBuySignal(item) ? 'buy-row' : ''}"
       data-brand="${(item.brand||'').trim()}"
       data-scale="${(item.scale||'').trim()}"
       data-status="${(item.status||'').trim()}"
@@ -800,6 +889,9 @@ function renderResults() {
       <td style="color:var(--gray);font-size:12px;">${item.site || '-'}</td>
       <td><span class="page-badge">${item.page || 1}</span></td>
       <td style="color:var(--gold);font-size:12px;">${item.notes || '-'}</td>
+      <td id="cmp_${item._id}">${compCellHtml(item)}</td>
+      <td id="dem_${item._id}">${demCellHtml(item)}</td>
+      <td id="sig_${item._id}">${sigCellHtml(item)}</td>
     </tr>`;
   }).join('');
 
@@ -819,12 +911,16 @@ function renderResults() {
           <th onclick="sortTbl(5)">Site ↕</th>
           <th>Page</th>
           <th>Notes</th>
+          <th>eBay vs Comp</th>
+          <th>Demand</th>
+          <th>Signal</th>
         </tr></thead>
         <tbody id="tblBody">${rows}</tbody>
       </table>
     </div>`;
 
   applyFilters();
+  autoCompareEbay();
 }
 
 // ============================================================
