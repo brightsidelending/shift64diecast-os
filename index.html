@@ -186,41 +186,60 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 @keyframes micpulse{0%{box-shadow:0 0 0 0 rgba(224,43,43,0.55)}70%{box-shadow:0 0 0 8px rgba(224,43,43,0)}100%{box-shadow:0 0 0 0 rgba(224,43,43,0)}}
 .qsearch-btn{background:var(--card);border:1px solid var(--border);color:var(--gray);padding:9px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'Rajdhani',sans-serif;letter-spacing:0.5px;font-weight:600;white-space:nowrap;transition:all 0.15s}
 .qsearch-btn:hover{border-color:var(--blue);color:var(--white)}
+/* account avatar + dropdown menu (shown on mobile) */
+#userAvatar{display:none;width:38px;height:38px;border-radius:50%;background:var(--red);color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;border:none;cursor:pointer;align-items:center;justify-content:center}
+#userMenu{display:none;position:absolute;right:0;top:48px;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:190px;z-index:300;box-shadow:0 12px 34px rgba(0,0,0,0.55)}
+#userMenu.open{display:block}
+#userMenu button{display:block;width:100%;text-align:left;background:transparent;border:none;color:var(--white);padding:13px 14px;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif}
+#userMenu button:hover{background:rgba(255,255,255,0.06)}
+.mic-btn{background:transparent;border:1px solid var(--border);color:var(--gray);border-radius:8px;padding:9px 16px;font-size:18px;cursor:pointer;transition:all 0.15s}
+.mic-btn:hover{border-color:var(--blue);color:var(--white)}
+.imp-chevron{display:none}
 /* MOBILE / RESPONSIVE */
 @media (max-width: 640px) {
-  .main { padding: 16px 12px !important; }
-  .header { padding: 14px 16px !important; flex-wrap: wrap; gap: 8px; }
-  .logo { font-size: 22px !important; }
-  .nav { padding: 0 10px !important; -webkit-overflow-scrolling: touch; }
+  .main { padding: 18px 14px 40px !important; }
+  .header { padding: 14px 16px !important; align-items: center; }
+  .logo { font-size: 21px !important; }
+  .tagline { display: none; }
+  .nav { padding: 0 8px !important; -webkit-overflow-scrolling: touch; }
   .nav-tab { padding: 12px 13px !important; font-size: 12px !important; }
-  .card { padding: 16px !important; }
+  .card { padding: 18px !important; margin-bottom: 18px !important; border-radius: 14px !important; }
+  /* readable inputs — >=16px stops iOS zoom-on-focus */
+  .text-input, .fi, .filter-search, .filter-select { font-size: 16px !important; }
+  /* grids stack */
   .stats-row { grid-template-columns: repeat(2,1fr) !important; }
   .coll-stats { grid-template-columns: repeat(2,1fr) !important; }
   .bid-grid { grid-template-columns: repeat(2,1fr) !important; }
   .frow { grid-template-columns: 1fr !important; }
   .two-col { grid-template-columns: 1fr !important; }
+  .mcol2 { grid-template-columns: repeat(2,1fr) !important; }
+  .mstack { grid-template-columns: 1fr !important; }
   .modal { width: 94vw !important; padding: 20px !important; }
   .tbl-wrap { overflow-x: auto !important; }
   .filter-bar { flex-direction: column; align-items: stretch; }
   .filter-search, .filter-select { width: 100% !important; min-width: 0 !important; }
-  /* utility overrides for inline grids */
-  .mcol2 { grid-template-columns: repeat(2,1fr) !important; }
-  .mstack { grid-template-columns: 1fr !important; }
-  /* 2: scan button full width below the search box */
+  /* 1: header — hide desktop text buttons, show avatar + menu */
+  .userbar-desktop { display: none !important; }
+  #userAvatar { display: flex !important; }
+  #userBar { position: relative; }
+  /* 3: full-width search + big scan button */
   .search-row { flex-direction: column !important; }
-  .search-row .btn-red { width: 100% !important; }
-  /* 3: bigger, easier-to-tap quick-search buttons */
-  .qsearch-row { gap: 10px !important; margin-top: 14px !important; }
-  .qsearch-btn { padding: 13px 16px !important; font-size: 14px !important; flex: 1 1 auto; }
-  #micBtn { font-size: 20px !important; flex: 0 0 auto; min-width: 58px; }
-  /* 1: import cost settings — readable labels, more room */
+  .search-row .text-input { width: 100% !important; font-size: 17px !important; padding: 16px 18px !important; }
+  .search-row .btn-red { width: 100% !important; padding: 16px !important; font-size: 16px !important; }
+  /* 5: big prominent mic circle below the search box */
+  .mic-wrap { text-align: center; margin-top: 16px !important; }
+  .mic-btn { width: 72px !important; height: 72px !important; border-radius: 50% !important; font-size: 30px !important; padding: 0 !important; margin: 0 auto; display: inline-flex; align-items: center; justify-content: center; }
+  /* 4: supplier buttons as a 2-column grid of tappable cards */
+  .qsearch-row { display: grid !important; grid-template-columns: repeat(2,1fr) !important; gap: 12px !important; margin-top: 18px !important; }
+  .qsearch-btn { padding: 18px 10px !important; font-size: 14px !important; text-align: center; border-radius: 12px !important; flex: none !important; white-space: normal !important; }
+  /* 3: hide quick-search chips */
+  .quick-chips { display: none !important; }
+  /* 2: import cost settings collapsed by default, expand on tap */
+  .imp-chevron { display: inline !important; font-size: 11px; color: var(--blue); font-weight: 600; letter-spacing: 0.5px; }
+  #impCostBody { display: none !important; }
+  #impCostCard.imp-open #impCostBody { display: grid !important; }
   .imp-cost { gap: 16px 12px !important; }
-  .imp-cost label { font-size: 11px !important; white-space: normal !important; line-height: 1.3; }
-  /* 5: more breathing room between sections */
-  .card { margin-bottom: 20px !important; }
-  .main > div { margin-bottom: 4px; }
-  /* 6: header user bar stacks neatly */
-  #userBar { width: 100%; justify-content: flex-start; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .imp-cost label { font-size: 12px !important; white-space: normal !important; line-height: 1.35; }
 }
 </style>
 </head>
@@ -255,10 +274,16 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="logo">SHIFT<span>64</span>DIECAST</div>
     <div class="tagline">Small Scale. Real Passion.</div>
   </div>
-  <div id="userBar" style="display:none;align-items:center;gap:10px;">
-    <span id="userLabel" style="font-size:12px;color:var(--gold);font-family:'Rajdhani',sans-serif;letter-spacing:1px;text-transform:uppercase;"></span>
-    <button id="adminBtn" class="userbar-btn" style="display:none;" onclick="openPwModal()">⚙ Change Passwords</button>
-    <button class="userbar-btn" onclick="logout()">Log Out</button>
+  <div id="userBar" style="display:none;align-items:center;gap:10px;position:relative;">
+    <span id="userLabel" class="userbar-desktop" style="font-size:12px;color:var(--gold);font-family:'Rajdhani',sans-serif;letter-spacing:1px;text-transform:uppercase;"></span>
+    <button id="adminBtn" class="userbar-btn userbar-desktop" style="display:none;" onclick="openPwModal()">⚙ Change Passwords</button>
+    <button class="userbar-btn userbar-desktop" onclick="logout()">Log Out</button>
+    <button id="userAvatar" onclick="toggleUserMenu(event)" aria-label="Account menu">E</button>
+    <div id="userMenu">
+      <div id="userMenuName" style="padding:11px 14px;border-bottom:1px solid var(--border);font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:1px;font-family:'Rajdhani',sans-serif;">Signed in</div>
+      <button id="adminMenuItem" onclick="openPwModal();toggleUserMenu();" style="display:none;">⚙ Change Passwords</button>
+      <button onclick="logout()">Log Out</button>
+    </div>
   </div>
 </div>
 <div class="nav" style="overflow-x:auto;">
@@ -279,9 +304,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
 <!-- ===== PRICE SCANNER ===== -->
 <div id="price_scanner" class="section active">
-  <div class="card" style="margin-bottom:16px;">
-    <div class="card-title">⚙️ Import Cost Settings</div>
-    <div class="mcol2 imp-cost" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;">
+  <div class="card" id="impCostCard" style="margin-bottom:16px;">
+    <div class="card-title" onclick="toggleImpCost()" style="cursor:pointer;">⚙️ Import Cost Settings<span class="imp-chevron" id="impCostChevron"> ▸ tap to edit</span></div>
+    <div id="impCostBody" class="mcol2 imp-cost" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;">
       <div><label style="font-size:10px;color:var(--gray);text-transform:uppercase;display:block;margin-bottom:4px;">Section 301 Tariff %</label><input class="text-input" id="t_tariff" type="number" value="25" style="width:100%;"/></div>
       <div><label style="font-size:10px;color:var(--gray);text-transform:uppercase;display:block;margin-bottom:4px;">Customs Duty %</label><input class="text-input" id="t_duty" type="number" value="6.8" step="0.1" style="width:100%;"/></div>
       <div><label style="font-size:10px;color:var(--gray);text-transform:uppercase;display:block;margin-bottom:4px;">Ship Cost Per Unit $</label><input class="text-input" id="t_ship" type="number" value="1.50" step="0.10" style="width:100%;"/></div>
@@ -297,15 +322,17 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red..." style="flex:1;font-size:15px;padding:14px 20px;"/>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
     </div>
+    <div class="mic-wrap" style="margin-top:10px;">
+      <button id="micBtn" class="mic-btn" onclick="startVoiceSearch()" title="Search by voice">🎤</button>
+    </div>
     <div class="qsearch-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
-      <button id="micBtn" class="qsearch-btn" onclick="startVoiceSearch()" title="Search by voice" style="font-size:15px;padding:8px 12px;">🎤</button>
       <button class="qsearch-btn" onclick="openAliExpress()" style="border-color:var(--orange);color:var(--orange);">🛒 AliExpress</button>
       <button class="qsearch-btn" onclick="openSiteSearch('horizon')">Horizon Diecast</button>
       <button class="qsearch-btn" onclick="openSiteSearch('carbromc')">CarBromc</button>
       <button class="qsearch-btn" onclick="openSiteSearch('rcmart')">RC Mart</button>
       <button class="qsearch-btn" onclick="openSiteSearch('pablo')">Pablo Diecast Garage</button>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+    <div class="quick-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
       <span onclick="quickPriceScan('MiniGT Porsche 911 GT3')" class="site-btn">MiniGT Porsche 911</span>
       <span onclick="quickPriceScan('Pop Race Ferrari F40 1/64')" class="site-btn">Pop Race Ferrari F40</span>
       <span onclick="quickPriceScan('Inno64 Lamborghini Huracan')" class="site-btn">Inno64 Lamborghini</span>
@@ -875,19 +902,47 @@ function checkPin() {
 
 function loginAs(user) {
   currentUser = user;
+  const name = user === 'eric' ? 'Eric' : 'Khai';
   document.getElementById('loginOverlay').style.display = 'none';
   const bar = document.getElementById('userBar');
   bar.style.display = 'flex';
-  document.getElementById('userLabel').textContent = user === 'eric' ? 'Eric' : 'Khai';
+  document.getElementById('userLabel').textContent = name;
   document.getElementById('adminBtn').style.display = user === 'eric' ? 'inline-block' : 'none';
+  // mobile avatar + dropdown menu
+  const av = document.getElementById('userAvatar'); if (av) av.textContent = name.charAt(0);
+  const nm = document.getElementById('userMenuName'); if (nm) nm.textContent = name;
+  const ami = document.getElementById('adminMenuItem'); if (ami) ami.style.display = user === 'eric' ? 'block' : 'none';
   pinEntry = '';
   renderDots();
   document.getElementById('pinError').textContent = '';
 }
 
+function toggleUserMenu(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('userMenu');
+  if (m) m.classList.toggle('open');
+}
+
+// Collapse/expand the Import Cost Settings card (used mainly on mobile)
+function toggleImpCost() {
+  const card = document.getElementById('impCostCard');
+  if (!card) return;
+  card.classList.toggle('imp-open');
+  const ch = document.getElementById('impCostChevron');
+  if (ch) ch.textContent = card.classList.contains('imp-open') ? ' ▾ tap to close' : ' ▸ tap to edit';
+}
+
+// Close the account menu when tapping elsewhere
+document.addEventListener('click', function(e) {
+  const m = document.getElementById('userMenu');
+  const av = document.getElementById('userAvatar');
+  if (m && m.classList.contains('open') && !m.contains(e.target) && e.target !== av) m.classList.remove('open');
+});
+
 function logout() {
   currentUser = null;
   document.getElementById('userBar').style.display = 'none';
+  const m = document.getElementById('userMenu'); if (m) m.classList.remove('open');
   document.getElementById('loginOverlay').style.display = 'flex';
   pinEntry = '';
   renderDots();
