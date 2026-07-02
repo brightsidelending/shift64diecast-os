@@ -179,6 +179,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 .userbar-btn{background:var(--card);border:1px solid var(--border);color:var(--gray);padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif}
 .userbar-btn:hover{border-color:var(--red);color:var(--white)}
+.listing-clickable{cursor:pointer;transition:background 0.15s}
+.listing-clickable:hover{background:rgba(74,144,217,0.12)}
 </style>
 </head>
 <body>
@@ -1771,7 +1773,8 @@ async function runPriceScan() {
         price: parseFloat(i.price?.value || 0),
         currency: i.price?.currency || 'USD',
         condition: i.condition || 'New',
-        shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null
+        shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null,
+        url: i.itemWebUrl || null
       })).filter(i => i.price > 0);
       useRealData = true;
     }
@@ -1790,7 +1793,8 @@ async function runPriceScan() {
         price: parseFloat(i.price?.value || 0),
         condition: i.condition || 'Unknown',
         soldDate: i.itemEndDate || null,
-        shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null
+        shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null,
+        url: i.itemWebUrl || null
       })).filter(i => i.price > 0);
       useRealData = true;
     }
@@ -1828,7 +1832,7 @@ async function runPriceScan() {
     const actionColor = action==='BUY'?'var(--green)':action==='WATCH'?'var(--yellow)':'var(--red)';
     const marginColor = marginPct>=80?'var(--green)':marginPct>=40?'var(--yellow)':'var(--red)';
     const fmtShip = s => s != null ? (s === 0 ? 'Free shipping' : '+$'+s.toFixed(2)+' ship') : 'Shipping n/a';
-    const activeListings = ebayActivePrices.length > 0 ? ebayActivePrices.slice(0,4).map(i => ({title:i.title,price:i.price,meta:i.condition+' · '+fmtShip(i.shipping)})) : [
+    const activeListings = ebayActivePrices.length > 0 ? ebayActivePrices.slice(0,4).map(i => ({title:i.title,price:i.price,url:i.url,meta:i.condition+' · '+fmtShip(i.shipping)})) : [
       {title:`${query} — New Sealed`,price:active,meta:'Buy It Now · Estimated'},
       {title:`${query} — Brand New`,price:(active*0.92).toFixed(2),meta:'Estimated'},
       {title:`${query} — Limited Release`,price:(active*1.18).toFixed(2),meta:'Estimated'},
@@ -1840,14 +1844,18 @@ async function runPriceScan() {
       const sd = fmtSoldDate(i.soldDate);
       if (sd) parts.push('Sold '+sd);
       parts.push(i.shipping != null ? (i.shipping === 0 ? 'Free shipping' : '+$'+i.shipping.toFixed(2)+' ship') : 'Shipping n/a');
-      return {title:i.title,price:i.price,meta:parts.join(' · ')};
+      return {title:i.title,price:i.price,url:i.url,meta:parts.join(' · ')};
     }) : [
       {title:`${query} — Sold`,price:sold,meta:'Completed · Estimated'},
       {title:`${query} — Sold`,price:(sold*1.22).toFixed(2),meta:'Estimated'},
       {title:`${query} — Sold`,price:(sold*0.87).toFixed(2),meta:'Estimated'},
       {title:`${query} — Sold`,price:(sold*1.05).toFixed(2),meta:'Estimated'},
     ];
-    const rl = (items,isSold) => items.map(i=>`<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};">$${parseFloat(i.price).toFixed(2)}</div></div>`).join('');
+    const rl = (items,isSold) => items.map(i=>{
+      const safeUrl = i.url ? String(i.url).replace(/"/g,'%22').replace(/'/g,'%27') : '';
+      const attrs = safeUrl ? `class="listing-clickable" onclick="window.open('${safeUrl}','_blank','noopener')" title="Open on eBay"` : '';
+      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};">$${parseFloat(i.price).toFixed(2)}</div></div>`;
+    }).join('');
     document.getElementById('psResults').innerHTML = `
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">${useRealData?'🟢 LIVE EBAY DATA':'🤖 AI ESTIMATE'} · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
