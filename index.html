@@ -202,6 +202,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .product-showcase img{width:100%;max-width:270px;border-radius:8px;object-fit:contain;background:var(--black);display:block}
 .ps-label{font-family:'Rajdhani',sans-serif;font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:1px;margin-top:10px}
 .product-hero{display:none}
+.show-more-btn{display:block;width:100%;background:transparent;border:none;border-top:1px solid var(--border);color:var(--blue);padding:11px;font-size:12px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:background 0.15s}
+.show-more-btn:hover{background:rgba(74,144,217,0.1)}
 /* image preview popup */
 #imgPreview{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9000;align-items:center;justify-content:center;padding:20px}
 #imgPreview.open{display:flex}
@@ -1901,9 +1903,28 @@ function cardClick(el) {
     showImagePreview(el.dataset.img, el.dataset.title);
   }, 260);
 }
+// Force a genuine new tab (more reliable than window.open on mobile) so the app stays open behind it
+function openInNewTab(url) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
 function cardDblClick(el) {
   if (cardClickTimer) { clearTimeout(cardClickTimer); cardClickTimer = null; }
-  if (el.dataset.url) window.open(el.dataset.url, '_blank', 'noopener');
+  if (el.dataset.url) openInNewTab(el.dataset.url);
+}
+// Expand a listings column from 4 up to 10, and collapse back
+function toggleShowMore(colId) {
+  const more = document.getElementById(colId + '-more');
+  const btn = document.getElementById(colId + '-btn');
+  if (!more || !btn) return;
+  const opening = more.style.display === 'none';
+  more.style.display = opening ? 'block' : 'none';
+  btn.textContent = opening ? 'Show Less' : ('Show More (' + more.children.length + ')');
 }
 function showImagePreview(img, title) {
   if (!img) return;
@@ -2129,14 +2150,14 @@ async function runPriceScan() {
     const marginColor = marginPct>=80?'var(--green)':marginPct>=40?'var(--yellow)':'var(--red)';
     const fmtShip = s => s != null ? (s === 0 ? 'Free shipping' : '+$'+s.toFixed(2)+' ship') : 'Shipping n/a';
     const simLabel = '<span style="color:var(--yellow);font-weight:600;">Similar Item - Not Exact Match</span>';
-    const activeListings = ebayActivePrices.length > 0 ? ebayActivePrices.slice(0,4).map(i => ({title:i.title,price:i.price,url:i.url,img:i.img,meta:(activeApprox?simLabel+' · ':'')+i.condition+' · '+fmtShip(i.shipping)})) : [
+    const activeListings = ebayActivePrices.length > 0 ? ebayActivePrices.slice(0,10).map(i => ({title:i.title,price:i.price,url:i.url,img:i.img,meta:(activeApprox?simLabel+' · ':'')+i.condition+' · '+fmtShip(i.shipping)})) : [
       {title:`${query} — New Sealed`,price:active,meta:'Buy It Now · Estimated'},
       {title:`${query} — Brand New`,price:(active*0.92).toFixed(2),meta:'Estimated'},
       {title:`${query} — Limited Release`,price:(active*1.18).toFixed(2),meta:'Estimated'},
       {title:`${query} — New in Box`,price:(active*0.97).toFixed(2),meta:'Estimated'},
     ];
     const fmtSoldDate = d => { if(!d) return null; const dt = new Date(d); return isNaN(dt) ? null : dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); };
-    const soldListings = ebaySoldPrices.length > 0 ? ebaySoldPrices.slice(0,4).map(i => {
+    const soldListings = ebaySoldPrices.length > 0 ? ebaySoldPrices.slice(0,10).map(i => {
       const parts = [];
       if (soldApprox) parts.push(simLabel);
       parts.push(i.condition);
@@ -2158,6 +2179,16 @@ async function runPriceScan() {
       const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" onclick="cardClick(this)" ondblclick="cardDblClick(this)" onmouseenter="cardHoverImg(this)" onmouseleave="cardHoverReset()"` : '';
       return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};">$${parseFloat(i.price).toFixed(2)}</div></div>`;
     }).join('');
+    const renderColumn = (items, isSold, colId) => {
+      const first = items.slice(0, 4);
+      const rest = items.slice(4, 10);
+      let html = rl(first, isSold);
+      if (rest.length > 0) {
+        html += `<div id="${colId}-more" style="display:none;">${rl(rest, isSold)}</div>`;
+        html += `<button class="show-more-btn" id="${colId}-btn" onclick="toggleShowMore('${colId}')">Show More (${rest.length})</button>`;
+      }
+      return html;
+    };
     const compMatches = findCompetitorMatches(query);
     const competitorHtml = compMatches.length > 0
       ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;"><div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🏷️ COMPETITOR PRICES</div><span style="font-size:11px;color:var(--blue);">${compMatches.length} match${compMatches.length>1?'es':''} from your scans</span></div>${compMatches.slice(0,8).map(it=>{const price=(it.price!=null&&!isNaN(it.price))?'$'+parseFloat(it.price).toFixed(2):'—';return `<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="min-width:0;"><div style="font-size:13px;">${it.name||'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site||'Unknown'}${it.status?' · '+it.status:''}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);white-space:nowrap;">${price}</div></div>`;}).join('')}</div>`
@@ -2175,11 +2206,11 @@ async function runPriceScan() {
         <div class="mstack listings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
           <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
             <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟡 ACTIVE LISTINGS</div><span style="font-size:11px;color:var(--gold);">~${data.listings} active</span></div>
-            ${rl(activeListings,false)}
+            ${renderColumn(activeListings,false,'active')}
           </div>
           <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
             <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟢 SOLD LISTINGS</div><span style="font-size:11px;color:var(--green);">${data.soldCount} sold/30 days</span></div>
-            ${rl(soldListings,true)}
+            ${renderColumn(soldListings,true,'sold')}
           </div>
         </div>
       </div>
