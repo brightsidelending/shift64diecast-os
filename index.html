@@ -204,6 +204,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .product-showcase{width:290px;flex-shrink:0;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,0.35)}
 .product-showcase img{width:100%;max-width:270px;border-radius:8px;object-fit:contain;background:var(--black);display:block}
 .ps-label{font-family:'Rajdhani',sans-serif;font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:1px;margin-top:10px}
+.ps-price{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-top:10px}
+.card-pin{width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0}
 .product-hero{display:none}
 .row-action{background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--gray);cursor:pointer;font-size:12px;padding:4px 7px;margin-left:4px;transition:all 0.15s}
 .row-action:hover{border-color:var(--blue);color:var(--white)}
@@ -752,7 +754,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="fg"><label>Model Name</label><input class="fi" id="e_name" placeholder="e.g. MiniGT Porsche 911 GT3 RS"/></div>
     <div class="frow">
       <div class="fg"><label>Brand</label><input class="fi" id="e_brand" placeholder="e.g. MiniGT"/></div>
-      <div class="fg"><label>Scale</label><select class="fi" id="e_scale"><option value="">Select</option><option>1/64</option><option>1/18</option><option>1/43</option></select></div>
+      <div class="fg"><label>Scale</label><select class="fi" id="e_scale"><option value="">Select</option><option selected>1/64</option><option>1/18</option><option>1/43</option></select></div>
     </div>
     <div class="frow">
       <div class="fg"><label>Amount Paid $</label><input class="fi" id="e_paid" type="number" placeholder="0.00"/></div>
@@ -787,7 +789,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="fg"><label>Model Name</label><input class="fi" id="k_name" placeholder="e.g. MiniGT Porsche 911 GT3 RS"/></div>
     <div class="frow">
       <div class="fg"><label>Brand</label><input class="fi" id="k_brand" placeholder="e.g. MiniGT"/></div>
-      <div class="fg"><label>Scale</label><select class="fi" id="k_scale"><option value="">Select</option><option>1/64</option><option>1/18</option><option>1/43</option></select></div>
+      <div class="fg"><label>Scale</label><select class="fi" id="k_scale"><option value="">Select</option><option selected>1/64</option><option>1/18</option><option>1/43</option></select></div>
     </div>
     <div class="frow">
       <div class="fg"><label>Amount Paid $</label><input class="fi" id="k_paid" type="number" placeholder="0.00"/></div>
@@ -822,7 +824,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="fg"><label>Model Name</label><input class="fi" id="ew_name" placeholder="e.g. Kaido House NSX Red 1/64"/></div>
     <div class="frow">
       <div class="fg"><label>Brand</label><input class="fi" id="ew_brand" placeholder="e.g. Kaido House"/></div>
-      <div class="fg"><label>Scale</label><select class="fi" id="ew_scale"><option value="">Select</option><option>1/64</option><option>1/18</option><option>1/43</option></select></div>
+      <div class="fg"><label>Scale</label><select class="fi" id="ew_scale"><option value="">Select</option><option selected>1/64</option><option>1/18</option><option>1/43</option></select></div>
     </div>
     <div class="frow">
       <div class="fg"><label>Max I Will Pay $</label><input class="fi" id="ew_max" type="number" placeholder="0.00"/></div>
@@ -843,7 +845,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="fg"><label>Model Name</label><input class="fi" id="kw_name" placeholder="e.g. Kaido House NSX Red 1/64"/></div>
     <div class="frow">
       <div class="fg"><label>Brand</label><input class="fi" id="kw_brand" placeholder="e.g. Kaido House"/></div>
-      <div class="fg"><label>Scale</label><select class="fi" id="kw_scale"><option value="">Select</option><option>1/64</option><option>1/18</option><option>1/43</option></select></div>
+      <div class="fg"><label>Scale</label><select class="fi" id="kw_scale"><option value="">Select</option><option selected>1/64</option><option>1/18</option><option>1/43</option></select></div>
     </div>
     <div class="frow">
       <div class="fg"><label>Max I Will Pay $</label><input class="fi" id="kw_max" type="number" placeholder="0.00"/></div>
@@ -1575,9 +1577,10 @@ function addToCollection(who) {
 function openAddCollection(who) {
   editingColl[who] = null;
   const p = who === 'eric' ? 'e_' : 'k_';
-  ['name','brand','scale','paid','ship','from','date','notes','ask','sold','soldon','solddate'].forEach(f => {
+  ['name','brand','paid','ship','from','date','notes','ask','sold','soldon','solddate'].forEach(f => {
     const el = document.getElementById(p + f); if (el) el.value = '';
   });
+  const scale = document.getElementById(p + 'scale'); if (scale) scale.value = '1/64';
   const cond = document.getElementById(p + 'cond'); if (cond) cond.selectedIndex = 0;
   setCollBtn(who, false);
   openModal(who + 'Modal');
@@ -2061,14 +2064,34 @@ function showImagePreview(img, title) {
 function closeImagePreview() {
   document.getElementById('imgPreview').classList.remove('open');
 }
-// Desktop: hovering a card previews its image in the reference panel
+// Reference photo panel: hover previews a card's image/price; a checked card locks it
+let refLocked = false;
+let refPriceDefault = '';
+function setRef(img, price, label, locked) {
+  [document.getElementById('refPhotoImg'), document.getElementById('refHeroImg')].forEach(el => { if (el && img) el.src = img; });
+  const p = document.getElementById('refPhotoPrice'); if (p) p.textContent = price || '';
+  const l = document.getElementById('refPhotoLabel'); if (l) l.innerHTML = locked ? '🔒 Pinned' : (label || 'Reference Photo');
+  const sc = document.querySelector('.product-showcase'); if (sc) sc.style.borderColor = locked ? 'var(--gold)' : 'var(--border)';
+}
 function cardHoverImg(el) {
-  const ref = document.getElementById('refPhotoImg');
-  if (ref && el.dataset.img) ref.src = el.dataset.img;
+  if (refLocked) return;
+  setRef(el.dataset.img, el.dataset.price, 'Preview', false);
 }
 function cardHoverReset() {
-  const ref = document.getElementById('refPhotoImg');
-  if (ref && refPhotoDefault) ref.src = refPhotoDefault;
+  if (refLocked) return;
+  setRef(refPhotoDefault, refPriceDefault, 'Reference Photo', false);
+}
+// Checking a card pins its image + price to the panel; only one can be pinned at a time
+function togglePin(cb) {
+  const card = cb.closest('.listing-clickable');
+  if (cb.checked) {
+    document.querySelectorAll('.card-pin').forEach(c => { if (c !== cb) c.checked = false; });
+    refLocked = true;
+    setRef(card ? card.dataset.img : '', card ? card.dataset.price : '', null, true);
+  } else {
+    refLocked = false;
+    setRef(refPhotoDefault, refPriceDefault, 'Reference Photo', false);
+  }
 }
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeImagePreview(); });
 
@@ -2179,21 +2202,26 @@ function startVoiceSearch() {
 }
 
 // Open AliExpress wholesale search for whatever is typed in the scanner box
+// Remove scale tokens (1/64, 1:18, 1/43, 1/32, etc.) so supplier searches are less specific
+function stripScale(q) {
+  return q.replace(/\b1\s*[\/:]\s*\d{2,3}\b/g, '').replace(/\s+/g, ' ').trim();
+}
+
 function openAliExpress() {
   const q = document.getElementById('psSearchInput').value.trim();
   if (!q) { alert('Type a model in the search box first.'); return; }
-  window.open('https://www.aliexpress.com/wholesale?SearchText=' + encodeURIComponent(q), '_blank', 'noopener');
+  window.open('https://www.aliexpress.com/wholesale?SearchText=' + encodeURIComponent(stripScale(q)), '_blank', 'noopener');
 }
 
 // Open a competitor store's search page for whatever is typed in the scanner box
 function openSiteSearch(site) {
   const q = document.getElementById('psSearchInput').value.trim();
   if (!q) { alert('Type a model in the search box first.'); return; }
-  const enc = encodeURIComponent(q);
+  const enc = encodeURIComponent(stripScale(q));
   const urls = {
     horizon: 'https://horizondiecast.com/search?q=' + enc,
     carbromc: 'https://carbromc.com/search?q=' + enc,
-    rcmart: 'https://www.rcmart.com/catalogsearch/result/?q=' + enc,
+    rcmart: 'https://www.rcmart.com/product-search?search=' + enc,
     pablo: 'https://www.pablodiecastgarage.com/search?q=' + enc
   };
   if (urls[site]) window.open(urls[site], '_blank', 'noopener');
@@ -2301,9 +2329,11 @@ async function runPriceScan() {
       const safeUrl = i.url ? String(i.url).replace(/"/g,'%22').replace(/'/g,'%27') : '';
       const safeImg = i.img ? String(i.img).replace(/"/g,'%22').replace(/'/g,'%27') : '';
       const safeTitle = (i.title||'').replace(/"/g,'&quot;');
+      const priceStr = '$'+parseFloat(i.price).toFixed(2);
       const interactive = safeUrl || safeImg;
-      const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" onclick="cardClick(this)" ondblclick="cardDblClick(this)" onmouseenter="cardHoverImg(this)" onmouseleave="cardHoverReset()"` : '';
-      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};">$${parseFloat(i.price).toFixed(2)}</div></div>`;
+      const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" data-price="${priceStr}" onclick="cardClick(this)" ondblclick="cardDblClick(this)" onmouseenter="cardHoverImg(this)" onmouseleave="cardHoverReset()"` : '';
+      const pin = (interactive && safeImg) ? `<input type="checkbox" class="card-pin" title="Pin as reference photo" onclick="event.stopPropagation();togglePin(this)" ondblclick="event.stopPropagation()"/>` : '';
+      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div></div>`;
     }).join('');
     const renderColumn = (items, isSold, colId) => {
       const first = items.slice(0, 4);
@@ -2321,14 +2351,16 @@ async function runPriceScan() {
       : `<div style="background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:18px;margin-bottom:14px;text-align:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;margin-bottom:4px;">🏷️ COMPETITOR PRICES</div><div style="font-size:13px;color:var(--gray);">No competitor data yet — scan in the Competitor tab.</div></div>`;
     const prodImg = ebayActivePrices[0]?.img || '';
     refPhotoDefault = prodImg;
+    refPriceDefault = ebayActivePrices[0] ? '$' + parseFloat(ebayActivePrices[0].price).toFixed(2) : '';
+    refLocked = false;
     document.getElementById('psResults').innerHTML = `
-      ${prodImg ? `<img class="product-hero" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
+      ${prodImg ? `<img class="product-hero" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">${useRealData?((activeApprox||soldApprox)?'🟢 LIVE EBAY DATA · SIMILAR ITEMS':'🟢 LIVE EBAY DATA'):'🤖 AI ESTIMATE'} · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
         <div style="font-size:14px;line-height:1.6;">${action==='BUY'?`Strong buy. ${data.soldCount} units sold in last 30 days. True landed cost $${landed.toFixed(2)} vs avg sell $${sold.toFixed(2)} = ${marginPct}% net margin.`:action==='WATCH'?`Watch this. ${data.soldCount} sold recently. ${marginPct}% margin is acceptable but negotiate harder on wholesale price.`:`Thin margins at ${marginPct}%. Find a higher demand model or negotiate lower wholesale.`}</div>
       </div>
       <div class="listings-wrap">
-        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-label">Reference Photo</div></div>` : ''}
+        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-price" id="refPhotoPrice">${refPriceDefault}</div><div class="ps-label" id="refPhotoLabel">Reference Photo</div></div>` : ''}
         <div class="mstack listings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
           <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
             <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟡 ACTIVE LISTINGS</div><span style="font-size:11px;color:var(--gold);">~${data.listings} active</span></div>
