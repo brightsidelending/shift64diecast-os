@@ -1824,29 +1824,54 @@ function buildQueryVariants(query) {
   return variants.filter(v => { const k = (v || '').toLowerCase(); if (!v || seen.has(k)) return false; seen.add(k); return true; });
 }
 
-// Voice search via Web Speech API — fills the scanner box with spoken text
+// Voice search via Web Speech API — continuous listening, keeps text until user stops
 let recognition = null;
 let isListening = false;
+let voiceBaseText = '';   // whatever was already in the box when listening started
+let voiceFinal = '';      // accumulated finalized speech for this listening session
+let voiceManualStop = false;
+
 function startVoiceSearch() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const mic = document.getElementById('micBtn');
+  const input = document.getElementById('psSearchInput');
   if (!SR) { alert("Voice search isn't supported in this browser. Try Chrome or Edge."); return; }
-  if (isListening && recognition) { recognition.stop(); return; } // click again to stop
+
+  // Second click = stop. Keep everything transcribed; do NOT clear the field.
+  if (isListening && recognition) { voiceManualStop = true; recognition.stop(); return; }
+
+  voiceManualStop = false;
+  voiceBaseText = input.value.trim();
+  voiceFinal = '';
   recognition = new SR();
   recognition.lang = 'en-US';
   recognition.interimResults = true;
-  recognition.continuous = false;
+  recognition.continuous = true;        // keep recording; don't cut off after a pause
+  recognition.maxAlternatives = 1;
+
   recognition.onstart = () => { isListening = true; mic.classList.add('listening'); mic.textContent = '🔴'; };
   recognition.onresult = (e) => {
-    let transcript = '';
-    for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-    document.getElementById('psSearchInput').value = transcript.trim();
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) voiceFinal += t + ' ';
+      else interim += t;
+    }
+    const spoken = (voiceFinal + interim).replace(/\s+/g, ' ').trim();
+    input.value = voiceBaseText ? (voiceBaseText + ' ' + spoken).trim() : spoken;
   };
   recognition.onerror = (e) => {
     console.log('Speech recognition error:', e.error);
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') alert('Microphone access was blocked. Allow mic permission for this site and try again.');
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      voiceManualStop = true;
+      alert('Microphone access was blocked. Allow mic permission for this site and try again.');
+    }
   };
-  recognition.onend = () => { isListening = false; mic.classList.remove('listening'); mic.textContent = '🎤'; };
+  recognition.onend = () => {
+    // Browsers auto-end on silence; if the user hasn't clicked stop, resume so it keeps listening.
+    if (!voiceManualStop) { try { recognition.start(); return; } catch (err) { console.log('resume failed:', err); } }
+    isListening = false; mic.classList.remove('listening'); mic.textContent = '🎤';
+  };
   try { recognition.start(); } catch (err) { console.log('Could not start recognition:', err); }
 }
 
