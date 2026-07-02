@@ -619,6 +619,24 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
   </div>
 
+  <!-- ===== VENDOR CATALOGS (Phase 1: Buying Intelligence Engine) ===== -->
+  <div class="card" style="margin-top:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
+      <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;">📚 Vendor Catalogs</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--gray);">Save scan to:</span>
+        <select id="scanTargetVendor" class="filter-select" style="min-width:150px;"></select>
+        <button class="btn-blue" onclick="saveScanToCatalog()">➕ Add Scanned Items</button>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Scan screenshots above (review in the results table), then add them to a vendor catalog — or add items manually per vendor.</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <input class="text-input" id="newVendorName" placeholder="New vendor name..." style="flex:1;min-width:160px;"/>
+      <button class="btn-blue" onclick="addVendor()">+ Add Vendor</button>
+    </div>
+    <div id="catalogsContainer"></div>
+  </div>
+
 </div>
 
 <!-- ===== ERIC COLLECTION ===== -->
@@ -1842,6 +1860,200 @@ function updateIntel() {
 }
 
 // ============================================================
+// VENDOR CATALOGS (Phase 1 — Buying Intelligence Engine)
+// ============================================================
+const DEFAULT_VENDORS = ['Horizon Diecast','CarBromc','RC Mart','Pablo Diecast Garage'];
+let vendorCatalogs = {};
+let _catIdCounter = 0;
+let editingCat = null; // { vendor, id } while editing an entry
+
+function ensureDefaultVendors() {
+  DEFAULT_VENDORS.forEach(v => { if (!vendorCatalogs[v]) vendorCatalogs[v] = []; });
+}
+function nextCatId() {
+  Object.values(vendorCatalogs).forEach(arr => (arr || []).forEach(e => { if (typeof e.id === 'number' && e.id > _catIdCounter) _catIdCounter = e.id; }));
+  return ++_catIdCounter;
+}
+function catToday() { return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+function escAttr(s) { return String(s || '').replace(/"/g, '&quot;'); }
+function escJs(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+function refreshVendorDropdowns() {
+  const opts = Object.keys(vendorCatalogs).map(n => `<option value="${escAttr(n)}">${n}</option>`).join('');
+  const t = document.getElementById('scanTargetVendor'); if (t) { const prev = t.value; t.innerHTML = opts; if (prev) t.value = prev; }
+  const m = document.getElementById('cat_vendor'); if (m) m.innerHTML = opts;
+}
+
+function renderCatalogs() {
+  ensureDefaultVendors();
+  refreshVendorDropdowns();
+  const cont = document.getElementById('catalogsContainer');
+  if (!cont) return;
+  const statusClass = { 'In Stock': 'b-instock', 'Out of Stock': 'b-outstock', 'Pre-Order': 'b-preorder', 'Low Stock': 'b-lowstock' };
+  cont.innerHTML = Object.keys(vendorCatalogs).sort().map(vendor => {
+    const items = vendorCatalogs[vendor] || [];
+    const vEsc = escJs(vendor);
+    const rows = items.length ? items.map(it => {
+      const priceNum = parseFloat(it.price);
+      const price = !isNaN(priceNum) ? '$' + priceNum.toFixed(2) : '-';
+      const cls = statusClass[it.status] || 'b-unknown';
+      return `<tr>
+        <td>${it.name || '-'}</td><td>${it.brand || '-'}</td><td>${it.scale || '-'}</td>
+        <td class="price-td">${price}</td>
+        <td><span class="badge ${cls}">${it.status || 'Unknown'}</span></td>
+        <td style="color:var(--gray);font-size:12px;">${it.dateAdded || '-'}</td>
+        <td style="white-space:nowrap;text-align:right;"><button class="row-action" title="Edit" onclick="openCatItemModal('${vEsc}',${it.id})">✏️</button><button class="row-action row-del" title="Delete" onclick="deleteCatItem('${vEsc}',${it.id})">🗑️</button></td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No items yet. Add manually or from a scan.</td></tr>`;
+    return `<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#0E1015;cursor:pointer;" onclick="toggleVendorSection(this)">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;">📦 ${vendor} <span style="color:var(--gray);font-size:12px;font-weight:400;">(${items.length})</span></div>
+        <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
+          <button class="btn-sm" style="background:var(--blue);" onclick="openCatItemModal('${vEsc}')">+ Item</button>
+          <button class="row-action row-del" title="Delete vendor" onclick="removeVendor('${vEsc}')">🗑 Vendor</button>
+          <span class="vsec-toggle" style="color:var(--gray);">▾</span>
+        </div>
+      </div>
+      <div class="vsec-body" style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr><th>Item</th><th>Brand</th><th>Scale</th><th>Price</th><th>Status</th><th>Added</th><th style="text-align:right;">Actions</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleVendorSection(headerEl) {
+  const body = headerEl.parentElement.querySelector('.vsec-body');
+  const tog = headerEl.querySelector('.vsec-toggle');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  if (tog) tog.textContent = open ? '▸' : '▾';
+}
+
+function addVendor() {
+  const inp = document.getElementById('newVendorName');
+  const name = (inp.value || '').trim();
+  if (!name) { toast('Enter a vendor name.', 'yellow'); return; }
+  if (vendorCatalogs[name]) { toast('That vendor already exists.', 'yellow'); return; }
+  vendorCatalogs[name] = [];
+  inp.value = '';
+  renderCatalogs();
+  saveData();
+  toast('✅ Vendor "' + name + '" added.', 'green');
+}
+
+function removeVendor(name) {
+  if (!vendorCatalogs[name]) return;
+  const n = vendorCatalogs[name].length;
+  if (!confirm('Delete vendor "' + name + '"' + (n ? (' and its ' + n + ' item' + (n > 1 ? 's' : '')) : '') + '? This cannot be undone.')) return;
+  delete vendorCatalogs[name];
+  renderCatalogs();
+  saveData();
+  toast('🗑️ Vendor deleted.', 'yellow');
+}
+
+function openCatItemModal(vendor, editId) {
+  refreshVendorDropdowns();
+  const v = document.getElementById('cat_vendor'); if (v) v.value = vendor;
+  if (editId != null) {
+    const it = (vendorCatalogs[vendor] || []).find(e => e.id === editId);
+    if (it) {
+      editingCat = { vendor, id: editId };
+      document.getElementById('cat_name').value = it.name || '';
+      document.getElementById('cat_brand').value = it.brand || '';
+      document.getElementById('cat_scale').value = it.scale || '1/64';
+      document.getElementById('cat_price').value = it.price != null ? it.price : '';
+      document.getElementById('cat_status').value = it.status || 'In Stock';
+      document.getElementById('catItemTitle').textContent = '✏️ Edit Catalog Item';
+    }
+  } else {
+    editingCat = null;
+    document.getElementById('cat_name').value = '';
+    document.getElementById('cat_brand').value = '';
+    document.getElementById('cat_scale').value = '1/64';
+    document.getElementById('cat_price').value = '';
+    document.getElementById('cat_status').value = 'In Stock';
+    document.getElementById('catItemTitle').textContent = '➕ Add Catalog Item';
+  }
+  openModal('catItemModal');
+}
+
+function saveCatItem() {
+  const vendor = document.getElementById('cat_vendor').value;
+  const name = document.getElementById('cat_name').value.trim();
+  if (!vendor) { toast('Pick a vendor.', 'yellow'); return; }
+  if (!name) { toast('Enter an item name.', 'yellow'); return; }
+  if (!vendorCatalogs[vendor]) vendorCatalogs[vendor] = [];
+  const entry = {
+    name,
+    brand: document.getElementById('cat_brand').value.trim(),
+    scale: document.getElementById('cat_scale').value,
+    price: parseFloat(document.getElementById('cat_price').value) || null,
+    status: document.getElementById('cat_status').value
+  };
+  if (editingCat) {
+    const oldArr = vendorCatalogs[editingCat.vendor] || [];
+    const idx = oldArr.findIndex(e => e.id === editingCat.id);
+    if (editingCat.vendor === vendor && idx >= 0) {
+      entry.id = editingCat.id;
+      entry.dateAdded = oldArr[idx].dateAdded || catToday();
+      oldArr[idx] = entry;
+    } else {
+      if (idx >= 0) oldArr.splice(idx, 1);
+      entry.id = nextCatId(); entry.dateAdded = catToday();
+      vendorCatalogs[vendor].push(entry);
+    }
+  } else {
+    entry.id = nextCatId(); entry.dateAdded = catToday();
+    vendorCatalogs[vendor].push(entry);
+  }
+  editingCat = null;
+  closeModal('catItemModal');
+  renderCatalogs();
+  saveData();
+  toast('✅ Saved to ' + vendor + ' catalog.', 'green');
+}
+
+function deleteCatItem(vendor, id) {
+  const arr = vendorCatalogs[vendor];
+  if (!arr) return;
+  const it = arr.find(e => e.id === id);
+  if (!confirm('Delete "' + (it ? it.name : 'this item') + '" from ' + vendor + '?')) return;
+  const idx = arr.findIndex(e => e.id === id);
+  if (idx >= 0) arr.splice(idx, 1);
+  renderCatalogs();
+  saveData();
+  toast('🗑️ Item deleted.', 'yellow');
+}
+
+function saveScanToCatalog() {
+  const vendor = document.getElementById('scanTargetVendor').value;
+  if (!vendor) { toast('Pick a vendor.', 'yellow'); return; }
+  if (!allItems.length) { toast('No scanned items yet. Scan screenshots first.', 'yellow'); return; }
+  if (!confirm('Add ' + allItems.length + ' scanned item' + (allItems.length > 1 ? 's' : '') + ' to the "' + vendor + '" catalog?')) return;
+  if (!vendorCatalogs[vendor]) vendorCatalogs[vendor] = [];
+  allItems.forEach(it => {
+    const priceNum = parseFloat(it.price);
+    vendorCatalogs[vendor].push({
+      id: nextCatId(),
+      name: it.name || '',
+      brand: it.brand || '',
+      scale: it.scale || '',
+      price: !isNaN(priceNum) ? priceNum : null,
+      status: it.status || 'Unknown',
+      dateAdded: catToday()
+    });
+  });
+  const n = allItems.length;
+  renderCatalogs();
+  saveData();
+  toast('✅ Added ' + n + ' item' + (n > 1 ? 's' : '') + ' to ' + vendor + ' catalog.', 'green');
+}
+
+// ============================================================
 // SAVE / LOAD
 // ============================================================
 // Cloud storage (Vercel KV via proxy) with localStorage fallback
@@ -1883,6 +2095,7 @@ async function saveData() {
     localStorage.setItem('s64_khai', JSON.stringify(khaiColl));
     localStorage.setItem('s64_ericW', JSON.stringify(ericWants));
     localStorage.setItem('s64_khaiW', JSON.stringify(khaiWants));
+    localStorage.setItem('s64_catalogs', JSON.stringify(vendorCatalogs));
   } catch(e) {}
   showSaving('💾 Saving…');
   toast('⏳ Saving…', 'yellow');
@@ -1892,7 +2105,8 @@ async function saveData() {
       kvSet('s64_eric', ericColl),
       kvSet('s64_khai', khaiColl),
       kvSet('s64_ericW', ericWants),
-      kvSet('s64_khaiW', khaiWants)
+      kvSet('s64_khaiW', khaiWants),
+      kvSet('s64_catalogs', vendorCatalogs)
     ]);
     hideSaving('✅ Saved to cloud');
     toast('✅ Saved to cloud', 'green');
@@ -1909,19 +2123,21 @@ async function loadKey(key) {
   return null;
 }
 async function loadData() {
-  const [items, eric, khai, ericW, khaiW] = await Promise.all([
-    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW')
+  const [items, eric, khai, ericW, khaiW, catalogs] = await Promise.all([
+    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs')
   ]);
   if (Array.isArray(items)) allItems = items;
   if (Array.isArray(eric)) ericColl = eric;
   if (Array.isArray(khai)) khaiColl = khai;
   if (Array.isArray(ericW)) ericWants = ericW;
   if (Array.isArray(khaiW)) khaiWants = khaiW;
+  if (catalogs && typeof catalogs === 'object' && !Array.isArray(catalogs)) vendorCatalogs = catalogs;
   if (allItems.length) renderResults();
   if (ericColl.length) renderCollection('eric');
   if (khaiColl.length) renderCollection('khai');
   if (ericWants.length) renderWants('eric');
   if (khaiWants.length) renderWants('khai');
+  renderCatalogs();
 }
 
 // ============================================================
@@ -2600,6 +2816,27 @@ document.addEventListener('DOMContentLoaded', function() {
     <button class="imgprev-close" onclick="closeImagePreview()" aria-label="Close">✕</button>
     <img id="imgPreviewImg" src="" alt="Listing image"/>
     <div class="imgprev-title" id="imgPreviewTitle"></div>
+  </div>
+</div>
+
+<!-- CATALOG ITEM MODAL -->
+<div class="modal-overlay" id="catItemModal">
+  <div class="modal">
+    <h2 id="catItemTitle">➕ Add Catalog Item</h2>
+    <div class="fg"><label>Vendor</label><select class="fi" id="cat_vendor"></select></div>
+    <div class="fg"><label>Item Name</label><input class="fi" id="cat_name" placeholder="e.g. MiniGT Porsche 911 GT3 RS"/></div>
+    <div class="frow">
+      <div class="fg"><label>Brand</label><input class="fi" id="cat_brand" placeholder="e.g. MiniGT"/></div>
+      <div class="fg"><label>Scale</label><select class="fi" id="cat_scale"><option value="">Select</option><option selected>1/64</option><option>1/18</option><option>1/43</option><option>1/32</option></select></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Supplier Price $</label><input class="fi" id="cat_price" type="number" step="0.01" placeholder="0.00"/></div>
+      <div class="fg"><label>Availability</label><select class="fi" id="cat_status"><option>In Stock</option><option>Out of Stock</option><option>Pre-Order</option><option>Low Stock</option></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('catItemModal')">Cancel</button>
+      <button class="btn-confirm" onclick="saveCatItem()">SAVE</button>
+    </div>
   </div>
 </div>
 
