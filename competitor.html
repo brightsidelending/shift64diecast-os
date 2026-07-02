@@ -1330,6 +1330,7 @@ async function saveData() {
     localStorage.setItem('s64_khaiW', JSON.stringify(khaiWants));
   } catch(e) {}
   showSaving('💾 Saving…');
+  toast('⏳ Saving…', 'yellow');
   try {
     await Promise.all([
       kvSet('s64_items', allItems),
@@ -1339,9 +1340,11 @@ async function saveData() {
       kvSet('s64_khaiW', khaiWants)
     ]);
     hideSaving('✅ Saved to cloud');
+    toast('✅ Saved to cloud', 'green');
   } catch(e) {
     console.log('Cloud save failed, kept local copy:', e);
     hideSaving('⚠️ Saved locally only');
+    toast('⚠️ Saved locally only', 'yellow');
   }
 }
 
