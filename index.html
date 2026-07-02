@@ -198,9 +198,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 /* product showcase image beside listings */
 .listings-wrap{display:flex;gap:14px;margin-bottom:14px;align-items:flex-start}
 .listings-grid{flex:1;min-width:0}
-.product-showcase{width:220px;flex-shrink:0;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,0.35)}
-.product-showcase img{width:100%;max-width:200px;border-radius:8px;object-fit:contain;background:var(--black);display:block}
+.product-showcase{width:290px;flex-shrink:0;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,0.35)}
+.product-showcase img{width:100%;max-width:270px;border-radius:8px;object-fit:contain;background:var(--black);display:block}
 .ps-label{font-family:'Rajdhani',sans-serif;font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:1px;margin-top:10px}
+.product-hero{display:none}
 /* MOBILE / RESPONSIVE */
 @media (max-width: 640px) {
   .main { padding: 18px 14px 40px !important; }
@@ -240,10 +241,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   .qsearch-btn { padding: 18px 10px !important; font-size: 14px !important; text-align: center; border-radius: 12px !important; flex: none !important; white-space: normal !important; }
   /* 3: hide quick-search chips */
   .quick-chips { display: none !important; }
-  /* product showcase: full width above the listings on mobile */
-  .listings-wrap { flex-direction: column !important; }
-  .product-showcase { width: 100% !important; order: -1; }
-  .product-showcase img { max-width: 100% !important; max-height: 260px; }
+  /* product image: clean full-width hero at very top on mobile; hide desktop showcase */
+  .product-hero { display: block !important; width: 100%; border: 1px solid var(--border); border-radius: 12px; object-fit: contain; background: var(--black); margin-bottom: 14px; max-height: 300px; }
+  .product-showcase { display: none !important; }
   /* 2: import cost settings collapsed by default, expand on tap */
   .imp-chevron { display: inline !important; font-size: 11px; color: var(--blue); font-weight: 600; letter-spacing: 0.5px; }
   #impCostBody { display: none !important; }
@@ -2125,11 +2125,13 @@ async function runPriceScan() {
       : `<div style="background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:18px;margin-bottom:14px;text-align:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;margin-bottom:4px;">🏷️ COMPETITOR PRICES</div><div style="font-size:13px;color:var(--gray);">No competitor data yet — scan in the Competitor tab.</div></div>`;
     const prodImg = ebayActivePrices[0]?.img || '';
     document.getElementById('psResults').innerHTML = `
+      ${prodImg ? `<img class="product-hero" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">${useRealData?((activeApprox||soldApprox)?'🟢 LIVE EBAY DATA · SIMILAR ITEMS':'🟢 LIVE EBAY DATA'):'🤖 AI ESTIMATE'} · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
         <div style="font-size:14px;line-height:1.6;">${action==='BUY'?`Strong buy. ${data.soldCount} units sold in last 30 days. True landed cost $${landed.toFixed(2)} vs avg sell $${sold.toFixed(2)} = ${marginPct}% net margin.`:action==='WATCH'?`Watch this. ${data.soldCount} sold recently. ${marginPct}% margin is acceptable but negotiate harder on wholesale price.`:`Thin margins at ${marginPct}%. Find a higher demand model or negotiate lower wholesale.`}</div>
       </div>
       <div class="listings-wrap">
+        ${prodImg ? `<div class="product-showcase"><img src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-label">Reference Photo</div></div>` : ''}
         <div class="mstack listings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
           <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
             <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟡 ACTIVE LISTINGS</div><span style="font-size:11px;color:var(--gold);">~${data.listings} active</span></div>
@@ -2140,7 +2142,6 @@ async function runPriceScan() {
             ${rl(soldListings,true)}
           </div>
         </div>
-        ${prodImg ? `<div class="product-showcase"><img src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-label">Reference Photo</div></div>` : ''}
       </div>
       ${competitorHtml}
       <div style="background:var(--card);border:2px solid var(--gold);border-radius:12px;padding:22px;">
