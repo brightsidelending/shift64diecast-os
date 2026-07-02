@@ -160,15 +160,63 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .sell-divider{border-top:1px solid var(--border);margin:14px 0 12px;padding-top:12px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;color:var(--gold);letter-spacing:1px}
 /* COLORS */
 .green{color:var(--green)}.gold{color:var(--gold)}.red-c{color:var(--red)}.blue-c{color:var(--blue)}.gray{color:var(--gray)}
+/* LOGIN */
+.login-overlay{position:fixed;inset:0;background:var(--black);z-index:10000;display:flex;align-items:center;justify-content:center;flex-direction:column}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:34px 30px;width:340px;max-width:92vw;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.6)}
+.login-logo{font-family:'Rajdhani',sans-serif;font-size:30px;font-weight:700;letter-spacing:2px;margin-bottom:4px}
+.login-logo span{color:var(--red)}
+.login-sub{font-size:11px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:22px}
+.pin-dots{display:flex;gap:14px;justify-content:center;margin-bottom:10px}
+.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);background:transparent;transition:all 0.15s}
+.pin-dot.filled{background:var(--gold);border-color:var(--gold)}
+.pin-error{height:18px;font-size:12px;color:var(--red);margin-bottom:14px;font-weight:600}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.key{background:var(--black);border:1px solid var(--border);color:var(--white);font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;border-radius:10px;padding:16px 0;cursor:pointer;transition:all 0.12s;user-select:none}
+.key:hover{border-color:var(--red);color:var(--red)}
+.key:active{background:var(--dark);transform:scale(0.96)}
+.key.key-fn{font-size:13px;color:var(--gray)}
+.login-shake{animation:shake 0.4s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.userbar-btn{background:var(--card);border:1px solid var(--border);color:var(--gray);padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif}
+.userbar-btn:hover{border-color:var(--red);color:var(--white)}
 </style>
 </head>
 <body>
+<!-- LOGIN SCREEN -->
+<div id="loginOverlay" class="login-overlay">
+  <div class="login-box" id="loginBox">
+    <div class="login-logo">SHIFT<span>64</span>DIECAST</div>
+    <div class="login-sub">Enter Passcode</div>
+    <div class="pin-dots" id="pinDots">
+      <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+    </div>
+    <div class="pin-error" id="pinError"></div>
+    <div class="keypad">
+      <button class="key" onclick="pinPress('1')">1</button>
+      <button class="key" onclick="pinPress('2')">2</button>
+      <button class="key" onclick="pinPress('3')">3</button>
+      <button class="key" onclick="pinPress('4')">4</button>
+      <button class="key" onclick="pinPress('5')">5</button>
+      <button class="key" onclick="pinPress('6')">6</button>
+      <button class="key" onclick="pinPress('7')">7</button>
+      <button class="key" onclick="pinPress('8')">8</button>
+      <button class="key" onclick="pinPress('9')">9</button>
+      <button class="key key-fn" onclick="pinClear()">CLEAR</button>
+      <button class="key" onclick="pinPress('0')">0</button>
+      <button class="key key-fn" onclick="pinDel()">⌫</button>
+    </div>
+  </div>
+</div>
 <div class="header">
   <div>
     <div class="logo">SHIFT<span>64</span>DIECAST</div>
     <div class="tagline">Small Scale. Real Passion.</div>
   </div>
-  
+  <div id="userBar" style="display:none;align-items:center;gap:10px;">
+    <span id="userLabel" style="font-size:12px;color:var(--gold);font-family:'Rajdhani',sans-serif;letter-spacing:1px;text-transform:uppercase;"></span>
+    <button id="adminBtn" class="userbar-btn" style="display:none;" onclick="openPwModal()">⚙ Change Passwords</button>
+    <button class="userbar-btn" onclick="logout()">Log Out</button>
+  </div>
 </div>
 <div class="nav" style="overflow-x:auto;">
   <button class="nav-tab active" onclick="showTab('price_scanner',this)">🔍 Price Scanner</button>
@@ -714,6 +762,124 @@ let screenshots = []; // {id, dataUrl, base64, hash}
 let allItems = [];
 let ericColl = [], khaiColl = [];
 let ericWants = [], khaiWants = [];
+
+// ============================================================
+// LOGIN / PASSCODE
+// ============================================================
+const DEFAULT_PINS = { eric: '0925', khai: '1111' };
+let currentUser = null;
+let pinEntry = '';
+
+function getPins() {
+  try {
+    const s = JSON.parse(localStorage.getItem('s64_pins'));
+    if (s && /^\d{4}$/.test(s.eric) && /^\d{4}$/.test(s.khai)) return s;
+  } catch (e) {}
+  return { ...DEFAULT_PINS };
+}
+
+function isLoginVisible() {
+  const o = document.getElementById('loginOverlay');
+  return o && o.style.display !== 'none';
+}
+
+function renderDots() {
+  const dots = document.querySelectorAll('#pinDots .pin-dot');
+  dots.forEach((d, idx) => d.classList.toggle('filled', idx < pinEntry.length));
+}
+
+function pinPress(d) {
+  if (pinEntry.length >= 4) return;
+  document.getElementById('pinError').textContent = '';
+  pinEntry += d;
+  renderDots();
+  if (pinEntry.length === 4) setTimeout(checkPin, 130);
+}
+
+function pinDel() {
+  pinEntry = pinEntry.slice(0, -1);
+  renderDots();
+}
+
+function pinClear() {
+  pinEntry = '';
+  renderDots();
+  document.getElementById('pinError').textContent = '';
+}
+
+function checkPin() {
+  const pins = getPins();
+  if (pinEntry === pins.eric) { loginAs('eric'); }
+  else if (pinEntry === pins.khai) { loginAs('khai'); }
+  else {
+    document.getElementById('pinError').textContent = 'Wrong passcode';
+    const box = document.getElementById('loginBox');
+    box.classList.remove('login-shake');
+    void box.offsetWidth;
+    box.classList.add('login-shake');
+    pinEntry = '';
+    renderDots();
+  }
+}
+
+function loginAs(user) {
+  currentUser = user;
+  document.getElementById('loginOverlay').style.display = 'none';
+  const bar = document.getElementById('userBar');
+  bar.style.display = 'flex';
+  document.getElementById('userLabel').textContent = user === 'eric' ? 'Eric' : 'Khai';
+  document.getElementById('adminBtn').style.display = user === 'eric' ? 'inline-block' : 'none';
+  pinEntry = '';
+  renderDots();
+  document.getElementById('pinError').textContent = '';
+}
+
+function logout() {
+  currentUser = null;
+  document.getElementById('userBar').style.display = 'none';
+  document.getElementById('loginOverlay').style.display = 'flex';
+  pinEntry = '';
+  renderDots();
+}
+
+function openPwModal() {
+  if (currentUser !== 'eric') return;
+  const pins = getPins();
+  document.getElementById('pw_eric').value = pins.eric;
+  document.getElementById('pw_khai').value = pins.khai;
+  const msg = document.getElementById('pw_msg');
+  msg.textContent = '';
+  openModal('pwModal');
+}
+
+function savePins() {
+  const e = document.getElementById('pw_eric').value.trim();
+  const k = document.getElementById('pw_khai').value.trim();
+  const msg = document.getElementById('pw_msg');
+  if (!/^\d{4}$/.test(e) || !/^\d{4}$/.test(k)) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = 'Each passcode must be exactly 4 digits.';
+    return;
+  }
+  if (e === k) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = 'The two passcodes must be different.';
+    return;
+  }
+  localStorage.setItem('s64_pins', JSON.stringify({ eric: e, khai: k }));
+  msg.style.color = 'var(--green)';
+  msg.textContent = 'Saved. New passcodes are active.';
+  setTimeout(() => closeModal('pwModal'), 900);
+}
+
+// Keyboard support for the passcode screen (top-row + numpad digits)
+document.addEventListener('keydown', function(e) {
+  if (!isLoginVisible()) return;
+  if (e.key >= '0' && e.key <= '9') { pinPress(e.key); e.preventDefault(); }
+  else if (e.key === 'Backspace') { pinDel(); e.preventDefault(); }
+  else if (e.key === 'Enter') { if (pinEntry.length === 4) checkPin(); e.preventDefault(); }
+  else if (e.key === 'Escape') { pinClear(); }
+});
 
 // ============================================================
 // TABS
@@ -1900,6 +2066,20 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="fg"><label>Supplier / Platform</label><input class="fi" id="tx_supplier"/></div>
     <div class="fg"><label>Amount $</label><input class="fi" id="tx_amount" type="number"/></div>
     <div class="modal-actions"><button class="btn-cancel" onclick="closeModal('txModal')">Cancel</button><button class="btn-confirm" onclick="addTransaction()">LOG IT</button></div>
+  </div>
+</div>
+
+<!-- CHANGE PASSWORDS MODAL (admin) -->
+<div class="modal-overlay" id="pwModal">
+  <div class="modal">
+    <h2>🔒 Change Passcodes</h2>
+    <div class="fg"><label>Eric's Passcode (4 digits)</label><input class="fi" id="pw_eric" type="text" inputmode="numeric" maxlength="4" autocomplete="off"/></div>
+    <div class="fg"><label>Khai's Passcode (4 digits)</label><input class="fi" id="pw_khai" type="text" inputmode="numeric" maxlength="4" autocomplete="off"/></div>
+    <div id="pw_msg" style="font-size:12px;font-weight:600;min-height:16px;margin-top:2px;"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('pwModal')">Cancel</button>
+      <button class="btn-confirm" onclick="savePins()">SAVE</button>
+    </div>
   </div>
 </div>
 
