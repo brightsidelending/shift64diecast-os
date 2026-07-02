@@ -526,6 +526,7 @@ let screenshots = []; // {id, dataUrl, base64, hash}
 let allItems = [];
 let ericColl = [], khaiColl = [];
 let ericWants = [], khaiWants = [];
+const PROXY_URL = 'https://shift64diecast-os.vercel.app/api/proxy';
 
 // ============================================================
 // TABS
@@ -1289,30 +1290,80 @@ function updateIntel() {
 // ============================================================
 // SAVE / LOAD
 // ============================================================
-function saveData() {
+// Cloud storage (Vercel KV via proxy) with localStorage fallback
+function showSaving(text) {
+  let el = document.getElementById('saveIndicator');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'saveIndicator';
+    el.style.cssText = 'position:fixed;bottom:16px;right:16px;background:var(--card);border:1px solid var(--border);color:var(--gold);padding:8px 14px;border-radius:8px;font-size:12px;font-family:Inter,sans-serif;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,0.45);transition:opacity 0.3s;';
+    document.body.appendChild(el);
+  }
+  el.textContent = text || '💾 Saving…';
+  el.style.display = 'block';
+  el.style.opacity = '1';
+}
+function hideSaving(text) {
+  const el = document.getElementById('saveIndicator');
+  if (!el) return;
+  if (text) el.textContent = text;
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => { el.style.display = 'none'; }, 300); }, text ? 1400 : 0);
+}
+async function kvSet(key, value) {
+  const r = await fetch(PROXY_URL + '?type=save_data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value }) });
+  const d = await r.json();
+  if (!d || !d.ok) throw new Error(d && d.error ? d.error : 'save failed');
+}
+async function kvGet(key) {
+  const r = await fetch(PROXY_URL + '?type=load_data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+  const d = await r.json();
+  if (!d || !d.ok) throw new Error('load failed');
+  return d.value;
+}
+
+async function saveData() {
   try {
     localStorage.setItem('s64_items', JSON.stringify(allItems));
     localStorage.setItem('s64_eric', JSON.stringify(ericColl));
     localStorage.setItem('s64_khai', JSON.stringify(khaiColl));
     localStorage.setItem('s64_ericW', JSON.stringify(ericWants));
     localStorage.setItem('s64_khaiW', JSON.stringify(khaiWants));
-    toast('💾 Data saved.', 'green');
-  } catch(e) { toast('⚠️ Could not save.','yellow'); }
+  } catch(e) {}
+  showSaving('💾 Saving…');
+  try {
+    await Promise.all([
+      kvSet('s64_items', allItems),
+      kvSet('s64_eric', ericColl),
+      kvSet('s64_khai', khaiColl),
+      kvSet('s64_ericW', ericWants),
+      kvSet('s64_khaiW', khaiWants)
+    ]);
+    hideSaving('✅ Saved to cloud');
+  } catch(e) {
+    console.log('Cloud save failed, kept local copy:', e);
+    hideSaving('⚠️ Saved locally only');
+  }
 }
 
-function loadData() {
-  try {
-    const items = localStorage.getItem('s64_items');
-    const eric = localStorage.getItem('s64_eric');
-    const khai = localStorage.getItem('s64_khai');
-    const ericW = localStorage.getItem('s64_ericW');
-    const khaiW = localStorage.getItem('s64_khaiW');
-    if (items) { allItems = JSON.parse(items); if (allItems.length) renderResults(); }
-    if (eric) { ericColl = JSON.parse(eric); if (ericColl.length) renderCollection('eric'); }
-    if (khai) { khaiColl = JSON.parse(khai); if (khaiColl.length) renderCollection('khai'); }
-    if (ericW) { ericWants = JSON.parse(ericW); if (ericWants.length) renderWants('eric'); }
-    if (khaiW) { khaiWants = JSON.parse(khaiW); if (khaiWants.length) renderWants('khai'); }
-  } catch(e) { console.log('No saved data'); }
+async function loadKey(key) {
+  try { const v = await kvGet(key); if (v != null) return v; } catch(e) {}
+  try { const ls = localStorage.getItem(key); if (ls) return JSON.parse(ls); } catch(e) {}
+  return null;
+}
+async function loadData() {
+  const [items, eric, khai, ericW, khaiW] = await Promise.all([
+    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW')
+  ]);
+  if (Array.isArray(items)) allItems = items;
+  if (Array.isArray(eric)) ericColl = eric;
+  if (Array.isArray(khai)) khaiColl = khai;
+  if (Array.isArray(ericW)) ericWants = ericW;
+  if (Array.isArray(khaiW)) khaiWants = khaiW;
+  if (allItems.length) renderResults();
+  if (ericColl.length) renderCollection('eric');
+  if (khaiColl.length) renderCollection('khai');
+  if (ericWants.length) renderWants('eric');
+  if (khaiWants.length) renderWants('khai');
 }
 
 // ============================================================

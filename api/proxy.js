@@ -42,6 +42,48 @@ export default async function handler(req, res) {
     }
   }
 
+  // Vercel KV — save data (persistent, cross-device)
+  if (type === 'save_data') {
+    try {
+      const { key, value } = req.body || {};
+      if (!key) return res.status(400).json({ ok: false, error: 'Missing key' });
+      const kv = kvConfig();
+      if (!kv) return res.status(200).json({ ok: false, error: 'KV not configured' });
+      const r = await fetch(kv.url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${kv.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(['SET', key, JSON.stringify(value)])
+      });
+      const data = await r.json();
+      return res.status(200).json({ ok: true, result: data.result });
+    } catch (err) {
+      return res.status(200).json({ ok: false, error: err.message });
+    }
+  }
+
+  // Vercel KV — load data
+  if (type === 'load_data') {
+    try {
+      const { key } = req.body || {};
+      if (!key) return res.status(400).json({ ok: false, error: 'Missing key' });
+      const kv = kvConfig();
+      if (!kv) return res.status(200).json({ ok: false, error: 'KV not configured' });
+      const r = await fetch(kv.url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${kv.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(['GET', key])
+      });
+      const data = await r.json();
+      let value = null;
+      if (data && data.result != null) {
+        try { value = JSON.parse(data.result); } catch (e) { value = data.result; }
+      }
+      return res.status(200).json({ ok: true, value });
+    } catch (err) {
+      return res.status(200).json({ ok: false, error: err.message, value: null });
+    }
+  }
+
   // Anthropic AI
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
@@ -59,6 +101,13 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
+}
+
+function kvConfig() {
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  return { url, token };
 }
 
 async function getEbayToken() {

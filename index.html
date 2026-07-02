@@ -202,6 +202,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .product-showcase img{width:100%;max-width:270px;border-radius:8px;object-fit:contain;background:var(--black);display:block}
 .ps-label{font-family:'Rajdhani',sans-serif;font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:1px;margin-top:10px}
 .product-hero{display:none}
+.row-action{background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--gray);cursor:pointer;font-size:12px;padding:4px 7px;margin-left:4px;transition:all 0.15s}
+.row-action:hover{border-color:var(--blue);color:var(--white)}
+.row-del:hover{border-color:var(--red);color:var(--red)}
 .show-more-btn{display:block;width:100%;background:transparent;border:none;border-top:1px solid var(--border);color:var(--blue);padding:11px;font-size:12px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:background 0.15s}
 .show-more-btn:hover{background:rgba(74,144,217,0.1)}
 /* image preview popup */
@@ -618,7 +621,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
     <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;">🏎️ Eric's Personal Collection</div>
     <div style="display:flex;gap:8px;">
-      <button class="btn-sm" onclick="openModal('ericModal')">+ ADD ITEM</button>
+      <button class="btn-sm" onclick="openAddCollection('eric')">+ ADD ITEM</button>
       <button class="btn-sm" style="background:var(--gold);color:var(--black);" onclick="saveData()">💾 SAVE</button>
       <button class="btn-sm" style="background:var(--green);color:var(--black);" onclick="exportColl('eric')">⬇️ EXPORT</button>
     </div>
@@ -635,9 +638,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <thead><tr>
         <th>Model</th><th>Brand</th><th>Scale</th><th>Paid</th><th>Shipping</th>
         <th>Total Cost</th><th>Bought From</th><th>Condition</th>
-        <th>Asking $</th><th>Sold $</th><th>Sold On</th><th>Profit/Loss</th><th>Status</th><th>Notes</th>
+        <th>Asking $</th><th>Sold $</th><th>Sold On</th><th>Profit/Loss</th><th>Status</th><th>Notes</th><th style="text-align:right;">Actions</th>
       </tr></thead>
-      <tbody id="ericBody"><tr><td colspan="14" style="text-align:center;color:var(--gray);padding:40px;">No items yet.</td></tr></tbody>
+      <tbody id="ericBody"><tr><td colspan="15" style="text-align:center;color:var(--gray);padding:40px;">No items yet.</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -647,7 +650,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
     <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;">🏎️ Khai's Personal Collection</div>
     <div style="display:flex;gap:8px;">
-      <button class="btn-sm" style="background:var(--blue);" onclick="openModal('khaiModal')">+ ADD ITEM</button>
+      <button class="btn-sm" style="background:var(--blue);" onclick="openAddCollection('khai')">+ ADD ITEM</button>
       <button class="btn-sm" style="background:var(--gold);color:var(--black);" onclick="saveData()">💾 SAVE</button>
       <button class="btn-sm" style="background:var(--green);color:var(--black);" onclick="exportColl('khai')">⬇️ EXPORT</button>
     </div>
@@ -664,9 +667,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <thead><tr>
         <th>Model</th><th>Brand</th><th>Scale</th><th>Paid</th><th>Shipping</th>
         <th>Total Cost</th><th>Bought From</th><th>Condition</th>
-        <th>Asking $</th><th>Sold $</th><th>Sold On</th><th>Profit/Loss</th><th>Status</th><th>Notes</th>
+        <th>Asking $</th><th>Sold $</th><th>Sold On</th><th>Profit/Loss</th><th>Status</th><th>Notes</th><th style="text-align:right;">Actions</th>
       </tr></thead>
-      <tbody id="khaiBody"><tr><td colspan="14" style="text-align:center;color:var(--gray);padding:40px;">No items yet.</td></tr></tbody>
+      <tbody id="khaiBody"><tr><td colspan="15" style="text-align:center;color:var(--gray);padding:40px;">No items yet.</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -742,7 +745,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <!-- ERIC COLLECTION MODAL -->
 <div class="modal-overlay" id="ericModal">
   <div class="modal">
-    <h2>➕ Add to Eric's Collection</h2>
+    <h2 id="e_modalTitle">➕ Add to Eric's Collection</h2>
     <div class="fg"><label>Model Name</label><input class="fi" id="e_name" placeholder="e.g. MiniGT Porsche 911 GT3 RS"/></div>
     <div class="frow">
       <div class="fg"><label>Brand</label><input class="fi" id="e_brand" placeholder="e.g. MiniGT"/></div>
@@ -769,7 +772,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('ericModal')">Cancel</button>
-      <button class="btn-confirm" onclick="addToCollection('eric')">ADD TO COLLECTION</button>
+      <button class="btn-confirm" id="e_saveBtn" onclick="addToCollection('eric')">ADD TO COLLECTION</button>
     </div>
   </div>
 </div>
@@ -777,7 +780,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <!-- KHAI COLLECTION MODAL -->
 <div class="modal-overlay" id="khaiModal">
   <div class="modal">
-    <h2>➕ Add to Khai's Collection</h2>
+    <h2 id="k_modalTitle">➕ Add to Khai's Collection</h2>
     <div class="fg"><label>Model Name</label><input class="fi" id="k_name" placeholder="e.g. MiniGT Porsche 911 GT3 RS"/></div>
     <div class="frow">
       <div class="fg"><label>Brand</label><input class="fi" id="k_brand" placeholder="e.g. MiniGT"/></div>
@@ -804,7 +807,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('khaiModal')">Cancel</button>
-      <button class="btn-confirm" style="background:var(--blue);" onclick="addToCollection('khai')">ADD TO COLLECTION</button>
+      <button class="btn-confirm" style="background:var(--blue);" id="k_saveBtn" onclick="addToCollection('khai')">ADD TO COLLECTION</button>
     </div>
   </div>
 </div>
@@ -1527,6 +1530,8 @@ function clearScanner() {
 // ============================================================
 // COLLECTIONS
 // ============================================================
+let editingColl = { eric: null, khai: null };
+
 function addToCollection(who) {
   const p = who === 'eric' ? 'e_' : 'k_';
   const name = document.getElementById(p+'name').value.trim();
@@ -1550,18 +1555,81 @@ function addToCollection(who) {
     solddate: document.getElementById(p+'solddate').value,
     profit, saleStatus
   };
-  if (who === 'eric') ericColl.push(item);
-  else khaiColl.push(item);
+  const editIdx = editingColl[who];
+  if (editIdx != null) {
+    if (who === 'eric') ericColl[editIdx] = item; else khaiColl[editIdx] = item;
+    editingColl[who] = null;
+  } else {
+    if (who === 'eric') ericColl.push(item); else khaiColl.push(item);
+  }
   renderCollection(who);
   closeModal(who+'Modal');
   saveData();
-  toast('✅ Added to ' + (who === 'eric' ? 'Eric' : 'Khai') + '\'s collection.', 'green');
+  toast(editIdx != null ? '✅ Item updated.' : ('✅ Added to ' + (who === 'eric' ? 'Eric' : 'Khai') + '\'s collection.'), 'green');
+}
+
+// Open the collection modal for a fresh add (clears fields, resets edit state)
+function openAddCollection(who) {
+  editingColl[who] = null;
+  const p = who === 'eric' ? 'e_' : 'k_';
+  ['name','brand','scale','paid','ship','from','date','notes','ask','sold','soldon','solddate'].forEach(f => {
+    const el = document.getElementById(p + f); if (el) el.value = '';
+  });
+  const cond = document.getElementById(p + 'cond'); if (cond) cond.selectedIndex = 0;
+  setCollBtn(who, false);
+  openModal(who + 'Modal');
+}
+
+// Open the collection modal pre-filled with an existing item for editing
+function editCollItem(who, idx) {
+  const coll = who === 'eric' ? ericColl : khaiColl;
+  const it = coll[idx];
+  if (!it) return;
+  editingColl[who] = idx;
+  const p = who === 'eric' ? 'e_' : 'k_';
+  document.getElementById(p + 'name').value = it.name || '';
+  document.getElementById(p + 'brand').value = it.brand || '';
+  document.getElementById(p + 'scale').value = it.scale || '';
+  document.getElementById(p + 'paid').value = it.paid != null ? it.paid : '';
+  document.getElementById(p + 'ship').value = it.ship != null ? it.ship : '';
+  document.getElementById(p + 'from').value = it.from || '';
+  document.getElementById(p + 'cond').value = it.cond || '';
+  document.getElementById(p + 'date').value = it.date || '';
+  document.getElementById(p + 'notes').value = it.notes || '';
+  document.getElementById(p + 'ask').value = it.ask > 0 ? it.ask : '';
+  document.getElementById(p + 'sold').value = it.sold > 0 ? it.sold : '';
+  document.getElementById(p + 'soldon').value = it.soldon || '';
+  document.getElementById(p + 'solddate').value = it.solddate || '';
+  setCollBtn(who, true);
+  openModal(who + 'Modal');
+}
+
+// Delete a collection item after confirmation
+function deleteCollItem(who, idx) {
+  const coll = who === 'eric' ? ericColl : khaiColl;
+  const it = coll[idx];
+  if (!it) return;
+  const name = who === 'eric' ? 'Eric' : 'Khai';
+  if (!confirm('Delete "' + (it.name || 'this item') + '" from ' + name + "'s collection? This cannot be undone.")) return;
+  coll.splice(idx, 1);
+  renderCollection(who);
+  saveData();
+  toast('🗑️ Item deleted.', 'yellow');
+}
+
+// Switch the collection modal between "add" and "edit" wording
+function setCollBtn(who, editing) {
+  const name = who === 'eric' ? 'Eric' : 'Khai';
+  const t = document.getElementById((who === 'eric' ? 'e_' : 'k_') + 'modalTitle');
+  const b = document.getElementById((who === 'eric' ? 'e_' : 'k_') + 'saveBtn');
+  if (t) t.textContent = editing ? ('✏️ Edit ' + name + "'s Item") : ('➕ Add to ' + name + "'s Collection");
+  if (b) b.textContent = editing ? 'SAVE CHANGES' : 'ADD TO COLLECTION';
 }
 
 function renderCollection(who) {
   const coll = who === 'eric' ? ericColl : khaiColl;
   const tbody = document.getElementById(who+'Body');
-  if (!coll.length) { tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--gray);padding:40px;">No items yet.</td></tr>`; return; }
+  if (!coll.length) { tbody.innerHTML = `<tr><td colspan="15" style="text-align:center;color:var(--gray);padding:40px;">No items yet.</td></tr>`; return; }
   const totalPaid = coll.reduce((a,b)=>a+b.total,0);
   const totalProfit = coll.filter(i=>i.profit!=null).reduce((a,b)=>a+(b.profit||0),0);
   document.getElementById(who+'Total').textContent = coll.length;
@@ -1570,7 +1638,7 @@ function renderCollection(who) {
   document.getElementById(who+'Profit').textContent = (totalProfit>=0?'+':'')+'$'+totalProfit.toFixed(2);
   document.getElementById(who+'Profit').style.color = totalProfit>=0 ? 'var(--green)' : 'var(--red)';
 
-  tbody.innerHTML = coll.map(item => {
+  tbody.innerHTML = coll.map((item, idx) => {
     const pColor = item.profit != null ? (item.profit > 0 ? 'var(--green)' : 'var(--red)') : 'var(--gray)';
     const ssBadge = item.saleStatus === 'Sold' ? 'b-instock' : item.saleStatus === 'For Sale' ? 'b-preorder' : 'b-unknown';
     return `<tr>
@@ -1586,6 +1654,7 @@ function renderCollection(who) {
       <td style="color:${pColor};font-weight:700;">${item.profit!=null?(item.profit>=0?'+':'')+'$'+Math.abs(item.profit).toFixed(2):'-'}</td>
       <td><span class="badge ${ssBadge}">${item.saleStatus}</span></td>
       <td style="color:var(--gold);font-size:12px;">${item.notes||'-'}</td>
+      <td style="white-space:nowrap;text-align:right;"><button class="row-action" title="Edit" onclick="editCollItem('${who}',${idx})">✏️</button><button class="row-action row-del" title="Delete" onclick="deleteCollItem('${who}',${idx})">🗑️</button></td>
     </tr>`;
   }).join('');
 }
@@ -1769,30 +1838,81 @@ function updateIntel() {
 // ============================================================
 // SAVE / LOAD
 // ============================================================
-function saveData() {
+// Cloud storage (Vercel KV via proxy) with localStorage fallback
+function showSaving(text) {
+  let el = document.getElementById('saveIndicator');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'saveIndicator';
+    el.style.cssText = 'position:fixed;bottom:16px;right:16px;background:var(--card);border:1px solid var(--border);color:var(--gold);padding:8px 14px;border-radius:8px;font-size:12px;font-family:Inter,sans-serif;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,0.45);transition:opacity 0.3s;';
+    document.body.appendChild(el);
+  }
+  el.textContent = text || '💾 Saving…';
+  el.style.display = 'block';
+  el.style.opacity = '1';
+}
+function hideSaving(text) {
+  const el = document.getElementById('saveIndicator');
+  if (!el) return;
+  if (text) el.textContent = text;
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => { el.style.display = 'none'; }, 300); }, text ? 1400 : 0);
+}
+async function kvSet(key, value) {
+  const r = await fetch(PROXY_URL + '?type=save_data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value }) });
+  const d = await r.json();
+  if (!d || !d.ok) throw new Error(d && d.error ? d.error : 'save failed');
+}
+async function kvGet(key) {
+  const r = await fetch(PROXY_URL + '?type=load_data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+  const d = await r.json();
+  if (!d || !d.ok) throw new Error('load failed');
+  return d.value; // may be null if not stored
+}
+
+async function saveData() {
+  // localStorage always written as a fallback
   try {
     localStorage.setItem('s64_items', JSON.stringify(allItems));
     localStorage.setItem('s64_eric', JSON.stringify(ericColl));
     localStorage.setItem('s64_khai', JSON.stringify(khaiColl));
     localStorage.setItem('s64_ericW', JSON.stringify(ericWants));
     localStorage.setItem('s64_khaiW', JSON.stringify(khaiWants));
-    toast('💾 Data saved.', 'green');
-  } catch(e) { toast('⚠️ Could not save.','yellow'); }
+  } catch(e) {}
+  showSaving('💾 Saving…');
+  try {
+    await Promise.all([
+      kvSet('s64_items', allItems),
+      kvSet('s64_eric', ericColl),
+      kvSet('s64_khai', khaiColl),
+      kvSet('s64_ericW', ericWants),
+      kvSet('s64_khaiW', khaiWants)
+    ]);
+    hideSaving('✅ Saved to cloud');
+  } catch(e) {
+    console.log('Cloud save failed, kept local copy:', e);
+    hideSaving('⚠️ Saved locally only');
+  }
 }
 
-function loadData() {
-  try {
-    const items = localStorage.getItem('s64_items');
-    const eric = localStorage.getItem('s64_eric');
-    const khai = localStorage.getItem('s64_khai');
-    const ericW = localStorage.getItem('s64_ericW');
-    const khaiW = localStorage.getItem('s64_khaiW');
-    if (items) { allItems = JSON.parse(items); if (allItems.length) renderResults(); }
-    if (eric) { ericColl = JSON.parse(eric); if (ericColl.length) renderCollection('eric'); }
-    if (khai) { khaiColl = JSON.parse(khai); if (khaiColl.length) renderCollection('khai'); }
-    if (ericW) { ericWants = JSON.parse(ericW); if (ericWants.length) renderWants('eric'); }
-    if (khaiW) { khaiWants = JSON.parse(khaiW); if (khaiWants.length) renderWants('khai'); }
-  } catch(e) { console.log('No saved data'); }
+async function loadKey(key) {
+  try { const v = await kvGet(key); if (v != null) return v; } catch(e) {}
+  try { const ls = localStorage.getItem(key); if (ls) return JSON.parse(ls); } catch(e) {}
+  return null;
+}
+async function loadData() {
+  const [items, eric, khai, ericW, khaiW] = await Promise.all([
+    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW')
+  ]);
+  if (Array.isArray(items)) allItems = items;
+  if (Array.isArray(eric)) ericColl = eric;
+  if (Array.isArray(khai)) khaiColl = khai;
+  if (Array.isArray(ericW)) ericWants = ericW;
+  if (Array.isArray(khaiW)) khaiWants = khaiW;
+  if (allItems.length) renderResults();
+  if (ericColl.length) renderCollection('eric');
+  if (khaiColl.length) renderCollection('khai');
+  if (ericWants.length) renderWants('eric');
+  if (khaiWants.length) renderWants('khai');
 }
 
 // ============================================================
