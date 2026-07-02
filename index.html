@@ -2210,18 +2210,18 @@ function stripScale(q) {
 function openAliExpress() {
   const q = document.getElementById('psSearchInput').value.trim();
   if (!q) { alert('Type a model in the search box first.'); return; }
-  window.open('https://www.aliexpress.com/wholesale?SearchText=' + encodeURIComponent(stripScale(q)), '_blank', 'noopener');
+  window.open('https://www.aliexpress.com/wholesale?SearchText=' + encodeURIComponent(q), '_blank', 'noopener');
 }
 
 // Open a competitor store's search page for whatever is typed in the scanner box
 function openSiteSearch(site) {
   const q = document.getElementById('psSearchInput').value.trim();
   if (!q) { alert('Type a model in the search box first.'); return; }
-  const enc = encodeURIComponent(stripScale(q));
+  const enc = encodeURIComponent(q);
   const urls = {
     horizon: 'https://horizondiecast.com/search?q=' + enc,
     carbromc: 'https://carbromc.com/search?q=' + enc,
-    rcmart: 'https://www.rcmart.com/product-search?search=' + enc,
+    rcmart: 'https://www.rcmart.com/product-search?search=' + encodeURIComponent(stripScale(q)),
     pablo: 'https://www.pablodiecastgarage.com/search?q=' + enc
   };
   if (urls[site]) window.open(urls[site], '_blank', 'noopener');
