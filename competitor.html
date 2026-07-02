@@ -747,18 +747,63 @@ Return ONLY this JSON (no markdown, no explanation):
     }
   }
 
-  allItems = [...allItems, ...newConfirmed];
+  // Duplicate detection: skip items already in the list (fuzzy name/brand match)
+  const toAdd = [];
+  const priceConflicts = [];
+  let skipped = 0;
+  newConfirmed.forEach(ni => {
+    const dup = findDuplicateItem(ni, allItems) || findDuplicateItem(ni, toAdd);
+    if (dup) {
+      skipped++;
+      const np = parseFloat(ni.price), op = parseFloat(dup.price);
+      if (!isNaN(np) && (isNaN(op) || np !== op)) priceConflicts.push({ existing: dup, newPrice: np, oldPrice: op });
+    } else {
+      toAdd.push(ni);
+    }
+  });
+  if (priceConflicts.length) {
+    const msg = priceConflicts.length + ' item' + (priceConflicts.length > 1 ? 's' : '') +
+      ' already exist with a different price in this scan.\n\nOK = update to the new scanned price' +
+      (priceConflicts.length > 1 ? 's' : '') + ', Cancel = keep existing.';
+    if (confirm(msg)) priceConflicts.forEach(c => { c.existing.price = c.newPrice; });
+  }
+  allItems = [...allItems, ...toAdd];
   renderResults();
   if (newUnclear.length > 0) renderUnclear(newUnclear);
   updateIntel();
   document.getElementById('loadingDiv').style.display = 'none';
   document.getElementById('scanBtn').disabled = false;
+  if (toAdd.length || skipped) saveData();
 
-  if (newUnclear.length > 0) {
-    toast('⚠️ ' + newConfirmed.length + ' items extracted. ' + newUnclear.length + ' need your review below.', 'yellow');
-  } else {
-    toast('✅ ' + newConfirmed.length + ' items extracted successfully!', 'green');
-  }
+  const parts = [];
+  if (toAdd.length) parts.push('✅ ' + toAdd.length + ' item' + (toAdd.length > 1 ? 's' : '') + ' added');
+  if (skipped) parts.push('ℹ️ ' + skipped + ' duplicate' + (skipped > 1 ? 's' : '') + ' skipped');
+  if (newUnclear.length > 0) parts.push('⚠️ ' + newUnclear.length + ' need review below');
+  toast(parts.join(' · ') || '✅ Scan complete', skipped || newUnclear.length ? 'yellow' : 'green');
+}
+
+// ---- Fuzzy duplicate detection (brand + model keyword overlap) ----
+function _normText(s) {
+  return (s || '').toLowerCase()
+    .replace(/\b1\s*[\/:]\s*\d{2,3}\b/g, ' ')   // drop scale tokens
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+function _itemTokens(item) {
+  const base = _normText(((item.brand || '') + ' ' + (item.name || '')));
+  return new Set(base.split(' ').filter(w => w.length >= 3));
+}
+function itemsSimilar(a, b) {
+  const ta = _itemTokens(a), tb = _itemTokens(b);
+  if (!ta.size || !tb.size) return false;
+  let inter = 0; ta.forEach(w => { if (tb.has(w)) inter++; });
+  const union = new Set([...ta, ...tb]).size;
+  const jaccard = inter / union;
+  const minOverlap = inter / Math.min(ta.size, tb.size);
+  return jaccard >= 0.6 || minOverlap >= 0.8;
+}
+function findDuplicateItem(item, list) {
+  return (list || []).find(ex => itemsSimilar(item, ex));
 }
 
 // ============================================================
