@@ -1604,7 +1604,8 @@ async function runPriceScan() {
         title: i.title,
         price: parseFloat(i.price?.value || 0),
         currency: i.price?.currency || 'USD',
-        condition: i.condition || 'New'
+        condition: i.condition || 'New',
+        shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null
       })).filter(i => i.price > 0);
       useRealData = true;
     }
@@ -1660,7 +1661,8 @@ async function runPriceScan() {
     const action = marginPct >= 80 ? 'BUY' : marginPct >= 40 ? 'WATCH' : 'PASS';
     const actionColor = action==='BUY'?'var(--green)':action==='WATCH'?'var(--yellow)':'var(--red)';
     const marginColor = marginPct>=80?'var(--green)':marginPct>=40?'var(--yellow)':'var(--red)';
-    const activeListings = ebayActivePrices.length > 0 ? ebayActivePrices.slice(0,4).map(i => ({title:i.title,price:i.price,meta:i.condition+' · Live eBay Data'})) : [
+    const fmtShip = s => s != null ? (s === 0 ? 'Free shipping' : '+$'+s.toFixed(2)+' ship') : 'Shipping n/a';
+    const activeListings = ebayActivePrices.length > 0 ? ebayActivePrices.slice(0,4).map(i => ({title:i.title,price:i.price,meta:i.condition+' · '+fmtShip(i.shipping)})) : [
       {title:`${query} — New Sealed`,price:active,meta:'Buy It Now · Estimated'},
       {title:`${query} — Brand New`,price:(active*0.92).toFixed(2),meta:'Estimated'},
       {title:`${query} — Limited Release`,price:(active*1.18).toFixed(2),meta:'Estimated'},
@@ -1893,4 +1895,13 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="modal-overlay" id="txModal">
   <div class="modal">
     <h2>💰 Log Transaction</h2>
-    <div class="fg"><label>Type</label><select class="fi" id="tx_type"><option>Purchase (Cost)</option><option>Sale (Revenue)</
+    <div class="fg"><label>Type</label><select class="fi" id="tx_type"><option>Purchase (Cost)</option><option>Sale (Revenue)</option><option>Tariff/Import Fee</option><option>Shipping Cost</option><option>Other Expense</option></select></div>
+    <div class="fg"><label>Item</label><input class="fi" id="tx_item"/></div>
+    <div class="fg"><label>Supplier / Platform</label><input class="fi" id="tx_supplier"/></div>
+    <div class="fg"><label>Amount $</label><input class="fi" id="tx_amount" type="number"/></div>
+    <div class="modal-actions"><button class="btn-cancel" onclick="closeModal('txModal')">Cancel</button><button class="btn-confirm" onclick="addTransaction()">LOG IT</button></div>
+  </div>
+</div>
+
+</body>
+</html>
