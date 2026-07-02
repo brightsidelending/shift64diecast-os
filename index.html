@@ -1621,7 +1621,9 @@ async function runPriceScan() {
       ebaySoldPrices = soldItems.map(i => ({
         title: i.title || query,
         price: parseFloat(i.price?.value || 0),
-        condition: i.condition || 'Unknown'
+        condition: i.condition || 'Unknown',
+        soldDate: i.itemEndDate || null,
+        shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null
       })).filter(i => i.price > 0);
       useRealData = true;
     }
@@ -1664,7 +1666,14 @@ async function runPriceScan() {
       {title:`${query} — Limited Release`,price:(active*1.18).toFixed(2),meta:'Estimated'},
       {title:`${query} — New in Box`,price:(active*0.97).toFixed(2),meta:'Estimated'},
     ];
-    const soldListings = ebaySoldPrices.length > 0 ? ebaySoldPrices.slice(0,4).map(i => ({title:i.title,price:i.price,meta:i.condition+' · Live eBay Sold'})) : [
+    const fmtSoldDate = d => { if(!d) return null; const dt = new Date(d); return isNaN(dt) ? null : dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); };
+    const soldListings = ebaySoldPrices.length > 0 ? ebaySoldPrices.slice(0,4).map(i => {
+      const parts = [i.condition];
+      const sd = fmtSoldDate(i.soldDate);
+      if (sd) parts.push('Sold '+sd);
+      parts.push(i.shipping != null ? (i.shipping === 0 ? 'Free shipping' : '+$'+i.shipping.toFixed(2)+' ship') : 'Shipping n/a');
+      return {title:i.title,price:i.price,meta:parts.join(' · ')};
+    }) : [
       {title:`${query} — Sold`,price:sold,meta:'Completed · Estimated'},
       {title:`${query} — Sold`,price:(sold*1.22).toFixed(2),meta:'Estimated'},
       {title:`${query} — Sold`,price:(sold*0.87).toFixed(2),meta:'Estimated'},
@@ -1884,13 +1893,4 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="modal-overlay" id="txModal">
   <div class="modal">
     <h2>💰 Log Transaction</h2>
-    <div class="fg"><label>Type</label><select class="fi" id="tx_type"><option>Purchase (Cost)</option><option>Sale (Revenue)</option><option>Tariff/Import Fee</option><option>Shipping Cost</option><option>Other Expense</option></select></div>
-    <div class="fg"><label>Item</label><input class="fi" id="tx_item"/></div>
-    <div class="fg"><label>Supplier / Platform</label><input class="fi" id="tx_supplier"/></div>
-    <div class="fg"><label>Amount $</label><input class="fi" id="tx_amount" type="number"/></div>
-    <div class="modal-actions"><button class="btn-cancel" onclick="closeModal('txModal')">Cancel</button><button class="btn-confirm" onclick="addTransaction()">LOG IT</button></div>
-  </div>
-</div>
-
-</body>
-</html>
+    <div class="fg"><label>Type</label><select class="fi" id="tx_type"><option>Purchase (Cost)</option><option>Sale (Revenue)</
