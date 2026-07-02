@@ -661,6 +661,35 @@ function removeScreenshot(idx) {
 // ============================================================
 // SCAN
 // ============================================================
+// Split a base64 PNG into N equal horizontal strips (returns array of base64 strings).
+// Sending smaller strips gives the AI a more zoomed-in view for more accurate reads.
+function splitImageStrips(base64, parts) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        if (!w || !h || h < parts * 2) { resolve([base64]); return; }
+        const stripH = Math.floor(h / parts);
+        const strips = [];
+        for (let p = 0; p < parts; p++) {
+          const y0 = p * stripH;
+          const sh = (p === parts - 1) ? (h - y0) : stripH; // last strip absorbs any remainder
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = sh;
+          canvas.getContext('2d').drawImage(img, 0, y0, w, sh, 0, 0, w, sh);
+          strips.push(canvas.toDataURL('image/png').split(',')[1]);
+        }
+        resolve(strips);
+      } catch (e) { resolve([base64]); }
+    };
+    img.onerror = () => resolve([base64]);
+    img.src = 'data:image/png;base64,' + base64;
+  });
+}
+
 async function startScan() {
   if (!screenshots.length) return;
   document.getElementById('loadingDiv').style.display = 'block';
@@ -676,7 +705,11 @@ async function startScan() {
 
   for (let i = 0; i < screenshots.length; i++) {
     document.getElementById('loadTitle').textContent = `Reading page ${i+1} of ${screenshots.length}...`;
-    document.getElementById('loadStatus').textContent = `Counting and extracting every item on screenshot ${i+1}`;
+    let strips;
+    try { strips = await splitImageStrips(screenshots[i].base64, 4); } catch(e) { strips = [screenshots[i].base64]; }
+
+    for (let s = 0; s < strips.length; s++) {
+    document.getElementById('loadStatus').textContent = `Page ${i+1}: reading section ${s+1} of ${strips.length}`;
 
     try {
       const res = await fetch('https://shift64diecast-os.vercel.app/api/proxy', {
@@ -706,8 +739,8 @@ Return ONLY this JSON (no markdown, no explanation):
           messages: [{
             role: 'user',
             content: [
-              { type: 'image', source: { type: 'base64', media_type: 'image/png', data: screenshots[i].base64 } },
-              { type: 'text', text: `Screenshot ${i+1} from ${selectedSite}. Count every product. Extract all. Return JSON only.` }
+              { type: 'image', source: { type: 'base64', media_type: 'image/png', data: strips[s] } },
+              { type: 'text', text: `Cropped horizontal strip (section ${s+1} of ${strips.length}) from a ${selectedSite} page. Count every product visible in THIS strip only. Extract all. Return JSON only.` }
             ]
           }]
         })
@@ -741,10 +774,11 @@ Return ONLY this JSON (no markdown, no explanation):
       }
 
     } catch(err) {
-      console.error('Scan error page ' + (i+1), err);
+      console.error('Scan error page ' + (i+1) + ' section ' + (s+1), err);
       // On error still show what we have
-      newUnclear.push({ partial_name: 'Scan failed for page ' + (i+1), reason: 'API error: ' + err.message, position: 'Page ' + (i+1), site: selectedSite, page: i+1 });
+      newUnclear.push({ partial_name: 'Scan failed for page ' + (i+1) + ' section ' + (s+1), reason: 'API error: ' + err.message, position: 'Page ' + (i+1), site: selectedSite, page: i+1 });
     }
+    } // end strip loop
   }
 
   // Duplicate detection: skip items already in the list (fuzzy name/brand match)
