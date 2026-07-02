@@ -1863,6 +1863,16 @@ function ebayItemUrl(it) {
   return null;
 }
 
+// Pull a usable image URL from an eBay item, covering the known field variants
+function ebayImageUrl(it) {
+  if (!it) return null;
+  return (it.image && it.image.imageUrl) ||
+         (it.thumbnailImages && it.thumbnailImages[0] && it.thumbnailImages[0].imageUrl) ||
+         (it.additionalImages && it.additionalImages[0] && it.additionalImages[0].imageUrl) ||
+         (typeof it.image === 'string' ? it.image : null) ||
+         it.imageUrl || it.galleryURL || it.galleryUrl || null;
+}
+
 // Fetch raw eBay item summaries for a query (returns [] on any failure)
 function fetchEbayItems(type, q) {
   return fetch(PROXY_URL + '?type=' + type, {
@@ -1880,7 +1890,7 @@ function mapActiveItems(items) {
     condition: i.condition || 'New',
     shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null,
     url: ebayItemUrl(i),
-    img: i.image?.imageUrl || i.thumbnailImages?.[0]?.imageUrl || null
+    img: ebayImageUrl(i)
   })).filter(i => i.price > 0);
 }
 
@@ -2023,7 +2033,14 @@ async function runPriceScan() {
     const variants = buildQueryVariants(query);
     // Active listings: exact query first, then broader variants until real results appear
     for (let idx = 0; idx < variants.length && ebayActivePrices.length === 0; idx++) {
-      const mapped = mapActiveItems(await fetchEbayItems('ebay_active', variants[idx]));
+      const rawActive = await fetchEbayItems('ebay_active', variants[idx]);
+      if (rawActive.length > 0) {
+        console.log('=== eBay active — FIRST ITEM OBJECT ===');
+        console.log(rawActive[0]);
+        console.log('=== field keys ===', Object.keys(rawActive[0]));
+        console.log('=== full JSON ===', JSON.stringify(rawActive[0], null, 2));
+      }
+      const mapped = mapActiveItems(rawActive);
       if (mapped.length > 0) { ebayActivePrices = mapped; activeApprox = idx > 0; useRealData = true; }
     }
     // Sold listings: same fallback chain
