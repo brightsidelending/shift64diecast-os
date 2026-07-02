@@ -2735,6 +2735,7 @@ function addTransaction() {
 
 // Init
 renderScreenshots();
+renderCatalogs();               // show default vendor catalogs immediately (independent of KV load)
 window.addEventListener('load', loadData);
 
 // Filter event listeners - guaranteed to fire
@@ -2746,6 +2747,7 @@ document.addEventListener('DOMContentLoaded', function() {
       el.addEventListener('input', applyFilters);
     }
   });
+  renderCatalogs();             // belt-and-suspenders: ensure catalogs render once DOM is ready
 });
 </script>
 
