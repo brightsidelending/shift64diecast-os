@@ -255,6 +255,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="display:flex;gap:12px;">
       <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red..." style="flex:1;font-size:15px;padding:14px 20px;"/>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
+      <button onclick="openAliExpress()" style="padding:14px 22px;font-size:14px;background:transparent;border:1px solid var(--orange);color:var(--orange);border-radius:8px;font-weight:700;cursor:pointer;font-family:Rajdhani,sans-serif;letter-spacing:1px;white-space:nowrap;">🛒 ALIEXPRESS</button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
       <span onclick="quickPriceScan('MiniGT Porsche 911 GT3')" class="site-btn">MiniGT Porsche 911</span>
@@ -1812,6 +1813,29 @@ function buildQueryVariants(query) {
   return variants.filter(v => { const k = (v || '').toLowerCase(); if (!v || seen.has(k)) return false; seen.add(k); return true; });
 }
 
+// Open AliExpress wholesale search for whatever is typed in the scanner box
+function openAliExpress() {
+  const q = document.getElementById('psSearchInput').value.trim();
+  if (!q) { alert('Type a model in the search box first.'); return; }
+  window.open('https://www.aliexpress.com/wholesale?SearchText=' + encodeURIComponent(q), '_blank', 'noopener');
+}
+
+// Find competitor items (scanned in the Competitor tab) that match the search query
+function findCompetitorMatches(query) {
+  const qWords = query.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
+  if (!qWords.length || !Array.isArray(allItems)) return [];
+  const need = Math.min(2, qWords.length);
+  return allItems
+    .map(it => {
+      const hay = ((it.name || '') + ' ' + (it.brand || '')).toLowerCase();
+      const score = qWords.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
+      return { it, score };
+    })
+    .filter(x => x.score >= need)
+    .sort((a, b) => b.score - a.score)
+    .map(x => x.it);
+}
+
 async function runPriceScan() {
   const query = document.getElementById('psSearchInput').value.trim();
   if (!query) return;
@@ -1899,6 +1923,10 @@ async function runPriceScan() {
       const attrs = safeUrl ? `class="listing-clickable" onclick="window.open('${safeUrl}','_blank','noopener')" title="Open on eBay"` : '';
       return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};">$${parseFloat(i.price).toFixed(2)}</div></div>`;
     }).join('');
+    const compMatches = findCompetitorMatches(query);
+    const competitorHtml = compMatches.length > 0
+      ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;"><div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🏷️ COMPETITOR PRICES</div><span style="font-size:11px;color:var(--blue);">${compMatches.length} match${compMatches.length>1?'es':''} from your scans</span></div>${compMatches.slice(0,8).map(it=>{const price=(it.price!=null&&!isNaN(it.price))?'$'+parseFloat(it.price).toFixed(2):'—';return `<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="min-width:0;"><div style="font-size:13px;">${it.name||'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site||'Unknown'}${it.status?' · '+it.status:''}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);white-space:nowrap;">${price}</div></div>`;}).join('')}</div>`
+      : `<div style="background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:18px;margin-bottom:14px;text-align:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;margin-bottom:4px;">🏷️ COMPETITOR PRICES</div><div style="font-size:13px;color:var(--gray);">No competitor data yet — scan in the Competitor tab.</div></div>`;
     document.getElementById('psResults').innerHTML = `
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">${useRealData?((activeApprox||soldApprox)?'🟢 LIVE EBAY DATA · SIMILAR ITEMS':'🟢 LIVE EBAY DATA'):'🤖 AI ESTIMATE'} · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
@@ -1914,6 +1942,7 @@ async function runPriceScan() {
           ${rl(soldListings,true)}
         </div>
       </div>
+      ${competitorHtml}
       <div style="background:var(--card);border:2px solid var(--gold);border-radius:12px;padding:22px;">
         <div style="font-family:Rajdhani,sans-serif;font-size:17px;font-weight:700;color:var(--gold);letter-spacing:2px;margin-bottom:18px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;">💰 TRUE MARGIN BREAKDOWN<span style="color:${actionColor};font-size:26px;">${action}</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
