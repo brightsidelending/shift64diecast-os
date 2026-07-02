@@ -672,10 +672,12 @@ function splitImageStrips(base64, parts) {
         const h = img.naturalHeight || img.height;
         if (!w || !h || h < parts * 2) { resolve([base64]); return; }
         const stripH = Math.floor(h / parts);
+        const overlap = Math.floor(stripH * 0.1); // 10% overlap so cards at strip edges stay fully visible in at least one strip
         const strips = [];
         for (let p = 0; p < parts; p++) {
-          const y0 = p * stripH;
-          const sh = (p === parts - 1) ? (h - y0) : stripH; // last strip absorbs any remainder
+          const y0 = (p === 0) ? 0 : Math.max(0, p * stripH - overlap); // start slightly above where the previous strip ended
+          const bottom = (p === parts - 1) ? h : (p + 1) * stripH;      // last strip absorbs any remainder
+          const sh = bottom - y0;
           const canvas = document.createElement('canvas');
           canvas.width = w;
           canvas.height = sh;
