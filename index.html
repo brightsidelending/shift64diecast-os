@@ -1746,6 +1746,72 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && document.activeElement?.id === 'psSearchInput') runPriceScan();
 });
 
+// Resolve a browser-openable eBay listing URL from an item summary,
+// falling back through the id fields if itemWebUrl is absent.
+function ebayItemUrl(it) {
+  if (!it) return null;
+  if (it.itemWebUrl) return it.itemWebUrl;
+  if (it.legacyItemId) return 'https://www.ebay.com/itm/' + it.legacyItemId;
+  if (it.itemId) {
+    const parts = String(it.itemId).split('|');
+    if (parts[1]) return 'https://www.ebay.com/itm/' + parts[1];
+  }
+  return null;
+}
+
+// Fetch raw eBay item summaries for a query (returns [] on any failure)
+function fetchEbayItems(type, q) {
+  return fetch(PROXY_URL + '?type=' + type, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: q })
+  }).then(r => r.json()).then(d => (d && d.itemSummaries) ? d.itemSummaries : []).catch(() => []);
+}
+
+function mapActiveItems(items) {
+  return items.map(i => ({
+    title: i.title,
+    price: parseFloat(i.price?.value || 0),
+    currency: i.price?.currency || 'USD',
+    condition: i.condition || 'New',
+    shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null,
+    url: ebayItemUrl(i)
+  })).filter(i => i.price > 0);
+}
+
+function mapSoldItems(items, query) {
+  return items.map(i => ({
+    title: i.title || query,
+    price: parseFloat(i.price?.value || 0),
+    condition: i.condition || 'Unknown',
+    soldDate: i.itemEndDate || null,
+    shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null,
+    url: ebayItemUrl(i)
+  })).filter(i => i.price > 0);
+}
+
+// Known diecast brands, checked longest-first so multi-word brands win
+function detectBrand(query) {
+  const brands = ['Kaido House','Mini GT','MiniGT','Pop Race','Inno64','Inno 64','Tarmac Works','LCD Models','Time Micro','Stance Hunters','YM Model','Almost Real','Ignition Model','Hot Wheels','Tomica','Schuco','Demon King','Motorhelix','Focal Horizon','Para64','GCD','Peako','DCM'];
+  const q = query.toLowerCase();
+  const sorted = brands.slice().sort((a, b) => b.length - a.length);
+  for (const b of sorted) { if (q.includes(b.toLowerCase())) return b; }
+  return null;
+}
+
+// Build progressively broader search terms: exact -> first 3 words -> brand (or first word)
+function buildQueryVariants(query) {
+  const clean = query.trim().replace(/\s+/g, ' ');
+  const words = clean.split(' ');
+  const variants = [clean];
+  if (words.length > 3) variants.push(words.slice(0, 3).join(' '));
+  const brand = detectBrand(clean);
+  if (brand) variants.push(brand);
+  else if (words.length > 1) variants.push(words[0]);
+  const seen = new Set();
+  return variants.filter(v => { const k = (v || '').toLowerCase(); if (!v || seen.has(k)) return false; seen.add(k); return true; });
+}
+
 async function runPriceScan() {
   const query = document.getElementById('psSearchInput').value.trim();
   if (!query) return;
@@ -1754,49 +1820,23 @@ async function runPriceScan() {
   document.getElementById('psResults').innerHTML = '';
   document.getElementById('psScanBtn').disabled = true;
 
-  // Try to get real eBay data first
+  // Try to get real eBay data first, with an automatic broader-search fallback
   let ebayActivePrices = [];
   let ebaySoldPrices = [];
   let useRealData = false;
+  let activeApprox = false, soldApprox = false;
 
   try {
-    // Fetch active listings
-    const activeRes = await fetch(PROXY_URL + '?type=ebay_active', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
-    });
-    const activeData = await activeRes.json();
-    if (activeData.itemSummaries && activeData.itemSummaries.length > 0) {
-      ebayActivePrices = activeData.itemSummaries.map(i => ({
-        title: i.title,
-        price: parseFloat(i.price?.value || 0),
-        currency: i.price?.currency || 'USD',
-        condition: i.condition || 'New',
-        shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null,
-        url: i.itemWebUrl || null
-      })).filter(i => i.price > 0);
-      useRealData = true;
+    const variants = buildQueryVariants(query);
+    // Active listings: exact query first, then broader variants until real results appear
+    for (let idx = 0; idx < variants.length && ebayActivePrices.length === 0; idx++) {
+      const mapped = mapActiveItems(await fetchEbayItems('ebay_active', variants[idx]));
+      if (mapped.length > 0) { ebayActivePrices = mapped; activeApprox = idx > 0; useRealData = true; }
     }
-
-    // Fetch sold listings
-    const soldRes = await fetch(PROXY_URL + '?type=ebay_sold', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
-    });
-    const soldData = await soldRes.json();
-    const soldItems = soldData?.itemSummaries || [];
-    if (soldItems.length > 0) {
-      ebaySoldPrices = soldItems.map(i => ({
-        title: i.title || query,
-        price: parseFloat(i.price?.value || 0),
-        condition: i.condition || 'Unknown',
-        soldDate: i.itemEndDate || null,
-        shipping: i.shippingOptions?.[0]?.shippingCost?.value != null ? parseFloat(i.shippingOptions[0].shippingCost.value) : null,
-        url: i.itemWebUrl || null
-      })).filter(i => i.price > 0);
-      useRealData = true;
+    // Sold listings: same fallback chain
+    for (let idx = 0; idx < variants.length && ebaySoldPrices.length === 0; idx++) {
+      const mapped = mapSoldItems(await fetchEbayItems('ebay_sold', variants[idx]), query);
+      if (mapped.length > 0) { ebaySoldPrices = mapped; soldApprox = idx > 0; useRealData = true; }
     }
   } catch(e) {
     console.log('eBay API error, using estimates:', e);
@@ -1832,7 +1872,8 @@ async function runPriceScan() {
     const actionColor = action==='BUY'?'var(--green)':action==='WATCH'?'var(--yellow)':'var(--red)';
     const marginColor = marginPct>=80?'var(--green)':marginPct>=40?'var(--yellow)':'var(--red)';
     const fmtShip = s => s != null ? (s === 0 ? 'Free shipping' : '+$'+s.toFixed(2)+' ship') : 'Shipping n/a';
-    const activeListings = ebayActivePrices.length > 0 ? ebayActivePrices.slice(0,4).map(i => ({title:i.title,price:i.price,url:i.url,meta:i.condition+' · '+fmtShip(i.shipping)})) : [
+    const simLabel = '<span style="color:var(--yellow);font-weight:600;">Similar Item - Not Exact Match</span>';
+    const activeListings = ebayActivePrices.length > 0 ? ebayActivePrices.slice(0,4).map(i => ({title:i.title,price:i.price,url:i.url,meta:(activeApprox?simLabel+' · ':'')+i.condition+' · '+fmtShip(i.shipping)})) : [
       {title:`${query} — New Sealed`,price:active,meta:'Buy It Now · Estimated'},
       {title:`${query} — Brand New`,price:(active*0.92).toFixed(2),meta:'Estimated'},
       {title:`${query} — Limited Release`,price:(active*1.18).toFixed(2),meta:'Estimated'},
@@ -1840,7 +1881,9 @@ async function runPriceScan() {
     ];
     const fmtSoldDate = d => { if(!d) return null; const dt = new Date(d); return isNaN(dt) ? null : dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); };
     const soldListings = ebaySoldPrices.length > 0 ? ebaySoldPrices.slice(0,4).map(i => {
-      const parts = [i.condition];
+      const parts = [];
+      if (soldApprox) parts.push(simLabel);
+      parts.push(i.condition);
       const sd = fmtSoldDate(i.soldDate);
       if (sd) parts.push('Sold '+sd);
       parts.push(i.shipping != null ? (i.shipping === 0 ? 'Free shipping' : '+$'+i.shipping.toFixed(2)+' ship') : 'Shipping n/a');
@@ -1858,7 +1901,7 @@ async function runPriceScan() {
     }).join('');
     document.getElementById('psResults').innerHTML = `
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
-        <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">${useRealData?'🟢 LIVE EBAY DATA':'🤖 AI ESTIMATE'} · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
+        <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">${useRealData?((activeApprox||soldApprox)?'🟢 LIVE EBAY DATA · SIMILAR ITEMS':'🟢 LIVE EBAY DATA'):'🤖 AI ESTIMATE'} · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
         <div style="font-size:14px;line-height:1.6;">${action==='BUY'?`Strong buy. ${data.soldCount} units sold in last 30 days. True landed cost $${landed.toFixed(2)} vs avg sell $${sold.toFixed(2)} = ${marginPct}% net margin.`:action==='WATCH'?`Watch this. ${data.soldCount} sold recently. ${marginPct}% margin is acceptable but negotiate harder on wholesale price.`:`Thin margins at ${marginPct}%. Find a higher demand model or negotiate lower wholesale.`}</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
