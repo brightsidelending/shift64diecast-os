@@ -640,6 +640,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <input class="text-input" id="newVendorName" placeholder="New vendor name..." style="flex:1;min-width:160px;"/>
       <button class="btn-blue" onclick="addVendor()">+ Add Vendor</button>
     </div>
+    <div style="position:relative;margin-bottom:14px;">
+      <input class="text-input" id="catalogSearch" placeholder="🔍 Search all catalogs by item name or brand..." oninput="filterCatalogs()" style="width:100%;box-sizing:border-box;padding-right:40px;"/>
+      <button id="catalogSearchClear" onclick="clearCatalogSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:20px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
+    </div>
     <div id="catalogsContainer"></div>
   </div>
 
@@ -1877,7 +1881,27 @@ function updateIntel() {
 // VENDOR CATALOGS (Phase 1 — Buying Intelligence Engine)
 // ============================================================
 const DEFAULT_VENDORS = ['Horizon Diecast','CarBromc','RC Mart','Pablo Diecast Garage'];
+
+// Auto-scrape configuration. All feeds are fetched through the Vercel proxy (?type=scrape&url=...)
+// to avoid browser CORS restrictions. {PAGE} is replaced by the current page number in the loop.
+const VENDOR_SCRAPERS = {
+  'Horizon Diecast': {
+    platform: 'shopify',
+    urlTemplate: 'https://horizondiecast.com/products.json?page={PAGE}&limit=250'
+  },
+  'CarBromc': {
+    platform: 'shopify',
+    urlTemplate: 'https://www.carbromc.com/products.json?page={PAGE}&limit=250'
+  },
+  'Pablo Diecast Garage': {
+    platform: 'woocommerce',
+    urlTemplate: 'https://pablosdiecastgarage.com/wp-json/wc/store/v1/products?per_page=100&page={PAGE}'
+  }
+};
+
 let vendorCatalogs = {};
+let vendorScrapeMeta = {};   // { vendorName: { lastScraped: <epoch ms> } }
+let _scraping = {};          // { vendorName: true } while a scrape is in flight
 let _catIdCounter = 0;
 let editingCat = null; // { vendor, id } while editing an entry
 
@@ -1911,7 +1935,8 @@ function renderCatalogs() {
       const priceNum = parseFloat(it.price);
       const price = !isNaN(priceNum) ? '$' + priceNum.toFixed(2) : '-';
       const cls = statusClass[it.status] || 'b-unknown';
-      return `<tr>
+      const hay = ((it.name || '') + ' ' + (it.brand || '')).toLowerCase();
+      return `<tr data-search="${escAttr(hay)}">
         <td>${it.name || '-'}</td><td>${it.brand || '-'}</td><td>${it.scale || '-'}</td>
         <td class="price-td">${price}</td>
         <td><span class="badge ${cls}">${it.status || 'Unknown'}</span></td>
@@ -1919,10 +1944,19 @@ function renderCatalogs() {
         <td style="white-space:nowrap;text-align:right;"><button class="row-action" title="Edit" onclick="openCatItemModal('${vEsc}',${it.id})">✏️</button><button class="row-action row-del" title="Delete" onclick="deleteCatItem('${vEsc}',${it.id})">🗑️</button></td>
       </tr>`;
     }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No items yet. Add manually or from a scan.</td></tr>`;
+    const scrapable = !!VENDOR_SCRAPERS[vendor];
+    const meta = vendorScrapeMeta[vendor];
+    const lastTxt = scrapable
+      ? `<span style="color:var(--gray);font-size:11px;font-weight:400;margin-left:8px;white-space:nowrap;">⏱ Last scraped: ${meta && meta.lastScraped ? timeAgo(meta.lastScraped) : 'never'}</span>`
+      : '';
+    const scrapeBtn = scrapable
+      ? `<button class="btn-sm" style="background:var(--gold);color:#111;" title="Fetch latest products from this vendor's live store" onclick="scrapeVendor('${vEsc}')">🔄 Auto Scrape</button>`
+      : '';
     return `<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#0E1015;cursor:pointer;" onclick="toggleVendorSection(this)">
-        <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;">📦 ${vendor} <span style="color:var(--gray);font-size:12px;font-weight:400;">(${items.length})</span></div>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;">📦 ${vendor} <span style="color:var(--gray);font-size:12px;font-weight:400;">(${items.length})</span>${lastTxt}</div>
         <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
+          ${scrapeBtn}
           <button class="btn-sm" style="background:var(--blue);" onclick="openCatItemModal('${vEsc}')">+ Item</button>
           <button class="row-action row-del" title="Delete vendor" onclick="removeVendor('${vEsc}')">🗑 Vendor</button>
           <span class="vsec-toggle" style="color:var(--gray);">▾</span>
@@ -1936,6 +1970,42 @@ function renderCatalogs() {
       </div>
     </div>`;
   }).join('');
+  filterCatalogs(); // re-apply any active search filter after re-render
+}
+
+// Live filter across every vendor table by item name or brand
+function filterCatalogs() {
+  const inp = document.getElementById('catalogSearch');
+  const clearBtn = document.getElementById('catalogSearchClear');
+  const q = (inp ? inp.value : '').trim().toLowerCase();
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+  const cont = document.getElementById('catalogsContainer');
+  if (!cont) return;
+  Array.from(cont.children).forEach(sec => {
+    const rows = sec.querySelectorAll('tbody tr[data-search]');
+    let visible = 0;
+    rows.forEach(tr => {
+      const show = !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1;
+      tr.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    // While searching, hide vendors with no matches and expand those with matches
+    if (q) {
+      sec.style.display = visible ? '' : 'none';
+      const body = sec.querySelector('.vsec-body');
+      if (visible && body) body.style.display = '';
+    } else {
+      sec.style.display = '';
+    }
+  });
+}
+
+function clearCatalogSearch() {
+  const inp = document.getElementById('catalogSearch');
+  if (!inp) return;
+  inp.value = '';
+  filterCatalogs();
+  inp.focus();
 }
 
 function toggleVendorSection(headerEl) {
@@ -2189,6 +2259,183 @@ function saveScanToCatalog() {
 }
 
 // ============================================================
+// AUTO-SCRAPE (Shopify products.json / WooCommerce Store API)
+// ============================================================
+function proxyScrapeUrl(remoteUrl) {
+  return PROXY_URL + '?type=scrape&url=' + encodeURIComponent(remoteUrl);
+}
+
+// Pull a scale token (1/18, 1/24, 1/32, 1/43, 1/64) out of free text
+function detectScale(txt) {
+  const m = String(txt || '').match(/1\s*[\/:]\s*(18|24|32|43|64)\b/);
+  return m ? '1/' + m[1] : '';
+}
+
+// Known brands checked in order; first substring found in the product name wins.
+const KNOWN_BRANDS = [
+  "Mini GT", "MiniGT", "Pop Race", "PopRace", "Tarmac Works", "Inno64", "INNO64",
+  "LCD", "TPC", "DCM", "Liberty64", "Liberty", "Rotating Wheel", "GlamCraft",
+  "Stance Art", "Rhino Model", "Bizarre Art", "Ignition Model", "Kaido",
+  "Demon King", "Blown AT64", "Raven Art", "Model One", "SLAMERAFT",
+  "Richsing Wheel", "GCM Model"
+];
+function brandFromName(name) {
+  const s = String(name || '');
+  for (let i = 0; i < KNOWN_BRANDS.length; i++) {
+    if (s.indexOf(KNOWN_BRANDS[i]) !== -1) return KNOWN_BRANDS[i];
+  }
+  return '';
+}
+
+// Map one Shopify products.json product to the catalog item shape
+function mapShopifyProduct(p) {
+  const variants = Array.isArray(p.variants) ? p.variants : [];
+  const first = variants[0] || {};
+  const price = parseFloat(first.price);
+  const inStock = variants.some(v => v && v.available);
+  const tags = Array.isArray(p.tags) ? p.tags.join(' ') : (p.tags || '');
+  return {
+    name: p.title || '',
+    brand: p.vendor || brandFromName(p.title || ''),
+    scale: detectScale((p.title || '') + ' ' + tags + ' ' + (p.body_html || '')),
+    price: !isNaN(price) ? price : null,
+    status: inStock ? 'In Stock' : 'Out of Stock'
+  };
+}
+
+// Map one WooCommerce Store API product to the catalog item shape
+function mapWooProduct(p) {
+  let price = null;
+  if (p.prices && p.prices.price != null) {
+    const minor = parseInt(p.prices.currency_minor_unit != null ? p.prices.currency_minor_unit : 2, 10);
+    const raw = parseFloat(p.prices.price);
+    if (!isNaN(raw)) price = raw / Math.pow(10, isNaN(minor) ? 2 : minor);
+  }
+  return {
+    name: p.name || '',
+    brand: brandFromName(p.name || ''),
+    scale: detectScale((p.name || '') + ' ' + (p.short_description || '') + ' ' + (p.description || '')),
+    price: price,
+    status: p.is_in_stock ? 'In Stock' : 'Out of Stock'
+  };
+}
+
+// Normalized key for fuzzy duplicate detection (case/punctuation-insensitive)
+function fuzzyKey(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Merge scraped items into a vendor catalog: update matches in place, add new ones
+function mergeScrapedItems(vendor, scraped) {
+  if (!vendorCatalogs[vendor]) vendorCatalogs[vendor] = [];
+  const arr = vendorCatalogs[vendor];
+  const index = {};
+  arr.forEach(it => { const k = fuzzyKey(it.name); if (k) index[k] = it; });
+  let added = 0, updated = 0;
+  scraped.forEach(s => {
+    const k = fuzzyKey(s.name);
+    if (!k) return;
+    const existing = index[k];
+    if (existing) {
+      if (s.price != null) existing.price = s.price;
+      if (s.status) existing.status = s.status;
+      if (s.scale && !existing.scale) existing.scale = s.scale;
+      if (s.brand && !existing.brand) existing.brand = s.brand;
+      existing.dateAdded = catToday();
+      updated++;
+    } else {
+      const entry = {
+        id: nextCatId(),
+        name: s.name || '',
+        brand: s.brand || '',
+        scale: s.scale || '',
+        price: s.price != null ? s.price : null,
+        status: s.status || 'Unknown',
+        dateAdded: catToday()
+      };
+      arr.push(entry);
+      index[k] = entry;
+      added++;
+    }
+  });
+  return { added, updated };
+}
+
+// Scrape one vendor: loop pages until empty, map, fuzzy-merge, timestamp, save.
+async function scrapeVendor(vendor, opts) {
+  opts = opts || {};
+  const silent = !!opts.silent;
+  const cfg = VENDOR_SCRAPERS[vendor];
+  if (!cfg) { if (!silent) toast('No scraper configured for ' + vendor, 'yellow'); return; }
+  if (_scraping[vendor]) return;
+  _scraping[vendor] = true;
+  if (!silent) toast('🔄 Scraping ' + vendor + '…', 'yellow');
+
+  const MAX_PAGES = 100; // safety cap so a broken feed can't loop forever
+  let page = 1, all = [], fetchError = false;
+  try {
+    while (page <= MAX_PAGES) {
+      const remote = cfg.urlTemplate.replace('{PAGE}', page);
+      const r = await fetch(proxyScrapeUrl(remote));
+      if (!r.ok) { fetchError = true; break; }
+      const data = await r.json();
+      if (data && data.error) { fetchError = true; break; }
+
+      let mapped = [];
+      if (cfg.platform === 'shopify') {
+        const products = (data && Array.isArray(data.products)) ? data.products : [];
+        if (!products.length) break;                 // empty page => done
+        mapped = products.map(mapShopifyProduct);
+      } else { // woocommerce store api returns a top-level array
+        const products = Array.isArray(data) ? data : ((data && Array.isArray(data.products)) ? data.products : []);
+        if (!products.length) break;                 // empty page => done
+        mapped = products.map(mapWooProduct);
+      }
+      all = all.concat(mapped);
+      page++;
+    }
+  } catch (e) {
+    console.log('Scrape error for ' + vendor, e);
+    fetchError = true;
+  }
+  _scraping[vendor] = false;
+
+  if (!all.length) {
+    if (!silent) toast('⚠️ No items scraped for ' + vendor + (fetchError ? ' (fetch error)' : ''), fetchError ? 'red' : 'yellow');
+    return;
+  }
+
+  const { added, updated } = mergeScrapedItems(vendor, all);
+  vendorScrapeMeta[vendor] = { lastScraped: Date.now() };
+  renderCatalogs();
+  await saveData();
+  if (!silent) toast('✅ ' + vendor + ': ' + added + ' new, ' + updated + ' updated', 'green');
+}
+
+// Human-friendly "x ago" for the last-scraped label
+function timeAgo(ts) {
+  if (!ts) return 'never';
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60); if (m < 60) return m + ' min ago';
+  const h = Math.floor(m / 60); if (h < 24) return h + ' hour' + (h > 1 ? 's' : '') + ' ago';
+  const d = Math.floor(h / 24); return d + ' day' + (d > 1 ? 's' : '') + ' ago';
+}
+
+// On page load, silently refresh any scrapable vendor whose data is >24h old
+async function maybeAutoScrape() {
+  const DAY = 24 * 60 * 60 * 1000;
+  for (const vendor of Object.keys(VENDOR_SCRAPERS)) {
+    if (!vendorCatalogs[vendor]) continue;
+    const meta = vendorScrapeMeta[vendor];
+    const last = (meta && meta.lastScraped) ? meta.lastScraped : 0;
+    if (Date.now() - last > DAY) {
+      await scrapeVendor(vendor, { silent: true });
+    }
+  }
+}
+
+// ============================================================
 // SAVE / LOAD
 // ============================================================
 // Cloud storage (Vercel KV via proxy) with localStorage fallback
@@ -2231,6 +2478,7 @@ async function saveData() {
     localStorage.setItem('s64_ericW', JSON.stringify(ericWants));
     localStorage.setItem('s64_khaiW', JSON.stringify(khaiWants));
     localStorage.setItem('s64_catalogs', JSON.stringify(vendorCatalogs));
+    localStorage.setItem('s64_scrape_meta', JSON.stringify(vendorScrapeMeta));
   } catch(e) {}
   showSaving('💾 Saving…');
   toast('⏳ Saving…', 'yellow');
@@ -2241,7 +2489,8 @@ async function saveData() {
       kvSet('s64_khai', khaiColl),
       kvSet('s64_ericW', ericWants),
       kvSet('s64_khaiW', khaiWants),
-      kvSet('s64_catalogs', vendorCatalogs)
+      kvSet('s64_catalogs', vendorCatalogs),
+      kvSet('s64_scrape_meta', vendorScrapeMeta)
     ]);
     hideSaving('✅ Saved to cloud');
     toast('✅ Saved to cloud', 'green');
@@ -2258,8 +2507,8 @@ async function loadKey(key) {
   return null;
 }
 async function loadData() {
-  const [items, eric, khai, ericW, khaiW, catalogs] = await Promise.all([
-    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs')
+  const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta] = await Promise.all([
+    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta')
   ]);
   if (Array.isArray(items)) allItems = items;
   if (Array.isArray(eric)) ericColl = eric;
@@ -2267,12 +2516,14 @@ async function loadData() {
   if (Array.isArray(ericW)) ericWants = ericW;
   if (Array.isArray(khaiW)) khaiWants = khaiW;
   if (catalogs && typeof catalogs === 'object' && !Array.isArray(catalogs)) vendorCatalogs = catalogs;
+  if (scrapeMeta && typeof scrapeMeta === 'object' && !Array.isArray(scrapeMeta)) vendorScrapeMeta = scrapeMeta;
   if (allItems.length) renderResults();
   if (ericColl.length) renderCollection('eric');
   if (khaiColl.length) renderCollection('khai');
   if (ericWants.length) renderWants('eric');
   if (khaiWants.length) renderWants('khai');
   renderCatalogs();
+  maybeAutoScrape(); // background refresh of any vendor whose data is >24h old
 }
 
 // ============================================================
