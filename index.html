@@ -2848,14 +2848,30 @@ function openSiteSearch(site) {
 // Find competitor items (scanned in the Competitor tab) that match the search query
 function findCompetitorMatches(query) {
   const qWords = query.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
-  if (!qWords.length || !Array.isArray(allItems)) return [];
+  if (!qWords.length) return [];
   const need = Math.min(2, qWords.length);
-  return allItems
-    .map(it => {
-      const hay = ((it.name || '') + ' ' + (it.brand || '')).toLowerCase();
-      const score = qWords.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
-      return { it, score };
-    })
+  // Score an item by how many query words appear in its name/brand (same fuzzy logic as before).
+  // `site` becomes the source label shown in the UI (competitor site for scans, vendor name for catalogs).
+  const scoreItem = (it, site) => {
+    const hay = ((it.name || '') + ' ' + (it.brand || '')).toLowerCase();
+    const score = qWords.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
+    return {
+      score,
+      it: { name: it.name, brand: it.brand, price: it.price, status: it.status, site: site || it.site || '' }
+    };
+  };
+  const results = [];
+  // 1) Scanned screenshot items
+  if (Array.isArray(allItems)) {
+    allItems.forEach(it => results.push(scoreItem(it, it.site)));
+  }
+  // 2) Every vendor catalog (scraped or manual) — source label is the vendor name
+  if (vendorCatalogs && typeof vendorCatalogs === 'object') {
+    Object.keys(vendorCatalogs).forEach(vendor => {
+      (vendorCatalogs[vendor] || []).forEach(it => results.push(scoreItem(it, vendor)));
+    });
+  }
+  return results
     .filter(x => x.score >= need)
     .sort((a, b) => b.score - a.score)
     .map(x => x.it);
@@ -2965,7 +2981,7 @@ async function runPriceScan() {
     };
     const compMatches = findCompetitorMatches(query);
     const competitorHtml = compMatches.length > 0
-      ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;"><div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🏷️ COMPETITOR PRICES</div><span style="font-size:11px;color:var(--blue);">${compMatches.length} match${compMatches.length>1?'es':''} from your scans</span></div>${compMatches.slice(0,8).map(it=>{const price=(it.price!=null&&!isNaN(it.price))?'$'+parseFloat(it.price).toFixed(2):'—';return `<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="min-width:0;"><div style="font-size:13px;">${it.name||'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site||'Unknown'}${it.status?' · '+it.status:''}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);white-space:nowrap;">${price}</div></div>`;}).join('')}</div>`
+      ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;"><div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🏷️ COMPETITOR PRICES</div><span style="font-size:11px;color:var(--blue);">${compMatches.length} match${compMatches.length>1?'es':''} from scans & catalogs</span></div>${compMatches.slice(0,8).map(it=>{const price=(it.price!=null&&!isNaN(it.price))?'$'+parseFloat(it.price).toFixed(2):'—';return `<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="min-width:0;"><div style="font-size:13px;">${it.name||'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site||'Unknown'}${it.status?' · '+it.status:''}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);white-space:nowrap;">${price}</div></div>`;}).join('')}</div>`
       : `<div style="background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:18px;margin-bottom:14px;text-align:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;margin-bottom:4px;">🏷️ COMPETITOR PRICES</div><div style="font-size:13px;color:var(--gray);">No competitor data yet — scan in the Competitor tab.</div></div>`;
     const prodImg = ebayActivePrices[0]?.img || '';
     refPhotoDefault = prodImg;
