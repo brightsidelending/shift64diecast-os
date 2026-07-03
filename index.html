@@ -1945,24 +1945,23 @@ function renderCatalogs() {
       </tr>`;
     }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No items yet. Add manually or from a scan.</td></tr>`;
     const scrapable = !!VENDOR_SCRAPERS[vendor];
-    console.log('vendor:', vendor, 'scrapable:', scrapable, 'VENDOR_SCRAPERS keys:', Object.keys(VENDOR_SCRAPERS));
     const meta = vendorScrapeMeta[vendor];
-    const lastTxt = scrapable
-      ? `<span style="color:var(--gray);font-size:11px;font-weight:400;margin-left:8px;white-space:nowrap;">⏱ Last scraped: ${meta && meta.lastScraped ? timeAgo(meta.lastScraped) : 'never'}</span>`
-      : '';
-    const scrapeBtn = scrapable
-      ? `<button class="btn-sm" style="background:var(--gold);color:#111;" title="Fetch latest products from this vendor's live store" onclick="scrapeVendor('${vEsc}')">🔄 Auto Scrape</button>`
+    const scrapeLine = scrapable
+      ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 16px;background:#0E1015;border-top:1px solid var(--border);">
+          <span style="color:var(--gray);font-size:11px;white-space:nowrap;">⏱ Last scraped: ${meta && meta.lastScraped ? timeAgo(meta.lastScraped) : 'never'}</span>
+          <button class="btn-sm" style="background:var(--gold);color:#111;" title="Fetch latest products from this vendor's live store" onclick="event.stopPropagation();scrapeVendor('${vEsc}')">🔄 Auto Scrape</button>
+        </div>`
       : '';
     return `<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#0E1015;cursor:pointer;" onclick="toggleVendorSection(this)">
-        <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;">📦 ${vendor} <span style="color:var(--gray);font-size:12px;font-weight:400;">(${items.length})</span>${lastTxt}</div>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;">📦 ${vendor} <span style="color:var(--gray);font-size:12px;font-weight:400;">(${items.length})</span></div>
         <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
-          ${scrapeBtn}
           <button class="btn-sm" style="background:var(--blue);" onclick="openCatItemModal('${vEsc}')">+ Item</button>
           <button class="row-action row-del" title="Delete vendor" onclick="removeVendor('${vEsc}')">🗑 Vendor</button>
           <span class="vsec-toggle" style="color:var(--gray);">▾</span>
         </div>
       </div>
+      ${scrapeLine}
       <div class="vsec-body" style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;">
           <thead><tr><th>Item</th><th>Brand</th><th>Scale</th><th>Price</th><th>Status</th><th>Added</th><th style="text-align:right;">Actions</th></tr></thead>
