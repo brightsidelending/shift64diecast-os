@@ -2881,8 +2881,9 @@ function findCompetitorMatches(query) {
 }
 
 // ---- Competitor Prices: status filter + In-Stock-first sorting ----
-let _compMatches = [];      // current query's matches (already sorted In Stock first)
-let _compFilter = 'all';    // 'all' | 'instock' | 'hideoos'
+let _compMatches = [];        // current query's matches (already sorted In Stock first)
+let _compFilter = 'all';      // status filter: 'all' | 'instock' | 'hideoos'
+let _compVendorFilter = 'all';// vendor/competitor filter: 'all' or a specific vendor/site name
 
 function compStatusRank(status) {
   return String(status || '').toLowerCase().trim() === 'in stock' ? 0 : 1;
@@ -2899,10 +2900,14 @@ function setCompFilter(f) {
   _compFilter = f;
   renderCompetitorPrices();
 }
+function setCompVendorFilter(v) {
+  _compVendorFilter = v;
+  renderCompetitorPrices();
+}
 function renderCompetitorPrices() {
   const list = document.getElementById('compList');
   if (!list) return;
-  // Highlight the active filter button in gold
+  // Highlight the active status filter button in gold
   document.querySelectorAll('#compFilterBar .comp-filter-btn').forEach(b => {
     const active = b.getAttribute('data-filter') === _compFilter;
     b.style.background = active ? 'var(--gold)' : 'transparent';
@@ -2910,7 +2915,19 @@ function renderCompetitorPrices() {
     b.style.borderColor = active ? 'var(--gold)' : 'var(--border)';
     b.style.fontWeight = active ? '700' : '400';
   });
-  const items = _compMatches.filter(it => compPassesFilter(it, _compFilter));
+  // Highlight the active vendor filter button in gold
+  document.querySelectorAll('#compVendorBar .comp-vendor-btn').forEach(b => {
+    const active = b.getAttribute('data-vendor') === _compVendorFilter;
+    b.style.background = active ? 'var(--gold)' : 'transparent';
+    b.style.color = active ? '#111' : 'var(--gray)';
+    b.style.borderColor = active ? 'var(--gold)' : 'var(--border)';
+    b.style.fontWeight = active ? '700' : '400';
+  });
+  // Status filter and vendor filter apply together
+  const items = _compMatches.filter(it =>
+    compPassesFilter(it, _compFilter) &&
+    (_compVendorFilter === 'all' || (it.site || '') === _compVendorFilter)
+  );
   if (!items.length) {
     list.innerHTML = `<div style="padding:16px;text-align:center;font-size:12px;color:var(--gray);">No items match this filter.</div>`;
     return;
@@ -3035,9 +3052,13 @@ async function runPriceScan() {
     // Store globally so the filter buttons can re-render. Sort In Stock first (stable — keeps score order within each group).
     _compMatches = compMatches.slice().sort((a, b) => compStatusRank(a.status) - compStatusRank(b.status));
     _compFilter = 'all';
+    _compVendorFilter = 'all';
     const compBtn = (f, label) => `<button class="comp-filter-btn" data-filter="${f}" onclick="setCompFilter('${f}')" style="font-size:11px;padding:6px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--gray);cursor:pointer;white-space:nowrap;">${label}</button>`;
+    const compVendorBtn = (v, label) => `<button class="comp-vendor-btn" data-vendor="${escAttr(v)}" onclick="setCompVendorFilter('${escJs(v)}')" style="font-size:11px;padding:6px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--gray);cursor:pointer;white-space:nowrap;">${label}</button>`;
+    const compVendors = [...new Set(_compMatches.map(m => m.site).filter(Boolean))].sort();
+    const compVendorBar = `<div id="compVendorBar" style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);">${compVendorBtn('all','All Vendors')}${compVendors.map(v => compVendorBtn(v, v)).join('')}</div>`;
     const competitorHtml = _compMatches.length > 0
-      ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;"><div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🏷️ COMPETITOR PRICES</div><span style="font-size:11px;color:var(--blue);">${_compMatches.length} match${_compMatches.length>1?'es':''} from scans & catalogs</span></div><div id="compFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);">${compBtn('all','All')}${compBtn('instock','In Stock Only')}${compBtn('hideoos','Hide Out of Stock/Pre-Order')}</div><div id="compList"></div></div>`
+      ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;"><div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🏷️ COMPETITOR PRICES</div><span style="font-size:11px;color:var(--blue);">${_compMatches.length} match${_compMatches.length>1?'es':''} from scans & catalogs</span></div><div id="compFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);">${compBtn('all','All')}${compBtn('instock','In Stock Only')}${compBtn('hideoos','Hide Out of Stock/Pre-Order')}</div>${compVendorBar}<div id="compList"></div></div>`
       : `<div style="background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:18px;margin-bottom:14px;text-align:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;margin-bottom:4px;">🏷️ COMPETITOR PRICES</div><div style="font-size:13px;color:var(--gray);">No competitor data yet — scan in the Competitor tab.</div></div>`;
     const prodImg = ebayActivePrices[0]?.img || '';
     refPhotoDefault = prodImg;
