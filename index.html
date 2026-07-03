@@ -269,6 +269,51 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   .imp-cost { gap: 16px 12px !important; }
   .imp-cost label { font-size: 12px !important; white-space: normal !important; line-height: 1.35; }
 }
+
+/* ===== PHONE OPTIMIZATION (390px–430px) ===== */
+@media (max-width: 480px) {
+  /* general: no horizontal overflow, tighter cards, readable base font */
+  html, body { overflow-x: hidden; max-width: 100%; }
+  .main { padding: 16px 12px 40px !important; }
+  .card { padding: 16px !important; }
+  .card td, .card th, .tbl-wrap td, .tbl-wrap th { font-size: 13px; }
+
+  /* 1: nav tabs — horizontal scroll, never wrap */
+  .nav { overflow-x: auto !important; white-space: nowrap !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; }
+  .nav-tab { flex: 0 0 auto !important; }
+
+  /* 2: Import Cost Settings — stack all 6 fields vertically */
+  #impCostBody { grid-template-columns: 1fr !important; }
+
+  /* 3: Price Scanner search row — SCAN button full width under the input */
+  .search-row { flex-direction: column !important; align-items: stretch !important; }
+  .search-row .text-input, #psScanBtn, .search-row .btn-red { width: 100% !important; }
+
+  /* 7: thumb-friendly minimum tap height on all buttons */
+  .btn-red, .btn-blue, .btn-green, .btn-gold, .btn-gray, .btn-sm,
+  .qsearch-btn, .site-btn, .filter-select, .mic-btn, .row-action { min-height: 44px !important; }
+
+  /* 8: 📷 Identify by Photo — full width, 52px tall */
+  #psIdBtn { width: 100% !important; flex: 1 1 100% !important; min-height: 52px !important; font-size: 15px !important; }
+
+  /* horizontal-scroll fallbacks for wide tables */
+  .tbl-wrap, .vsec-body, #auctWatchlist, #resultsDiv { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+
+  /* 4: Vendor Catalogs table — hide Scale(3) + Added(6) */
+  #catalogsContainer table th:nth-child(3), #catalogsContainer table td:nth-child(3),
+  #catalogsContainer table th:nth-child(6), #catalogsContainer table td:nth-child(6) { display: none !important; }
+
+  /* 5: Auction watchlist — hide Est Tax(7), Avg Sold(9), Max Bid(11) */
+  #auctWatchlist table th:nth-child(7), #auctWatchlist table td:nth-child(7),
+  #auctWatchlist table th:nth-child(9), #auctWatchlist table td:nth-child(9),
+  #auctWatchlist table th:nth-child(11), #auctWatchlist table td:nth-child(11) { display: none !important; }
+
+  /* 9: Eric & Khai collection tables — hide Scale(3) + Notes(14) */
+  #eric .tbl-wrap table th:nth-child(3), #eric .tbl-wrap table td:nth-child(3),
+  #eric .tbl-wrap table th:nth-child(14), #eric .tbl-wrap table td:nth-child(14),
+  #khai .tbl-wrap table th:nth-child(3), #khai .tbl-wrap table td:nth-child(3),
+  #khai .tbl-wrap table th:nth-child(14), #khai .tbl-wrap table td:nth-child(14) { display: none !important; }
+}
 </style>
 </head>
 <body>
@@ -317,6 +362,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <div class="nav" style="overflow-x:auto;">
   <button class="nav-tab active" onclick="showTab('price_scanner',this)">🔍 Price Scanner</button>
   <button class="nav-tab" onclick="showTab('scanner',this)">🕵️ Competitor Scanner</button>
+  <button class="nav-tab" onclick="showTab('auction_watch',this)">🎯 Auction Watch</button>
+  <button class="nav-tab" onclick="showTab('buy_report',this)">📋 Buy Report</button>
   <button class="nav-tab" onclick="showTab('inventory',this)">📦 Inventory</button>
   <button class="nav-tab" onclick="showTab('suppliers',this)">🤝 Suppliers</button>
   <button class="nav-tab" onclick="showTab('negotiation',this)">💬 Negotiation</button>
@@ -346,14 +393,21 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div class="card">
     <div style="font-family:Rajdhani,sans-serif;font-size:22px;font-weight:700;margin-bottom:4px;">MARKET PRICE SCANNER + TRUE MARGIN CALCULATOR</div>
     <div style="color:var(--gray);font-size:13px;margin-bottom:20px;">Type any diecast model. Get price estimates, true landed cost, and real margin after ALL fees.</div>
-    <div class="search-row" style="display:flex;gap:12px;">
-      <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red..." style="flex:1;font-size:15px;padding:14px 20px;border:2px solid var(--gold);box-shadow:0 0 12px rgba(212,175,55,0.35);background:#1E2330;"/>
+    <div class="search-row" style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div style="position:relative;flex:1;min-width:200px;">
+        <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red... — or paste an image with Ctrl+V" style="width:100%;box-sizing:border-box;font-size:15px;padding:14px 44px 14px 20px;" oninput="togglePsClear()"/>
+        <button id="psClearBtn" onclick="clearPsSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
+      </div>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
     </div>
-    <div class="mic-wrap" style="margin-top:10px;">
+    <input type="file" id="psImageInput" accept="image/*" style="display:none" onchange="handlePsImageInput(event)"/>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
       <button id="micBtn" class="mic-btn" onclick="startVoiceSearch()" title="Search by voice">🎤</button>
+      <button id="psIdBtn" class="qsearch-btn" onclick="document.getElementById('psImageInput').click()" title="Identify a diecast from a photo" style="border-color:var(--gold);color:var(--gold);font-weight:700;">📷 Identify by Photo</button>
+      <div style="flex:1;min-width:180px;font-size:12px;color:var(--gray);">Works on mobile camera, photo library, or desktop paste — auto-identifies the diecast model.</div>
     </div>
     <div class="qsearch-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
+      <button class="qsearch-btn" onclick="openGoogleSearch()" style="border-color:#4285F4;color:#fff;font-weight:700;"><span style="color:#4285F4;">G</span><span style="color:#EA4335;">o</span><span style="color:#FBBC05;">o</span><span style="color:#4285F4;">g</span><span style="color:#34A853;">l</span><span style="color:#EA4335;">e</span> 🔍</button>
       <button class="qsearch-btn" onclick="openAliExpress()" style="border-color:var(--orange);color:var(--orange);">🛒 AliExpress</button>
       <button class="qsearch-btn" onclick="openSiteSearch('horizon')">Horizon Diecast</button>
       <button class="qsearch-btn" onclick="openSiteSearch('carbromc')">CarBromc</button>
@@ -522,6 +576,80 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   </div>
 </div>
 
+<!-- ===== BUY REPORT ===== -->
+<div id="buy_report" class="section">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
+      <div style="min-width:200px;flex:1;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;">🏆 Top 10 Buy Report</div>
+        <div style="color:var(--gray);font-size:13px;margin-top:2px;">Your best buying opportunities right now based on demand, price advantage, and margin.</div>
+      </div>
+      <div style="text-align:right;">
+        <button id="buyGenBtn" onclick="generateBuyReport()" style="padding:14px 26px;font-size:15px;font-weight:800;background:#C9A84C;color:#000;border:2px solid #F0D97A;border-radius:10px;cursor:pointer;box-shadow:0 2px 10px rgba(201,168,76,0.35);white-space:nowrap;">⚡ Generate Report</button>
+        <div id="buyLastGen" style="font-size:11px;color:var(--gray);margin-top:6px;">Not generated yet</div>
+      </div>
+    </div>
+    <div id="buyLoading" style="display:none;text-align:center;padding:20px;">
+      <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px;"></div>
+      <div id="buyProgress" style="font-size:13px;color:var(--gray);">Analyzing…</div>
+    </div>
+  </div>
+  <div id="buyReportCards"></div>
+</div>
+
+<!-- ===== AUCTION WATCH ===== -->
+<div id="auction_watch" class="section">
+
+  <!-- SECTION 1: GLOBAL SETTINGS (collapsed) -->
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleAuctionSettings()">
+      <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;">⚙️ Global Settings</div>
+      <span id="auctionSettingsTog" style="color:var(--gray);">▸</span>
+    </div>
+    <div id="auctionSettingsBody" style="display:none;margin-top:14px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;">
+        <div><label style="font-size:12px;color:var(--gray);display:block;margin-bottom:5px;">Market threshold % — flag bids under this % of avg sold</label><input class="text-input" id="auctThreshold" type="number" step="1" value="70" style="width:100%;box-sizing:border-box;"/></div>
+        <div><label style="font-size:12px;color:var(--gray);display:block;margin-bottom:5px;">Ending soon alert — flag auctions ending within X hours</label><input class="text-input" id="auctEndingSoon" type="number" step="0.5" value="2" style="width:100%;box-sizing:border-box;"/></div>
+        <div><label style="font-size:12px;color:var(--gray);display:block;margin-bottom:5px;">Max shipping cost filter — hide auctions above this $</label><input class="text-input" id="auctMaxShip" type="number" step="0.5" value="15" style="width:100%;box-sizing:border-box;"/></div>
+        <div><label style="font-size:12px;color:var(--gray);display:block;margin-bottom:5px;">Tax rate % — used for true total</label><input class="text-input" id="auctTaxRate" type="number" step="0.01" value="10.25" style="width:100%;box-sizing:border-box;"/></div>
+      </div>
+      <button class="btn-blue" onclick="saveAuctionSettings()" style="margin-top:14px;">💾 Save Settings</button>
+    </div>
+  </div>
+
+  <!-- SECTION 2: SEARCH -->
+  <div class="card" style="margin-bottom:14px;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;margin-bottom:4px;">🎯 Auction Watchlist</div>
+    <div style="color:var(--gray);font-size:13px;margin-bottom:14px;">Search live eBay auctions — specific (e.g. "Kaido House NSX") or broad (e.g. "1/64 diecast Ferrari", "Mini GT 1/64 lot").</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <input class="text-input" id="auctSearchInput" placeholder="Search eBay auctions…" style="flex:1;min-width:200px;" onkeydown="if(event.key==='Enter')searchAuctions()"/>
+      <button class="btn-red" onclick="searchAuctions()" style="padding:12px 24px;font-size:14px;white-space:nowrap;">🔍 Search Auctions</button>
+    </div>
+    <div id="auctSearchResults" style="margin-top:12px;"></div>
+  </div>
+
+  <!-- WATCHLIST TABLE -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--gray);">Sort:</span>
+        <select id="auctSort" class="filter-select" onchange="setAuctionSort(this.value)">
+          <option value="ending">Ending Soonest</option>
+          <option value="steal">Biggest Steal</option>
+          <option value="total">Lowest True Total</option>
+          <option value="ghost">Ghost Auctions First</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <span id="auctLastRefresh" style="font-size:11px;color:var(--gray);">Not refreshed yet</span>
+        <button onclick="refreshWatchlist()" style="padding:8px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">🔄 Refresh Now</button>
+      </div>
+    </div>
+    <div id="auctWatchlist"></div>
+  </div>
+
+</div>
+
 <!-- ===== COMPETITOR SCANNER ===== -->
 <div id="scanner" class="section">
 
@@ -574,6 +702,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
   <!-- UNCLEAR ITEMS -->
   <div id="unclearDiv"></div>
+
+  <!-- REVIEW BEFORE SAVE -->
+  <div id="reviewDiv"></div>
 
   <!-- FILTERS -->
   <div class="filter-bar" id="filterBar" style="display:none">
@@ -633,6 +764,12 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
       <input class="text-input" id="newVendorName" placeholder="New vendor name..." style="flex:1;min-width:160px;"/>
       <button class="btn-blue" onclick="addVendor()">+ Add Vendor</button>
+    </div>
+    <style>#catalogSearch::placeholder{color:#DDE2EC;opacity:1;}</style>
+    <div style="position:relative;margin-bottom:14px;">
+      <span aria-hidden="true" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:16px;line-height:1;pointer-events:none;color:var(--gold);">🔍</span>
+      <input class="text-input" id="catalogSearch" placeholder="Search all catalogs by item name or brand..." oninput="filterCatalogs()" style="width:100%;box-sizing:border-box;padding:13px 40px 13px 42px;font-size:14px;border:2px solid var(--gold);background:#232A38;color:var(--white);box-shadow:0 0 0 3px rgba(201,168,76,0.15);"/>
+      <button id="catalogSearchClear" onclick="clearCatalogSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:20px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
     </div>
     <div id="catalogsContainer"></div>
   </div>
@@ -761,6 +898,70 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div id="intelContent">
     <div class="empty"><div class="empty-icon">💡</div><div class="empty-title">No Intel Yet</div><div>Scan competitor screenshots to generate market intelligence.</div></div>
   </div>
+
+  <!-- ===== WHATNOT INTEL ===== -->
+  <div style="font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;margin:24px 0 12px;">📺 Whatnot Intel</div>
+
+  <!-- SECTION 1: CSV UPLOAD -->
+  <div class="card">
+    <div class="card-title">⬆️ Upload Whatnot Spy CSV</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <input class="text-input" id="whatnotSeller" placeholder="Seller name (e.g. Pablo)" style="flex:1;min-width:160px;"/>
+      <input class="text-input" id="whatnotDate" type="date" style="flex:1;min-width:160px;"/>
+    </div>
+    <div id="whatnotDrop" onclick="document.getElementById('whatnotFileInput').click()" style="border:2px dashed var(--border);border-radius:12px;padding:34px 18px;text-align:center;cursor:pointer;transition:all 0.15s;color:var(--gray);">
+      <div style="font-size:34px;margin-bottom:8px;">📄</div>
+      <div style="font-size:14px;font-weight:600;color:var(--white);">Drag &amp; drop a Sales or Buyers CSV here</div>
+      <div style="font-size:12px;margin-top:4px;">or click to browse — type is auto-detected from the columns</div>
+    </div>
+    <input type="file" id="whatnotFileInput" accept=".csv,text/csv" multiple style="display:none" onchange="handleWhatnotFiles(this.files)"/>
+    <div id="whatnotUploadStatus" style="font-size:12px;color:var(--gray);margin-top:10px;"></div>
+    <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;margin:18px 0 8px;">Uploaded Shows</div>
+    <div id="whatnotShowsList"></div>
+  </div>
+
+  <!-- SECTION 2: TOP BUYERS LEADERBOARD -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">🏆 Top Buyers Leaderboard</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="wnLbSeller" class="filter-select" onchange="renderWhatnotLeaderboard()"><option value="">All sellers</option></select>
+        <select id="wnLbSort" class="filter-select" onchange="renderWhatnotLeaderboard()">
+          <option value="spent">Sort: Total Spent</option>
+          <option value="purchases">Sort: # Purchases</option>
+          <option value="shows">Sort: # Shows</option>
+        </select>
+      </div>
+    </div>
+    <div id="whatnotLeaderboard"></div>
+  </div>
+
+  <!-- SECTION 3: SALES ANALYSIS -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">💵 Sales Analysis</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="wnSalesShow" class="filter-select" onchange="renderWhatnotSales()"><option value="">All shows</option></select>
+        <select id="wnSalesSort" class="filter-select" onchange="renderWhatnotSales()">
+          <option value="recent">Sort: Most Recent</option>
+          <option value="price">Sort: Price High→Low</option>
+          <option value="type">Sort: Sale Type</option>
+        </select>
+      </div>
+    </div>
+    <div id="whatnotSalesSummary" style="margin-bottom:12px;"></div>
+    <div id="whatnotSales"></div>
+  </div>
+
+  <!-- SECTION 4: AI SOURCING -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">🤖 AI Sourcing Recommendations</div>
+      <button class="btn-blue" onclick="generateSourcingReport()">✨ Generate Sourcing Report</button>
+    </div>
+    <div id="whatnotSourcing"><div style="color:var(--gray);font-size:13px;">Upload sales data, then generate a report to see what to stock, best price ranges, and which brands are moving.</div></div>
+  </div>
+
 </div>
 
 </div><!-- end main -->
@@ -1077,7 +1278,12 @@ document.addEventListener('paste', async function(e) {
   for (let i = 0; i < items.length; i++) {
     if (items[i].type.startsWith('image/')) {
       const file = items[i].getAsFile();
-      await addScreenshot(file);
+      const psActive = document.getElementById('price_scanner') && document.getElementById('price_scanner').classList.contains('active');
+      if (psActive) {
+        identifyFromFile(file); // Price Scanner tab: paste = identify a diecast
+      } else {
+        await addScreenshot(file); // Competitor tab: paste = add a screenshot
+      }
       break;
     }
   }
@@ -1238,6 +1444,7 @@ Return ONLY this JSON (no markdown, no explanation):
   allItems = [...allItems, ...newConfirmed];
   renderResults();
   if (newUnclear.length > 0) renderUnclear(newUnclear);
+  renderReviewTable(newConfirmed);
   updateIntel();
   document.getElementById('loadingDiv').style.display = 'none';
   document.getElementById('scanBtn').disabled = false;
@@ -1870,7 +2077,27 @@ function updateIntel() {
 // VENDOR CATALOGS (Phase 1 — Buying Intelligence Engine)
 // ============================================================
 const DEFAULT_VENDORS = ['Horizon Diecast','CarBromc','RC Mart','Pablo Diecast Garage'];
+
+// Auto-scrape configuration. All feeds are fetched through the Vercel proxy (?type=scrape&url=...)
+// to avoid browser CORS restrictions. {PAGE} is replaced by the current page number in the loop.
+const VENDOR_SCRAPERS = {
+  'Horizon Diecast': {
+    platform: 'shopify',
+    urlTemplate: 'https://horizondiecast.com/products.json?page={PAGE}&limit=250'
+  },
+  'CarBromc': {
+    platform: 'shopify',
+    urlTemplate: 'https://www.carbromc.com/products.json?page={PAGE}&limit=250'
+  },
+  'Pablo Diecast Garage': {
+    platform: 'woocommerce',
+    urlTemplate: 'https://pablosdiecastgarage.com/wp-json/wc/store/v1/products?per_page=100&page={PAGE}'
+  }
+};
+
 let vendorCatalogs = {};
+let vendorScrapeMeta = {};   // { vendorName: { lastScraped: <epoch ms> } }
+let _scraping = {};          // { vendorName: true } while a scrape is in flight
 let _catIdCounter = 0;
 let editingCat = null; // { vendor, id } while editing an entry
 
@@ -1904,7 +2131,8 @@ function renderCatalogs() {
       const priceNum = parseFloat(it.price);
       const price = !isNaN(priceNum) ? '$' + priceNum.toFixed(2) : '-';
       const cls = statusClass[it.status] || 'b-unknown';
-      return `<tr>
+      const hay = ((it.name || '') + ' ' + (it.brand || '')).toLowerCase();
+      return `<tr data-search="${escAttr(hay)}">
         <td>${it.name || '-'}</td><td>${it.brand || '-'}</td><td>${it.scale || '-'}</td>
         <td class="price-td">${price}</td>
         <td><span class="badge ${cls}">${it.status || 'Unknown'}</span></td>
@@ -1912,16 +2140,25 @@ function renderCatalogs() {
         <td style="white-space:nowrap;text-align:right;"><button class="row-action" title="Edit" onclick="openCatItemModal('${vEsc}',${it.id})">✏️</button><button class="row-action row-del" title="Delete" onclick="deleteCatItem('${vEsc}',${it.id})">🗑️</button></td>
       </tr>`;
     }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No items yet. Add manually or from a scan.</td></tr>`;
+    const scrapable = !!VENDOR_SCRAPERS[vendor];
+    const meta = vendorScrapeMeta[vendor];
+    const scrapeLine = scrapable
+      ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 16px;background:#0E1015;border-top:1px solid var(--border);">
+          <span style="color:var(--gray);font-size:11px;white-space:nowrap;">⏱ Last scraped: ${meta && meta.lastScraped ? timeAgo(meta.lastScraped) : 'never'}</span>
+          <button class="btn-sm" style="background:var(--gold);color:#111;" title="Fetch latest products from this vendor's live store" onclick="event.stopPropagation();scrapeVendor('${vEsc}')">🔄 Auto Scrape</button>
+        </div>`
+      : '';
     return `<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#0E1015;cursor:pointer;" onclick="toggleVendorSection(this)">
         <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;">📦 ${vendor} <span style="color:var(--gray);font-size:12px;font-weight:400;">(${items.length})</span></div>
         <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
           <button class="btn-sm" style="background:var(--blue);" onclick="openCatItemModal('${vEsc}')">+ Item</button>
           <button class="row-action row-del" title="Delete vendor" onclick="removeVendor('${vEsc}')">🗑 Vendor</button>
-          <span class="vsec-toggle" style="color:var(--gray);">▾</span>
+          <span class="vsec-toggle" style="color:var(--gray);">▸</span>
         </div>
       </div>
-      <div class="vsec-body" style="overflow-x:auto;">
+      ${scrapeLine}
+      <div class="vsec-body" style="overflow-x:auto;display:none;">
         <table style="width:100%;border-collapse:collapse;">
           <thead><tr><th>Item</th><th>Brand</th><th>Scale</th><th>Price</th><th>Status</th><th>Added</th><th style="text-align:right;">Actions</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -1929,6 +2166,42 @@ function renderCatalogs() {
       </div>
     </div>`;
   }).join('');
+  filterCatalogs(); // re-apply any active search filter after re-render
+}
+
+// Live filter across every vendor table by item name or brand
+function filterCatalogs() {
+  const inp = document.getElementById('catalogSearch');
+  const clearBtn = document.getElementById('catalogSearchClear');
+  const q = (inp ? inp.value : '').trim().toLowerCase();
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+  const cont = document.getElementById('catalogsContainer');
+  if (!cont) return;
+  Array.from(cont.children).forEach(sec => {
+    const rows = sec.querySelectorAll('tbody tr[data-search]');
+    let visible = 0;
+    rows.forEach(tr => {
+      const show = !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1;
+      tr.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    // While searching, hide vendors with no matches and expand those with matches
+    if (q) {
+      sec.style.display = visible ? '' : 'none';
+      const body = sec.querySelector('.vsec-body');
+      if (visible && body) body.style.display = '';
+    } else {
+      sec.style.display = '';
+    }
+  });
+}
+
+function clearCatalogSearch() {
+  const inp = document.getElementById('catalogSearch');
+  if (!inp) return;
+  inp.value = '';
+  filterCatalogs();
+  inp.focus();
 }
 
 function toggleVendorSection(headerEl) {
@@ -2036,6 +2309,127 @@ function deleteCatItem(vendor, id) {
   toast('🗑️ Item deleted.', 'yellow');
 }
 
+// ============================================================
+// PRE-SAVE REVIEW TABLE (Competitor Scanner)
+// ============================================================
+let reviewItems = [];
+function escHtmlR(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Render the review/edit table for freshly scanned items before they're committed to a catalog
+function renderReviewTable(items) {
+  const div = document.getElementById('reviewDiv');
+  if (!div) return;
+  reviewItems = (items || []).map((it, i) => ({
+    _rid: i,
+    name: it.name || '',
+    brand: it.brand || '',
+    scale: it.scale || '',
+    price: (it.price === 0 || it.price) ? it.price : '',
+    status: it.status || 'Unknown',
+    site: it.site || selectedSite
+  }));
+  if (!reviewItems.length) { div.innerHTML = ''; return; }
+
+  ensureDefaultVendors();
+  const vendorNames = Object.keys(vendorCatalogs).sort();
+  const defVendor = vendorCatalogs[selectedSite] ? selectedSite : (vendorNames[0] || '');
+  const vendorOpts = vendorNames.map(n => `<option value="${escAttr(n)}"${n === defVendor ? ' selected' : ''}>${escHtmlR(n)}</option>`).join('');
+
+  const rows = reviewItems.map(it => {
+    const priceVal = (it.price === 0 || it.price) ? it.price : '';
+    return `<tr id="revRow_${it._rid}" data-rid="${it._rid}">
+      <td id="revWarn_${it._rid}" style="width:24px;text-align:center;font-size:15px;"></td>
+      <td>${escHtmlR(it.name) || '<span style="color:var(--gray)">(no name)</span>'}</td>
+      <td style="color:var(--gray);">${escHtmlR(it.brand) || '-'}</td>
+      <td><input type="number" step="0.01" min="0" class="rev-price" data-rid="${it._rid}" value="${priceVal}" oninput="recomputeReviewDupes()" style="width:92px;padding:6px 8px;font-size:13px;background:#12151b;border:1px solid var(--border);border-radius:6px;color:inherit;"/></td>
+      <td style="color:var(--gray);">${escHtmlR(it.status) || '-'}</td>
+    </tr>`;
+  }).join('');
+
+  div.innerHTML = `<div class="card" style="margin-top:14px;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;margin-bottom:6px;">📝 Review Before Saving <span style="color:var(--gray);font-size:13px;font-weight:400;">(${reviewItems.length} items)</span></div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Check each price and edit if the AI misread it. Rows flagged <span style="color:var(--orange);">⚠️ orange</span> share the same price across different items — a common AI mistake. When it looks right, save to a vendor catalog.</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr><th></th><th style="text-align:left;">Item</th><th style="text-align:left;">Brand</th><th style="text-align:left;">Price</th><th style="text-align:left;">Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:16px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--gray);">Save to vendor:</span>
+        <select id="reviewTargetVendor" class="filter-select" style="min-width:170px;">${vendorOpts}</select>
+      </div>
+      <button class="btn-green" onclick="saveReviewToCatalog()">💾 Save All to Catalog</button>
+    </div>
+  </div>`;
+
+  recomputeReviewDupes();
+}
+
+// Flag rows whose (edited) price matches another row belonging to a DIFFERENT item name
+function recomputeReviewDupes() {
+  const inputs = Array.from(document.querySelectorAll('#reviewDiv .rev-price'));
+  const byPrice = {};
+  inputs.forEach(inp => {
+    const rid = inp.getAttribute('data-rid');
+    const it = reviewItems.find(r => String(r._rid) === String(rid));
+    const p = parseFloat(inp.value);
+    if (isNaN(p)) return;
+    const key = p.toFixed(2);
+    (byPrice[key] = byPrice[key] || []).push((it ? it.name : '').trim().toLowerCase());
+  });
+  const dupPrices = {};
+  Object.keys(byPrice).forEach(key => {
+    const names = new Set(byPrice[key]);
+    if (byPrice[key].length > 1 && names.size > 1) dupPrices[key] = true;
+  });
+  inputs.forEach(inp => {
+    const rid = inp.getAttribute('data-rid');
+    const row = document.getElementById('revRow_' + rid);
+    const warn = document.getElementById('revWarn_' + rid);
+    const p = parseFloat(inp.value);
+    const key = isNaN(p) ? null : p.toFixed(2);
+    const isDup = !!(key && dupPrices[key]);
+    if (row) row.style.background = isDup ? 'rgba(255,140,0,0.14)' : '';
+    if (warn) warn.textContent = isDup ? '⚠️' : '';
+    inp.style.borderColor = isDup ? 'var(--orange)' : 'var(--border)';
+  });
+}
+
+// Commit all reviewed rows (including manual price edits) to the chosen vendor catalog
+function saveReviewToCatalog() {
+  const sel = document.getElementById('reviewTargetVendor');
+  const vendor = sel ? sel.value : '';
+  if (!vendor) { toast('Pick a vendor.', 'yellow'); return; }
+  if (!reviewItems.length) { toast('Nothing to save.', 'yellow'); return; }
+  if (!vendorCatalogs[vendor]) vendorCatalogs[vendor] = [];
+  let n = 0;
+  reviewItems.forEach(it => {
+    const inp = document.querySelector('#reviewDiv .rev-price[data-rid="' + it._rid + '"]');
+    const priceNum = parseFloat(inp ? inp.value : it.price);
+    vendorCatalogs[vendor].push({
+      id: nextCatId(),
+      name: it.name || '',
+      brand: it.brand || '',
+      scale: it.scale || '',
+      price: !isNaN(priceNum) ? priceNum : null,
+      status: it.status || 'Unknown',
+      dateAdded: catToday()
+    });
+    n++;
+  });
+  document.getElementById('reviewDiv').innerHTML = '';
+  reviewItems = [];
+  renderCatalogs();
+  saveData();
+  toast('✅ Saved ' + n + ' item' + (n > 1 ? 's' : '') + ' to ' + vendor + ' catalog.', 'green');
+}
+
 function saveScanToCatalog() {
   const vendor = document.getElementById('scanTargetVendor').value;
   if (!vendor) { toast('Pick a vendor.', 'yellow'); return; }
@@ -2058,6 +2452,189 @@ function saveScanToCatalog() {
   renderCatalogs();
   saveData();
   toast('✅ Added ' + n + ' item' + (n > 1 ? 's' : '') + ' to ' + vendor + ' catalog.', 'green');
+}
+
+// ============================================================
+// AUTO-SCRAPE (Shopify products.json / WooCommerce Store API)
+// ============================================================
+function proxyScrapeUrl(remoteUrl) {
+  return PROXY_URL + '?type=scrape&url=' + encodeURIComponent(remoteUrl);
+}
+
+// Pull a scale token (1/18, 1/24, 1/32, 1/43, 1/64) out of free text
+function detectScale(txt) {
+  const m = String(txt || '').match(/1\s*[\/:]\s*(18|24|32|43|64)\b/);
+  return m ? '1/' + m[1] : '';
+}
+
+// Known brands checked in order; first substring found in the product name wins.
+const KNOWN_BRANDS = [
+  "Mini GT", "MiniGT", "Pop Race", "PopRace", "Tarmac Works", "Inno64", "INNO64",
+  "LCD", "TPC", "DCM", "Liberty64", "Liberty", "Rotating Wheel", "GlamCraft",
+  "Stance Art", "Rhino Model", "Bizarre Art", "Ignition Model", "Kaido",
+  "Demon King", "Blown AT64", "Raven Art", "Model One", "SLAMERAFT",
+  "Richsing Wheel", "GCM Model"
+];
+function brandFromName(name) {
+  const s = String(name || '');
+  for (let i = 0; i < KNOWN_BRANDS.length; i++) {
+    if (s.indexOf(KNOWN_BRANDS[i]) !== -1) return KNOWN_BRANDS[i];
+  }
+  return '';
+}
+
+// Map one Shopify products.json product to the catalog item shape
+function mapShopifyProduct(p) {
+  const variants = Array.isArray(p.variants) ? p.variants : [];
+  const first = variants[0] || {};
+  const price = parseFloat(first.price);
+  const inStock = variants.some(v => v && v.available);
+  const tags = Array.isArray(p.tags) ? p.tags.join(' ') : (p.tags || '');
+  const image = (Array.isArray(p.images) && p.images[0] && p.images[0].src) ? p.images[0].src : '';
+  return {
+    name: p.title || '',
+    brand: p.vendor || brandFromName(p.title || ''),
+    scale: detectScale((p.title || '') + ' ' + tags + ' ' + (p.body_html || '')),
+    price: !isNaN(price) ? price : null,
+    status: inStock ? 'In Stock' : 'Out of Stock',
+    image: image
+  };
+}
+
+// Map one WooCommerce Store API product to the catalog item shape
+function mapWooProduct(p) {
+  let price = null;
+  if (p.prices && p.prices.price != null) {
+    const minor = parseInt(p.prices.currency_minor_unit != null ? p.prices.currency_minor_unit : 2, 10);
+    const raw = parseFloat(p.prices.price);
+    if (!isNaN(raw)) price = raw / Math.pow(10, isNaN(minor) ? 2 : minor);
+  }
+  const image = (Array.isArray(p.images) && p.images[0] && p.images[0].src) ? p.images[0].src : '';
+  return {
+    name: p.name || '',
+    brand: brandFromName(p.name || ''),
+    scale: detectScale((p.name || '') + ' ' + (p.short_description || '') + ' ' + (p.description || '')),
+    price: price,
+    status: p.is_in_stock ? 'In Stock' : 'Out of Stock',
+    image: image
+  };
+}
+
+// Normalized key for fuzzy duplicate detection (case/punctuation-insensitive)
+function fuzzyKey(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Merge scraped items into a vendor catalog: update matches in place, add new ones
+function mergeScrapedItems(vendor, scraped) {
+  if (!vendorCatalogs[vendor]) vendorCatalogs[vendor] = [];
+  const arr = vendorCatalogs[vendor];
+  const index = {};
+  arr.forEach(it => { const k = fuzzyKey(it.name); if (k) index[k] = it; });
+  let added = 0, updated = 0;
+  scraped.forEach(s => {
+    const k = fuzzyKey(s.name);
+    if (!k) return;
+    const existing = index[k];
+    if (existing) {
+      if (s.price != null) existing.price = s.price;
+      if (s.status) existing.status = s.status;
+      if (s.scale && !existing.scale) existing.scale = s.scale;
+      if (s.brand && !existing.brand) existing.brand = s.brand;
+      if (s.image && !existing.image) existing.image = s.image;
+      existing.dateAdded = catToday();
+      updated++;
+    } else {
+      const entry = {
+        id: nextCatId(),
+        name: s.name || '',
+        brand: s.brand || '',
+        scale: s.scale || '',
+        price: s.price != null ? s.price : null,
+        status: s.status || 'Unknown',
+        image: s.image || '',
+        dateAdded: catToday()
+      };
+      arr.push(entry);
+      index[k] = entry;
+      added++;
+    }
+  });
+  return { added, updated };
+}
+
+// Scrape one vendor: loop pages until empty, map, fuzzy-merge, timestamp, save.
+async function scrapeVendor(vendor, opts) {
+  opts = opts || {};
+  const silent = !!opts.silent;
+  const cfg = VENDOR_SCRAPERS[vendor];
+  if (!cfg) { if (!silent) toast('No scraper configured for ' + vendor, 'yellow'); return; }
+  if (_scraping[vendor]) return;
+  _scraping[vendor] = true;
+  if (!silent) toast('🔄 Scraping ' + vendor + '…', 'yellow');
+
+  const MAX_PAGES = 100; // safety cap so a broken feed can't loop forever
+  let page = 1, all = [], fetchError = false;
+  try {
+    while (page <= MAX_PAGES) {
+      const remote = cfg.urlTemplate.replace('{PAGE}', page);
+      const r = await fetch(proxyScrapeUrl(remote));
+      if (!r.ok) { fetchError = true; break; }
+      const data = await r.json();
+      if (data && data.error) { fetchError = true; break; }
+
+      let mapped = [];
+      if (cfg.platform === 'shopify') {
+        const products = (data && Array.isArray(data.products)) ? data.products : [];
+        if (!products.length) break;                 // empty page => done
+        mapped = products.map(mapShopifyProduct);
+      } else { // woocommerce store api returns a top-level array
+        const products = Array.isArray(data) ? data : ((data && Array.isArray(data.products)) ? data.products : []);
+        if (!products.length) break;                 // empty page => done
+        mapped = products.map(mapWooProduct);
+      }
+      all = all.concat(mapped);
+      page++;
+    }
+  } catch (e) {
+    console.log('Scrape error for ' + vendor, e);
+    fetchError = true;
+  }
+  _scraping[vendor] = false;
+
+  if (!all.length) {
+    if (!silent) toast('⚠️ No items scraped for ' + vendor + (fetchError ? ' (fetch error)' : ''), fetchError ? 'red' : 'yellow');
+    return;
+  }
+
+  const { added, updated } = mergeScrapedItems(vendor, all);
+  vendorScrapeMeta[vendor] = { lastScraped: Date.now() };
+  renderCatalogs();
+  await saveData();
+  if (!silent) toast('✅ ' + vendor + ': ' + added + ' new, ' + updated + ' updated', 'green');
+}
+
+// Human-friendly "x ago" for the last-scraped label
+function timeAgo(ts) {
+  if (!ts) return 'never';
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60); if (m < 60) return m + ' min ago';
+  const h = Math.floor(m / 60); if (h < 24) return h + ' hour' + (h > 1 ? 's' : '') + ' ago';
+  const d = Math.floor(h / 24); return d + ' day' + (d > 1 ? 's' : '') + ' ago';
+}
+
+// On page load, silently refresh any scrapable vendor whose data is >24h old
+async function maybeAutoScrape() {
+  const DAY = 24 * 60 * 60 * 1000;
+  for (const vendor of Object.keys(VENDOR_SCRAPERS)) {
+    if (!vendorCatalogs[vendor]) continue;
+    const meta = vendorScrapeMeta[vendor];
+    const last = (meta && meta.lastScraped) ? meta.lastScraped : 0;
+    if (Date.now() - last > DAY) {
+      await scrapeVendor(vendor, { silent: true });
+    }
+  }
 }
 
 // ============================================================
@@ -2103,6 +2680,11 @@ async function saveData() {
     localStorage.setItem('s64_ericW', JSON.stringify(ericWants));
     localStorage.setItem('s64_khaiW', JSON.stringify(khaiWants));
     localStorage.setItem('s64_catalogs', JSON.stringify(vendorCatalogs));
+    localStorage.setItem('s64_scrape_meta', JSON.stringify(vendorScrapeMeta));
+    localStorage.setItem('s64_auction_watch', JSON.stringify(auctionWatchlist));
+    localStorage.setItem('s64_auction_settings', JSON.stringify(auctionSettings));
+    localStorage.setItem('s64_whatnot_intel', JSON.stringify(whatnotShows));
+    localStorage.setItem('s64_buy_report', JSON.stringify(buyReport));
   } catch(e) {}
   showSaving('💾 Saving…');
   toast('⏳ Saving…', 'yellow');
@@ -2113,7 +2695,12 @@ async function saveData() {
       kvSet('s64_khai', khaiColl),
       kvSet('s64_ericW', ericWants),
       kvSet('s64_khaiW', khaiWants),
-      kvSet('s64_catalogs', vendorCatalogs)
+      kvSet('s64_catalogs', vendorCatalogs),
+      kvSet('s64_scrape_meta', vendorScrapeMeta),
+      kvSet('s64_auction_watch', auctionWatchlist),
+      kvSet('s64_auction_settings', auctionSettings),
+      kvSet('s64_whatnot_intel', whatnotShows),
+      kvSet('s64_buy_report', buyReport)
     ]);
     hideSaving('✅ Saved to cloud');
     toast('✅ Saved to cloud', 'green');
@@ -2130,8 +2717,8 @@ async function loadKey(key) {
   return null;
 }
 async function loadData() {
-  const [items, eric, khai, ericW, khaiW, catalogs] = await Promise.all([
-    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs')
+  const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta, auctWatch, auctSettings, whatnot, buyRep] = await Promise.all([
+    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings'), loadKey('s64_whatnot_intel'), loadKey('s64_buy_report')
   ]);
   if (Array.isArray(items)) allItems = items;
   if (Array.isArray(eric)) ericColl = eric;
@@ -2139,12 +2726,24 @@ async function loadData() {
   if (Array.isArray(ericW)) ericWants = ericW;
   if (Array.isArray(khaiW)) khaiWants = khaiW;
   if (catalogs && typeof catalogs === 'object' && !Array.isArray(catalogs)) vendorCatalogs = catalogs;
+  if (scrapeMeta && typeof scrapeMeta === 'object' && !Array.isArray(scrapeMeta)) vendorScrapeMeta = scrapeMeta;
+  if (Array.isArray(auctWatch)) auctionWatchlist = auctWatch;
+  if (auctSettings && typeof auctSettings === 'object' && !Array.isArray(auctSettings)) auctionSettings = Object.assign(auctionSettings, auctSettings);
   if (allItems.length) renderResults();
   if (ericColl.length) renderCollection('eric');
   if (khaiColl.length) renderCollection('khai');
   if (ericWants.length) renderWants('eric');
   if (khaiWants.length) renderWants('khai');
   renderCatalogs();
+  applyAuctionSettingsToInputs();
+  renderWatchlist();
+  startAuctionAutoRefresh();
+  if (Array.isArray(whatnot)) whatnotShows = whatnot;
+  initWhatnotDropzone();
+  renderWhatnotAll();
+  if (buyRep && typeof buyRep === 'object' && Array.isArray(buyRep.items)) buyReport = buyRep;
+  renderBuyReport();
+  maybeAutoScrape(); // background refresh of any vendor whose data is >24h old
 }
 
 // ============================================================
@@ -2215,7 +2814,22 @@ function getTariffs() {
 
 function quickPriceScan(term) {
   document.getElementById('psSearchInput').value = term;
+  togglePsClear();
   runPriceScan();
+}
+
+// Show the clear (×) button only when the search field has text
+function togglePsClear() {
+  const inp = document.getElementById('psSearchInput');
+  const btn = document.getElementById('psClearBtn');
+  if (inp && btn) btn.style.display = inp.value.length ? 'block' : 'none';
+}
+function clearPsSearch() {
+  const inp = document.getElementById('psSearchInput');
+  if (!inp) return;
+  inp.value = '';
+  togglePsClear();
+  inp.focus();
 }
 
 document.addEventListener('keydown', function(e) {
@@ -2373,6 +2987,739 @@ function buildQueryVariants(query) {
   return variants.filter(v => { const k = (v || '').toLowerCase(); if (!v || seen.has(k)) return false; seen.add(k); return true; });
 }
 
+// ============================================================
+// AUCTION WATCH
+// ============================================================
+let auctionSettings = { threshold: 70, endingSoon: 2, maxShipping: 15, taxRate: 10.25 };
+let auctionWatchlist = [];      // persisted watchlist items
+let auctionSearchResults = [];  // transient search results
+let auctionSortMode = 'ending'; // ending | steal | total | ghost
+let _auctionLastRefresh = 0;
+let _auctionRefreshTimer = null;
+const LOT_RE = /\b(lot|bundle|collection|set of|joblot|job lot|bulk|wholesale|qty|quantity|x\d+|\d+\s*pcs?)\b/i;
+
+function escHtmlA(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function toggleAuctionSettings() {
+  const body = document.getElementById('auctionSettingsBody');
+  const tog = document.getElementById('auctionSettingsTog');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  if (tog) tog.textContent = open ? '▸' : '▾';
+}
+
+function applyAuctionSettingsToInputs() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('auctThreshold', auctionSettings.threshold);
+  set('auctEndingSoon', auctionSettings.endingSoon);
+  set('auctMaxShip', auctionSettings.maxShipping);
+  set('auctTaxRate', auctionSettings.taxRate);
+}
+
+function saveAuctionSettings() {
+  const num = (id, def) => { const v = parseFloat((document.getElementById(id) || {}).value); return isNaN(v) ? def : v; };
+  auctionSettings = {
+    threshold: num('auctThreshold', 70),
+    endingSoon: num('auctEndingSoon', 2),
+    maxShipping: num('auctMaxShip', 15),
+    taxRate: num('auctTaxRate', 10.25)
+  };
+  renderAuctionSearchResults();
+  renderWatchlist();
+  saveData();
+  toast('✅ Auction settings saved.', 'green');
+}
+
+// Map a raw eBay item summary to an auction candidate
+function mapAuctionItem(i) {
+  const bid = parseFloat((i.currentBidPrice && i.currentBidPrice.value) || (i.price && i.price.value) || 0);
+  const bidCount = (typeof i.bidCount === 'number') ? i.bidCount : (parseInt(i.bidCount, 10) || 0);
+  const shipping = (i.shippingOptions && i.shippingOptions[0] && i.shippingOptions[0].shippingCost && i.shippingOptions[0].shippingCost.value != null)
+    ? parseFloat(i.shippingOptions[0].shippingCost.value) : null;
+  return {
+    title: i.title || '',
+    url: ebayItemUrl(i),
+    img: ebayImageUrl(i),
+    currentBid: bid,
+    bidCount: bidCount,
+    endDate: i.itemEndDate || null,
+    shipping: shipping
+  };
+}
+
+async function searchAuctions() {
+  const q = ((document.getElementById('auctSearchInput') || {}).value || '').trim();
+  if (!q) { toast('Enter a search term.', 'yellow'); return; }
+  const div = document.getElementById('auctSearchResults');
+  if (div) div.innerHTML = '<div style="padding:14px;color:var(--gray);font-size:13px;">Searching eBay auctions…</div>';
+  const raw = await fetchEbayItems('ebay_auction', q);
+  auctionSearchResults = (raw || []).map(mapAuctionItem).filter(a => a.currentBid > 0);
+  renderAuctionSearchResults();
+}
+
+function renderAuctionSearchResults() {
+  const div = document.getElementById('auctSearchResults');
+  if (!div) return;
+  // Apply the max-shipping filter (unknown/free shipping always passes)
+  const items = auctionSearchResults
+    .map((a, idx) => ({ a, idx }))
+    .filter(x => x.a.shipping == null || x.a.shipping <= auctionSettings.maxShipping);
+  if (!auctionSearchResults.length) { div.innerHTML = ''; return; }
+  if (!items.length) {
+    div.innerHTML = '<div style="padding:14px;color:var(--gray);font-size:13px;border:1px solid var(--border);border-radius:8px;">No auctions under your max shipping filter ($' + auctionSettings.maxShipping + '). Raise it in Global Settings.</div>';
+    return;
+  }
+  div.innerHTML = '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">' + items.map(({ a, idx }) => {
+    const img = a.img ? `<img src="${escAttr(a.img)}" alt="" style="width:46px;height:46px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
+    const bids = a.bidCount + ' bid' + (a.bidCount === 1 ? '' : 's');
+    const ends = a.endDate ? (' · ' + auctionTimeLeft(a.endDate).label + ' left') : '';
+    const onWatch = auctionWatchlist.find(w => w.url && w.url === a.url);
+    const btn = onWatch
+      ? `<button disabled style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--border);color:var(--gray);border:none;border-radius:7px;white-space:nowrap;">✓ Added</button>`
+      : `<button onclick="addToWatchlist(${idx})" style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:7px;cursor:pointer;white-space:nowrap;">+ Watchlist</button>`;
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">${img}<div style="flex:1;min-width:0;"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(a.title)}</div><div style="font-size:11px;color:var(--gray);">$${a.currentBid.toFixed(2)} · ${bids}${ends}${a.shipping != null ? ' · +$' + a.shipping.toFixed(2) + ' ship' : ''}</div></div>${btn}</div>`;
+  }).join('') + '</div>';
+}
+
+async function addToWatchlist(idx) {
+  const a = auctionSearchResults[idx];
+  if (!a) return;
+  if (auctionWatchlist.find(w => w.url && w.url === a.url)) { toast('Already on your watchlist.', 'yellow'); return; }
+  const item = {
+    id: Date.now() + '_' + Math.floor(Math.random() * 1000),
+    title: a.title, url: a.url, img: a.img,
+    currentBid: a.currentBid, bidCount: a.bidCount, endDate: a.endDate, shipping: a.shipping,
+    avgSold: null, maxBid: null
+  };
+  auctionWatchlist.push(item);
+  renderWatchlist();
+  renderAuctionSearchResults();
+  toast('🎯 Added. Fetching sold comps…', 'green');
+  item.avgSold = await fetchAvgSold(a.title);
+  renderWatchlist();
+  saveData();
+}
+
+// Average of eBay sold prices for a query (via existing ebay_sold proxy)
+async function fetchAvgSold(query) {
+  try {
+    const raw = await fetchEbayItems('ebay_sold', query);
+    const prices = mapSoldItems(raw || [], query).map(m => m.price).filter(p => p > 0);
+    if (!prices.length) return null;
+    return prices.reduce((s, p) => s + p, 0) / prices.length;
+  } catch (e) { return null; }
+}
+
+function removeFromWatchlist(id) {
+  auctionWatchlist = auctionWatchlist.filter(w => w.id !== id);
+  renderWatchlist();
+  renderAuctionSearchResults();
+  saveData();
+}
+
+function setAuctionMaxBid(id, val) {
+  const it = auctionWatchlist.find(w => w.id === id);
+  if (!it) return;
+  const v = parseFloat(val);
+  it.maxBid = isNaN(v) ? null : v;
+  renderWatchlist();
+  saveData();
+}
+
+function setAuctionSort(mode) {
+  auctionSortMode = mode;
+  renderWatchlist();
+}
+
+// Time remaining from an ISO end date
+function auctionTimeLeft(endDate) {
+  if (!endDate) return { ms: Infinity, hours: Infinity, label: '—' };
+  const ms = new Date(endDate).getTime() - Date.now();
+  if (isNaN(ms)) return { ms: Infinity, hours: Infinity, label: '—' };
+  if (ms <= 0) return { ms: 0, hours: 0, label: 'ended' };
+  const hours = ms / 3600000;
+  const d = Math.floor(hours / 24);
+  const h = Math.floor(hours % 24);
+  const m = Math.floor((ms % 3600000) / 60000);
+  let label;
+  if (d > 0) label = d + 'd ' + h + 'h';
+  else if (h > 0) label = h + 'h ' + m + 'm';
+  else label = m + 'm';
+  return { ms, hours, label };
+}
+
+// Compute derived values + flags for a watchlist item
+function computeAuction(it) {
+  const taxRate = auctionSettings.taxRate / 100;
+  const shipping = (it.shipping != null && !isNaN(it.shipping)) ? it.shipping : 0;
+  const bid = it.currentBid || 0;
+  const tax = (bid + shipping) * taxRate;
+  const trueTotal = bid + shipping + tax;
+  const avg = (it.avgSold != null && !isNaN(it.avgSold)) ? it.avgSold : null;
+  const tl = auctionTimeLeft(it.endDate);
+  const thresholdVal = avg != null ? avg * (auctionSettings.threshold / 100) : null;
+  let margin = null;
+  if (avg != null && avg > 0) margin = ((avg - trueTotal - (avg * 0.1325)) / avg) * 100;
+
+  const flags = [];
+  // STEAL: per-item override wins, else global threshold on true total
+  const isSteal = (it.maxBid != null) ? (trueTotal < it.maxBid) : (thresholdVal != null && trueTotal < thresholdVal);
+  if (isSteal) flags.push({ e: '🎯', t: 'STEAL', c: 'var(--green)' });
+  const endingSoon = tl.ms > 0 && tl.hours <= auctionSettings.endingSoon;
+  if (endingSoon) flags.push({ e: '⏰', t: 'ENDING SOON', c: 'var(--orange)' });
+  if (LOT_RE.test(it.title || '')) flags.push({ e: '📦', t: 'LOT', c: 'var(--blue)' });
+  const ghost = it.bidCount === 0 && tl.ms > 0 && tl.hours <= 6;
+  if (ghost) flags.push({ e: '👻', t: 'GHOST', c: 'var(--gold)' });
+  const overpriced = avg != null && trueTotal > avg;
+  if (overpriced) flags.push({ e: '❌', t: 'OVERPRICED', c: 'var(--red)' });
+
+  return { shipping, bid, tax, trueTotal, avg, margin, tl, isSteal, ghost, flags };
+}
+
+function sortedWatchlist() {
+  const arr = auctionWatchlist.slice();
+  const c = it => computeAuction(it);
+  if (auctionSortMode === 'ending') arr.sort((a, b) => c(a).tl.ms - c(b).tl.ms);
+  else if (auctionSortMode === 'steal') arr.sort((a, b) => ((c(b).margin == null ? -Infinity : c(b).margin) - (c(a).margin == null ? -Infinity : c(a).margin)));
+  else if (auctionSortMode === 'total') arr.sort((a, b) => c(a).trueTotal - c(b).trueTotal);
+  else if (auctionSortMode === 'ghost') arr.sort((a, b) => ((c(b).ghost ? 1 : 0) - (c(a).ghost ? 1 : 0)) || (c(a).tl.ms - c(b).tl.ms));
+  return arr;
+}
+
+function renderWatchlist() {
+  const cont = document.getElementById('auctWatchlist');
+  if (!cont) return;
+  const lr = document.getElementById('auctLastRefresh');
+  if (lr) lr.textContent = _auctionLastRefresh ? ('Last refreshed: ' + timeAgo(_auctionLastRefresh)) : 'Not refreshed yet';
+  if (!auctionWatchlist.length) {
+    cont.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gray);">No auctions on your watchlist yet. Search above and add some.</div>';
+    return;
+  }
+  const rows = sortedWatchlist().map(it => {
+    const d = computeAuction(it);
+    const img = it.img ? `<img src="${escAttr(it.img)}" alt="" style="width:54px;height:54px;object-fit:cover;border-radius:6px;" onerror="this.style.display='none'"/>` : '';
+    const bidBadge = it.bidCount === 0
+      ? '<span style="background:#0D2B0D;color:var(--green);border:1px solid var(--green);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;white-space:nowrap;">ZERO BIDS</span>'
+      : (it.bidCount === 1
+        ? '<span style="background:#2B2200;color:var(--yellow);border:1px solid var(--yellow);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">LOW</span>'
+        : (it.bidCount + ' bids'));
+    const timeColor = d.tl.hours < 2 ? 'var(--red)' : (d.tl.hours < 6 ? 'var(--orange)' : 'var(--white)');
+    const avgStr = d.avg != null ? '$' + d.avg.toFixed(2) : '…';
+    const marginStr = d.margin != null ? ((d.margin >= 0 ? '+' : '') + d.margin.toFixed(0) + '%') : '—';
+    const marginColor = d.margin == null ? 'var(--gray)' : (d.margin >= 25 ? 'var(--green)' : (d.margin >= 0 ? 'var(--yellow)' : 'var(--red)'));
+    const flagsHtml = d.flags.map(f => `<span title="${f.t}" style="color:${f.c};font-size:11px;font-weight:700;white-space:nowrap;margin-right:6px;">${f.e} ${f.t}</span>`).join('');
+    const titleCell = it.url
+      ? `<a href="${escAttr(it.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--white);text-decoration:none;">${escHtmlA(it.title)}</a>`
+      : escHtmlA(it.title);
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px;">${img}</td>
+      <td style="padding:8px;max-width:220px;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;">${titleCell}</div>${flagsHtml ? `<div style="margin-top:4px;">${flagsHtml}</div>` : ''}</td>
+      <td style="padding:8px;white-space:nowrap;">$${d.bid.toFixed(2)}</td>
+      <td style="padding:8px;white-space:nowrap;">${bidBadge}</td>
+      <td style="padding:8px;white-space:nowrap;color:${timeColor};font-weight:600;">${d.tl.label}</td>
+      <td style="padding:8px;white-space:nowrap;">${d.shipping ? '$' + d.shipping.toFixed(2) : 'Free'}</td>
+      <td style="padding:8px;white-space:nowrap;">$${d.tax.toFixed(2)}</td>
+      <td style="padding:8px;white-space:nowrap;font-weight:700;color:var(--gold);">$${d.trueTotal.toFixed(2)}</td>
+      <td style="padding:8px;white-space:nowrap;">${avgStr}</td>
+      <td style="padding:8px;white-space:nowrap;font-weight:700;color:${marginColor};">${marginStr}</td>
+      <td style="padding:8px;"><input type="number" step="0.01" value="${it.maxBid != null ? it.maxBid : ''}" placeholder="—" onchange="setAuctionMaxBid('${it.id}', this.value)" style="width:72px;padding:5px;font-size:12px;background:#12151b;border:1px solid var(--border);border-radius:5px;color:inherit;"/></td>
+      <td style="padding:8px;"><button onclick="removeFromWatchlist('${it.id}')" class="row-action row-del" title="Remove">🗑️</button></td>
+    </tr>`;
+  }).join('');
+  cont.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="text-align:left;color:var(--gray);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border);">
+      <th style="padding:8px;">Img</th><th style="padding:8px;">Item / Flags</th><th style="padding:8px;">Bid</th><th style="padding:8px;">Bids</th><th style="padding:8px;">Time Left</th><th style="padding:8px;">Ship</th><th style="padding:8px;">Est Tax</th><th style="padding:8px;">True Total</th><th style="padding:8px;">Avg Sold</th><th style="padding:8px;">Flip %</th><th style="padding:8px;">Max Bid</th><th style="padding:8px;"></th>
+    </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// Best-effort live refresh of each watchlist item's bid/time via the search API
+async function refreshWatchlist(opts) {
+  opts = opts || {};
+  if (!auctionWatchlist.length) { _auctionLastRefresh = Date.now(); renderWatchlist(); return; }
+  if (!opts.silent) toast('🔄 Refreshing watchlist…', 'yellow');
+  for (const it of auctionWatchlist) {
+    try {
+      const mapped = (await fetchEbayItems('ebay_auction', it.title) || []).map(mapAuctionItem);
+      const match = mapped.find(m => m.url && it.url && m.url === it.url);
+      if (match) {
+        it.currentBid = match.currentBid;
+        it.bidCount = match.bidCount;
+        if (match.endDate) it.endDate = match.endDate;
+        if (match.shipping != null) it.shipping = match.shipping;
+      }
+    } catch (e) { /* keep existing values on failure */ }
+  }
+  _auctionLastRefresh = Date.now();
+  renderWatchlist();
+  saveData();
+  if (!opts.silent) toast('✅ Watchlist refreshed.', 'green');
+}
+
+function startAuctionAutoRefresh() {
+  if (_auctionRefreshTimer) clearInterval(_auctionRefreshTimer);
+  _auctionRefreshTimer = setInterval(() => { refreshWatchlist({ silent: true }); }, 5 * 60 * 1000);
+}
+
+// ============================================================
+// WHATNOT INTEL
+// ============================================================
+let whatnotShows = [];   // [{id, seller, date, type, fileName, rowCount, rows:[{}]}]
+
+// --- CSV parsing ---
+function parseCSV(text) {
+  const rows = []; let cur = [], field = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { cur.push(field); field = ''; }
+      else if (c === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; }
+      else if (c === '\r') { /* ignore */ }
+      else field += c;
+    }
+  }
+  if (field.length || cur.length) { cur.push(field); rows.push(cur); }
+  return rows.filter(r => r.length && !(r.length === 1 && r[0].trim() === ''));
+}
+function csvToObjects(text) {
+  const rows = parseCSV(text);
+  if (!rows.length) return { headers: [], objects: [] };
+  const headers = rows[0].map(h => h.trim());
+  const objects = rows.slice(1).map(r => { const o = {}; headers.forEach((h, i) => o[h] = (r[i] != null ? r[i].trim() : '')); return o; });
+  return { headers, objects };
+}
+function findCol(headers, patterns) {
+  for (const h of headers) { const lh = h.toLowerCase(); for (const p of patterns) { if (lh.includes(p)) return h; } }
+  return null;
+}
+function parseMoney(v) { if (v == null) return 0; const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
+
+// Auto-detect Sales vs Buyers CSV by columns
+function detectCsvType(headers) {
+  const itemCol = findCol(headers, ['item', 'product', 'title', 'listing']);
+  const buyerCol = findCol(headers, ['buyer', 'username', 'user', 'handle', 'customer']);
+  const spentCol = findCol(headers, ['spent', 'total']);
+  if (itemCol) return 'sales';
+  if (buyerCol && spentCol) return 'buyers';
+  if (findCol(headers, ['price', 'amount'])) return 'sales';
+  return 'sales';
+}
+
+// --- Upload handling ---
+function handleWhatnotFiles(fileList) {
+  const files = Array.from(fileList || []);
+  files.forEach(f => {
+    const reader = new FileReader();
+    reader.onload = e => addWhatnotShow(f.name, String(e.target.result));
+    reader.readAsText(f);
+  });
+  const inp = document.getElementById('whatnotFileInput'); if (inp) inp.value = '';
+}
+
+function addWhatnotShow(fileName, text) {
+  const { headers, objects } = csvToObjects(text);
+  if (!headers.length || !objects.length) { toast('Could not read that CSV (no rows).', 'red'); return; }
+  const type = detectCsvType(headers);
+  const seller = ((document.getElementById('whatnotSeller') || {}).value || '').trim() || 'Unknown';
+  const date = ((document.getElementById('whatnotDate') || {}).value || '').trim() || new Date().toISOString().slice(0, 10);
+  const show = {
+    id: Date.now() + '_' + Math.floor(Math.random() * 1000),
+    seller, date, type, fileName, headers, rowCount: objects.length, rows: objects
+  };
+  whatnotShows.push(show);
+  const status = document.getElementById('whatnotUploadStatus');
+  if (status) status.innerHTML = `✅ <strong>${escHtmlA(fileName)}</strong> — detected <strong>${type === 'sales' ? 'Sales' : 'Buyers'} CSV</strong>, ${objects.length} rows (${escHtmlA(seller)}, ${escHtmlA(date)})`;
+  renderWhatnotAll();
+  saveData();
+  toast('📺 Show added: ' + seller + ' (' + type + ', ' + objects.length + ' rows)', 'green');
+}
+
+function deleteWhatnotShow(id) {
+  const s = whatnotShows.find(w => w.id === id);
+  if (!confirm('Delete this uploaded show' + (s ? ' (' + s.seller + ', ' + s.date + ')' : '') + '?')) return;
+  whatnotShows = whatnotShows.filter(w => w.id !== id);
+  renderWhatnotAll();
+  saveData();
+  toast('🗑️ Show deleted.', 'yellow');
+}
+
+function renderWhatnotShows() {
+  const div = document.getElementById('whatnotShowsList');
+  if (!div) return;
+  if (!whatnotShows.length) { div.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:6px 0;">No shows uploaded yet.</div>'; return; }
+  div.innerHTML = '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">' + whatnotShows.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(s => {
+    const badge = s.type === 'sales'
+      ? '<span style="background:#0D2B0D;color:var(--green);border:1px solid var(--green);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">SALES</span>'
+      : '<span style="background:#0D1520;color:var(--blue);border:1px solid var(--blue);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">BUYERS</span>';
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${escHtmlA(s.date)} ${badge}</div><div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(s.fileName)} · ${s.rowCount} rows</div></div>
+      <button onclick="deleteWhatnotShow('${s.id}')" class="row-action row-del" title="Delete show">🗑️</button>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// --- Aggregation helpers ---
+function wnBuyerRecordsForShow(show) {
+  // Returns [{buyer, spent, purchases}] for one show
+  const h = show.headers;
+  const buyerCol = findCol(h, ['buyer', 'username', 'user', 'handle', 'customer']);
+  if (!buyerCol) return [];
+  if (show.type === 'buyers') {
+    const spentCol = findCol(h, ['spent', 'total', 'amount', 'revenue']);
+    const purCol = findCol(h, ['purchase', 'orders', 'items', 'qty', 'count']);
+    return show.rows.map(r => ({
+      buyer: (r[buyerCol] || '').trim(),
+      spent: parseMoney(spentCol ? r[spentCol] : 0),
+      purchases: purCol ? (parseInt(parseMoney(r[purCol]), 10) || 1) : 1
+    })).filter(x => x.buyer);
+  }
+  // sales CSV: group individual sales by buyer
+  const priceCol = findCol(h, ['price', 'amount', 'sold', 'total']);
+  const map = {};
+  show.rows.forEach(r => {
+    const b = (r[buyerCol] || '').trim(); if (!b) return;
+    if (!map[b]) map[b] = { buyer: b, spent: 0, purchases: 0 };
+    map[b].spent += parseMoney(priceCol ? r[priceCol] : 0);
+    map[b].purchases += 1;
+  });
+  return Object.values(map);
+}
+
+function buildBuyerLeaderboard(sellerFilter) {
+  const agg = {}; // buyer -> {spent, purchases, shows:Set}
+  whatnotShows.forEach(show => {
+    if (sellerFilter && show.seller !== sellerFilter) return;
+    wnBuyerRecordsForShow(show).forEach(rec => {
+      if (!agg[rec.buyer]) agg[rec.buyer] = { buyer: rec.buyer, spent: 0, purchases: 0, shows: new Set() };
+      agg[rec.buyer].spent += rec.spent;
+      agg[rec.buyer].purchases += rec.purchases;
+      agg[rec.buyer].shows.add(show.id);
+    });
+  });
+  return Object.values(agg).map(a => ({
+    buyer: a.buyer, spent: a.spent, purchases: a.purchases,
+    showCount: a.shows.size, avgPerShow: a.shows.size ? a.spent / a.shows.size : 0
+  }));
+}
+
+function renderWhatnotLeaderboard() {
+  const div = document.getElementById('whatnotLeaderboard');
+  if (!div) return;
+  const sellerFilter = (document.getElementById('wnLbSeller') || {}).value || '';
+  const sortMode = (document.getElementById('wnLbSort') || {}).value || 'spent';
+  let list = buildBuyerLeaderboard(sellerFilter);
+  if (!list.length) { div.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:6px 0;">No buyer data yet. Upload a Sales or Buyers CSV.</div>'; return; }
+  if (sortMode === 'purchases') list.sort((a, b) => b.purchases - a.purchases);
+  else if (sortMode === 'shows') list.sort((a, b) => b.showCount - a.showCount || b.spent - a.spent);
+  else list.sort((a, b) => b.spent - a.spent);
+  const medals = ['🥇', '🥈', '🥉'];
+  const totSpent = list.reduce((s, x) => s + x.spent, 0);
+  const totPur = list.reduce((s, x) => s + x.purchases, 0);
+  const rows = list.map((x, i) => {
+    const medal = i < 3 ? medals[i] : (i + 1);
+    const nmeColor = i < 3 ? ['var(--gold)', '#C0C0C0', '#CD7F32'][i] : 'var(--white)';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px;font-weight:700;color:${nmeColor};">${medal}</td>
+      <td style="padding:8px;font-weight:${i < 3 ? '700' : '400'};color:${nmeColor};">${escHtmlA(x.buyer)}</td>
+      <td style="padding:8px;white-space:nowrap;font-weight:700;color:var(--green);">$${x.spent.toFixed(2)}</td>
+      <td style="padding:8px;">${x.purchases}</td>
+      <td style="padding:8px;">${x.showCount}</td>
+      <td style="padding:8px;white-space:nowrap;">$${x.avgPerShow.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+  div.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="text-align:left;color:var(--gray);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border);">
+      <th style="padding:8px;">Rank</th><th style="padding:8px;">Buyer</th><th style="padding:8px;">Total Spent</th><th style="padding:8px;"># Purchases</th><th style="padding:8px;"># Shows</th><th style="padding:8px;">Avg / Show</th>
+    </tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr style="border-top:2px solid var(--border);font-weight:700;"><td style="padding:8px;"></td><td style="padding:8px;">TOTAL (${list.length} buyers)</td><td style="padding:8px;color:var(--green);">$${totSpent.toFixed(2)}</td><td style="padding:8px;">${totPur}</td><td style="padding:8px;"></td><td style="padding:8px;"></td></tr></tfoot>
+  </table></div>`;
+}
+
+// --- Sales analysis ---
+function wnSalesForShow(show) {
+  if (show.type !== 'sales') return [];
+  const h = show.headers;
+  const itemCol = findCol(h, ['item', 'product', 'title', 'listing', 'name']);
+  const priceCol = findCol(h, ['price', 'amount', 'sold', 'total']);
+  const timeCol = findCol(h, ['time', 'date', 'sold at', 'timestamp']);
+  const typeCol = findCol(h, ['type', 'method', 'auction', 'sale type', 'format']);
+  const durCol = findCol(h, ['second', 'duration', 'elapsed', 'time to sell', 'sold in']);
+  return show.rows.map(r => {
+    const dur = durCol ? parseMoney(r[durCol]) : null;
+    return {
+      show: show.seller + ' · ' + show.date, showId: show.id, seller: show.seller,
+      item: itemCol ? r[itemCol] : '(unknown)',
+      price: parseMoney(priceCol ? r[priceCol] : 0),
+      time: timeCol ? r[timeCol] : '',
+      saleType: typeCol ? r[typeCol] : '',
+      durationSec: (durCol && dur != null && !isNaN(dur)) ? dur : null
+    };
+  });
+}
+
+function allWhatnotSales(sellerOrShowFilter) {
+  let out = [];
+  whatnotShows.forEach(show => {
+    if (sellerOrShowFilter && show.id !== sellerOrShowFilter && show.seller !== sellerOrShowFilter) return;
+    out = out.concat(wnSalesForShow(show));
+  });
+  return out;
+}
+
+function renderWhatnotSales() {
+  const div = document.getElementById('whatnotSales');
+  const sumDiv = document.getElementById('whatnotSalesSummary');
+  if (!div) return;
+  const filter = (document.getElementById('wnSalesShow') || {}).value || '';
+  const sortMode = (document.getElementById('wnSalesSort') || {}).value || 'recent';
+  let sales = allWhatnotSales(filter);
+  if (!sales.length) {
+    if (sumDiv) sumDiv.innerHTML = '';
+    div.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:6px 0;">No sales data yet. Upload a Sales CSV.</div>';
+    return;
+  }
+  // summary
+  const prices = sales.map(s => s.price).filter(p => p > 0);
+  const total = prices.reduce((s, p) => s + p, 0);
+  const avg = prices.length ? total / prices.length : 0;
+  const hi = prices.length ? Math.max(...prices) : 0;
+  const lo = prices.length ? Math.min(...prices) : 0;
+  if (sumDiv) sumDiv.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+    ${[['Revenue', '$' + total.toFixed(2), 'var(--green)'], ['Avg Sale', '$' + avg.toFixed(2), 'var(--gold)'], ['Highest', '$' + hi.toFixed(2), 'var(--green)'], ['Lowest', '$' + lo.toFixed(2), 'var(--gray)'], ['Sales', String(sales.length), 'var(--white)']].map(([l, v, c]) => `<div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;"><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${c};">${v}</div><div style="font-size:10px;color:var(--gray);text-transform:uppercase;">${l}</div></div>`).join('')}
+  </div>`;
+  // sort
+  if (sortMode === 'price') sales.sort((a, b) => b.price - a.price);
+  else if (sortMode === 'type') sales.sort((a, b) => String(a.saleType).localeCompare(String(b.saleType)));
+  else sales.reverse();
+  const rows = sales.map(s => {
+    const hot = (s.durationSec != null && s.durationSec > 0 && s.durationSec < 60);
+    const hotBadge = hot ? '<span style="background:#2B0D0D;color:var(--red);border:1px solid var(--red);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;">🔥 HOT ITEM</span>' : '';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px;font-size:13px;">${escHtmlA(s.item)}${hotBadge}</td>
+      <td style="padding:8px;white-space:nowrap;font-weight:700;color:var(--gold);">$${s.price.toFixed(2)}</td>
+      <td style="padding:8px;white-space:nowrap;font-size:12px;color:var(--gray);">${escHtmlA(s.time)}</td>
+      <td style="padding:8px;white-space:nowrap;font-size:12px;">${escHtmlA(s.saleType) || '—'}</td>
+      <td style="padding:8px;white-space:nowrap;font-size:12px;color:${hot ? 'var(--red)' : 'var(--gray)'};">${s.durationSec != null ? s.durationSec + 's' : '—'}</td>
+    </tr>`;
+  }).join('');
+  div.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="text-align:left;color:var(--gray);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border);">
+      <th style="padding:8px;">Item</th><th style="padding:8px;">Price</th><th style="padding:8px;">Time</th><th style="padding:8px;">Sale Type</th><th style="padding:8px;">Sold In</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// Refresh the seller/show dropdowns from current shows
+function refreshWhatnotFilters() {
+  const sellers = [...new Set(whatnotShows.map(s => s.seller).filter(Boolean))].sort();
+  const lb = document.getElementById('wnLbSeller');
+  if (lb) { const prev = lb.value; lb.innerHTML = '<option value="">All sellers</option>' + sellers.map(s => `<option value="${escAttr(s)}">${escHtmlA(s)}</option>`).join(''); lb.value = prev; }
+  const ss = document.getElementById('wnSalesShow');
+  if (ss) {
+    const prev = ss.value;
+    const showOpts = whatnotShows.filter(s => s.type === 'sales').map(s => `<option value="${escAttr(s.id)}">${escHtmlA(s.seller + ' · ' + s.date)}</option>`).join('');
+    ss.innerHTML = '<option value="">All shows</option>' + showOpts;
+    ss.value = prev;
+  }
+}
+
+function renderWhatnotAll() {
+  renderWhatnotShows();
+  refreshWhatnotFilters();
+  renderWhatnotLeaderboard();
+  renderWhatnotSales();
+}
+
+// --- AI sourcing report ---
+async function generateSourcingReport() {
+  const out = document.getElementById('whatnotSourcing');
+  const sales = allWhatnotSales('');
+  if (!sales.length) { toast('Upload a Sales CSV first.', 'yellow'); return; }
+  if (out) out.innerHTML = '<div style="color:var(--gray);font-size:13px;">🤖 Analyzing your sales data…</div>';
+  // Compact summary to keep the payload small
+  const summary = sales.slice(0, 400).map(s => ({
+    item: (s.item || '').slice(0, 80), price: Math.round(s.price * 100) / 100,
+    type: (s.saleType || '').slice(0, 20), soldInSec: s.durationSec
+  }));
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 1200,
+        system: `You are a diecast reselling sourcing analyst. You are given a JSON array of Whatnot livestream sales (item name, sale price, sale type, and how many seconds it took to sell). Analyze what sold, at what prices, and how fast. Return ONLY JSON: {"stock_more":["..."],"best_price_ranges":["..."],"brands_moving":["..."],"notes":["..."]}. Each array holds short, specific, actionable bullet strings. Base everything strictly on the data provided.`,
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'Sales data (JSON):\n' + JSON.stringify(summary) + '\n\nReturn the sourcing recommendations JSON only.' }] }]
+      })
+    });
+    if (!res.ok) throw new Error('API ' + res.status);
+    const data = await res.json();
+    const raw = (data.content || []).map(c => c.text || '').join('').replace(/```json|```/g, '').trim();
+    const rec = JSON.parse(raw);
+    renderSourcingReport(rec);
+  } catch (err) {
+    if (out) out.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:8px;padding:14px;font-size:13px;">Could not generate the report (${escHtmlA(err.message)}). Try again.</div>`;
+  }
+}
+
+function renderSourcingReport(rec) {
+  const out = document.getElementById('whatnotSourcing');
+  if (!out) return;
+  const block = (title, arr, color) => {
+    if (!arr || !arr.length) return '';
+    return `<div style="margin-bottom:14px;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;color:${color};margin-bottom:6px;">${title}</div><ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.7;">${arr.map(x => `<li>${escHtmlA(String(x))}</li>`).join('')}</ul></div>`;
+  };
+  out.innerHTML = `<div style="background:var(--black);border:1px solid var(--gold);border-radius:10px;padding:16px 18px;">
+    ${block('📦 Stock more of', rec.stock_more, 'var(--green)')}
+    ${block('💰 Best price ranges', rec.best_price_ranges, 'var(--gold)')}
+    ${block('🏷️ Brands moving', rec.brands_moving, 'var(--blue)')}
+    ${block('📝 Notes', rec.notes, 'var(--gray)')}
+    <div style="font-size:11px;color:var(--gray);margin-top:8px;">AI-generated from your uploaded sales data.</div>
+  </div>`;
+}
+
+// Drag & drop wiring for the upload zone
+function initWhatnotDropzone() {
+  const dz = document.getElementById('whatnotDrop');
+  if (!dz || dz._wired) return;
+  dz._wired = true;
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dz.style.borderColor = 'var(--gold)'; dz.style.color = 'var(--gold)'; }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dz.style.borderColor = 'var(--border)'; dz.style.color = 'var(--gray)'; }));
+  dz.addEventListener('drop', e => { const files = e.dataTransfer && e.dataTransfer.files; if (files && files.length) handleWhatnotFiles(files); });
+  const d = document.getElementById('whatnotDate');
+  if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
+}
+
+// ============================================================
+// BUY REPORT (Top 10 opportunities)
+// ============================================================
+let buyReport = null;          // { generatedAt, items:[...] }
+let _buyReportRunning = false;
+function buySleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Demand from eBay sold count in last 30 days (proxy returns up to ~10 comps)
+function buyDemand(soldCount) {
+  if (soldCount >= 6) return { label: 'High', num: 100, color: 'var(--green)' };
+  if (soldCount >= 3) return { label: 'Medium', num: 60, color: 'var(--yellow)' };
+  return { label: 'Low', num: 25, color: 'var(--gray)' };
+}
+// Buy-signal strength from true margin %
+function buySignal(margin) {
+  if (margin > 50) return { e: '🔥', t: 'STRONG', c: 'var(--green)' };
+  if (margin >= 30) return { e: '✅', t: 'GOOD', c: 'var(--gold)' };
+  if (margin >= 15) return { e: '⚠️', t: 'FAIR', c: 'var(--orange)' };
+  return { e: '', t: 'LOW', c: 'var(--gray)' };
+}
+
+async function generateBuyReport() {
+  if (_buyReportRunning) return;
+  const fees = getTariffs();
+  const feeRate = (fees.ebayFee || 0) + (fees.paymentFee || 0); // eBay + payment fees from existing settings
+  // Candidates: In Stock, vendor price present and under $150
+  const candidates = [];
+  Object.keys(vendorCatalogs).forEach(vendor => {
+    (vendorCatalogs[vendor] || []).forEach(it => {
+      const price = parseFloat(it.price);
+      const inStock = String(it.status || '').toLowerCase().trim() === 'in stock';
+      if (inStock && !isNaN(price) && price > 0 && price < 150) {
+        candidates.push({
+          vendor, name: it.name || '', brand: it.brand || '', image: it.image || '',
+          vendorPrice: price, shipping: (it.shipping != null && !isNaN(it.shipping)) ? parseFloat(it.shipping) : 0
+        });
+      }
+    });
+  });
+  if (!candidates.length) { toast('No in-stock vendor items under $150 to analyze. Add or scrape catalog items first.', 'yellow'); return; }
+
+  _buyReportRunning = true;
+  const btn = document.getElementById('buyGenBtn'); if (btn) btn.disabled = true;
+  const spin = document.getElementById('buyLoading'); if (spin) spin.style.display = 'block';
+  const prog = document.getElementById('buyProgress');
+  const list = candidates.slice(0, 60); // cap to limit API calls
+  const scored = [];
+  for (let i = 0; i < list.length; i++) {
+    const c = list[i];
+    if (prog) prog.textContent = `Analyzing item ${i + 1} of ${list.length}…`;
+    let avgSold = null, soldCount = 0;
+    try {
+      const prices = mapSoldItems(await fetchEbayItems('ebay_sold', c.name) || [], c.name).map(m => m.price).filter(p => p > 0);
+      soldCount = prices.length;
+      if (prices.length) avgSold = prices.reduce((s, p) => s + p, 0) / prices.length;
+    } catch (e) { /* skip on error */ }
+    if (avgSold != null && avgSold > 0) {
+      const taxes = 0;
+      const margin = ((avgSold - c.vendorPrice - c.shipping) * (1 - feeRate) - taxes) / avgSold * 100;
+      const priceAdv = ((avgSold - (c.vendorPrice + c.shipping)) / avgSold) * 100;
+      const demand = buyDemand(soldCount);
+      const score = (margin * 0.5) + (demand.num * 0.3) + (priceAdv * 0.2);
+      scored.push({ ...c, avgSold, soldCount, margin, priceAdv, demandLabel: demand.label, demandColor: demand.color, score });
+    }
+    await buySleep(320); // gentle pacing to avoid rate limits
+  }
+  scored.sort((a, b) => b.score - a.score);
+  buyReport = { generatedAt: Date.now(), items: scored.slice(0, 10).map((x, idx) => ({ ...x, rank: idx + 1 })) };
+
+  _buyReportRunning = false;
+  if (btn) btn.disabled = false;
+  if (spin) spin.style.display = 'none';
+  if (prog) prog.textContent = '';
+  renderBuyReport();
+  saveData();
+  toast('🏆 Buy Report ready: ' + buyReport.items.length + ' opportunities.', 'green');
+}
+
+function renderBuyReport() {
+  const cont = document.getElementById('buyReportCards');
+  const ts = document.getElementById('buyLastGen');
+  if (ts) ts.textContent = (buyReport && buyReport.generatedAt) ? ('Last generated: ' + timeAgo(buyReport.generatedAt)) : 'Not generated yet';
+  if (!cont) return;
+  if (!buyReport || !buyReport.items || !buyReport.items.length) {
+    cont.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:10px 2px;">No report yet. Click Generate Report to find your best buys from your vendor catalogs.</div>';
+    return;
+  }
+  const cards = buyReport.items.map(x => {
+    const sig = buySignal(x.margin);
+    const marginColor = x.margin > 50 ? 'var(--green)' : (x.margin >= 30 ? 'var(--gold)' : (x.margin >= 15 ? 'var(--orange)' : 'var(--red)'));
+    const img = x.image
+      ? `<img src="${escAttr(x.image)}" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;" onerror="this.style.display='none'"/>`
+      : `<div style="width:60px;height:60px;border-radius:8px;background:var(--black);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">🏎️</div>`;
+    const ebayUrl = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(x.name);
+    const vendorUrl = compVendorUrl(x.vendor, x.name);
+    const vendorBtn = vendorUrl
+      ? `<a href="${escAttr(vendorUrl)}" target="_blank" rel="noopener noreferrer" style="flex:1;text-align:center;padding:9px;font-size:12px;font-weight:700;background:var(--blue);color:#fff;border-radius:7px;text-decoration:none;">🛒 Buy from Vendor</a>`
+      : `<span style="flex:1;text-align:center;padding:9px;font-size:12px;font-weight:700;background:var(--border);color:var(--gray);border-radius:7px;">🛒 ${escHtmlA(x.vendor)}</span>`;
+    const row = (l, v, c) => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;"><span style="color:var(--gray);">${l}</span><span style="font-weight:700;color:${c || 'var(--white)'};">${v}</span></div>`;
+    return `<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="font-family:Rajdhani,sans-serif;font-size:30px;font-weight:800;color:var(--gold);line-height:1;min-width:44px;">#${x.rank}</div>
+        ${img}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;">${escHtmlA(x.name) || 'Unnamed'}</div>
+          <div style="font-size:11px;color:var(--gray);">${escHtmlA(x.brand) || '—'} · ${escHtmlA(x.vendor)}</div>
+          <div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;">
+            <span style="background:var(--black);border:1px solid ${x.demandColor};color:${x.demandColor};border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;">DEMAND: ${x.demandLabel}</span>
+            <span style="background:var(--black);border:1px solid ${sig.c};color:${sig.c};border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;">${sig.e} ${sig.t}</span>
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:8px;">
+        ${row('Vendor price', '$' + x.vendorPrice.toFixed(2), 'var(--gold)')}
+        ${row('Shipping', x.shipping ? '$' + x.shipping.toFixed(2) : 'Free/—', 'var(--white)')}
+        ${row('eBay avg sold', '$' + x.avgSold.toFixed(2) + ' (' + x.soldCount + ' sold)', 'var(--blue)')}
+        ${row('True margin', (x.margin >= 0 ? '+' : '') + x.margin.toFixed(0) + '%', marginColor)}
+      </div>
+      <div style="display:flex;gap:8px;">
+        <a href="${escAttr(ebayUrl)}" target="_blank" rel="noopener noreferrer" style="flex:1;text-align:center;padding:9px;font-size:12px;font-weight:700;background:var(--card);border:1px solid var(--border);color:var(--white);border-radius:7px;text-decoration:none;">📷 View on eBay</a>
+        ${vendorBtn}
+      </div>
+    </div>`;
+  }).join('');
+  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;">${cards}</div>`;
+}
+
 // Voice search via Web Speech API — continuous listening, keeps text until user stops
 let recognition = null;
 let isListening = false;
@@ -2408,6 +3755,7 @@ function startVoiceSearch() {
     }
     const spoken = (voiceFinal + interim).replace(/\s+/g, ' ').trim();
     input.value = voiceBaseText ? (voiceBaseText + ' ' + spoken).trim() : spoken;
+    togglePsClear();
   };
   recognition.onerror = (e) => {
     console.log('Speech recognition error:', e.error);
@@ -2436,6 +3784,13 @@ function openAliExpress() {
   window.open('https://www.aliexpress.com/wholesale?SearchText=' + encodeURIComponent(q), '_blank', 'noopener');
 }
 
+// Open a Google search for the current query, scoped to diecast 1/64
+function openGoogleSearch() {
+  const q = document.getElementById('psSearchInput').value.trim();
+  if (!q) { alert('Type a model in the search box first.'); return; }
+  window.open('https://www.google.com/search?q=' + encodeURIComponent(q + ' diecast 1/64'), '_blank', 'noopener');
+}
+
 // Open a competitor store's search page for whatever is typed in the scanner box
 function openSiteSearch(site) {
   const q = document.getElementById('psSearchInput').value.trim();
@@ -2445,7 +3800,7 @@ function openSiteSearch(site) {
     horizon: 'https://horizondiecast.com/search?q=' + enc,
     carbromc: 'https://carbromc.com/search?q=' + enc,
     rcmart: 'https://www.rcmart.com/product-search?search=' + encodeURIComponent(stripScale(q)),
-    pablo: 'https://www.pablodiecastgarage.com/search?q=' + enc
+    pablo: 'https://pablosdiecastgarage.com/search?q=' + enc
   };
   if (urls[site]) window.open(urls[site], '_blank', 'noopener');
 }
@@ -2453,17 +3808,220 @@ function openSiteSearch(site) {
 // Find competitor items (scanned in the Competitor tab) that match the search query
 function findCompetitorMatches(query) {
   const qWords = query.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
-  if (!qWords.length || !Array.isArray(allItems)) return [];
-  const need = Math.min(2, qWords.length);
-  return allItems
-    .map(it => {
-      const hay = ((it.name || '') + ' ' + (it.brand || '')).toLowerCase();
-      const score = qWords.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
-      return { it, score };
-    })
-    .filter(x => x.score >= need)
+  if (!qWords.length) return [];
+  // Require at least 3 query words to appear in the item (capped by how many words the query has),
+  // plus an absolute floor so a single loose word match ("Kaido") no longer returns everything.
+  const need = Math.min(3, qWords.length);
+  const MIN_SCORE = 2;
+  // Score an item by how many query words appear in its name/brand (same fuzzy logic as before).
+  // `site` becomes the source label shown in the UI (competitor site for scans, vendor name for catalogs).
+  const scoreItem = (it, site) => {
+    const hay = ((it.name || '') + ' ' + (it.brand || '')).toLowerCase();
+    const score = qWords.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
+    // Shopify preorders are often stored as "In Stock" but flagged in the name (e.g. "[Preorder]").
+    // Override the status so the Pre-Order filters work correctly. Applies to both scans and catalogs.
+    const status = /preorder/i.test(it.name || '') ? 'Pre-Order' : it.status;
+    return {
+      score,
+      it: { name: it.name, brand: it.brand, price: it.price, status: status, site: site || it.site || '', image: it.image || '' }
+    };
+  };
+  const results = [];
+  // 1) Scanned screenshot items
+  if (Array.isArray(allItems)) {
+    allItems.forEach(it => results.push(scoreItem(it, it.site)));
+  }
+  // 2) Every vendor catalog (scraped or manual) — source label is the vendor name
+  if (vendorCatalogs && typeof vendorCatalogs === 'object') {
+    Object.keys(vendorCatalogs).forEach(vendor => {
+      (vendorCatalogs[vendor] || []).forEach(it => results.push(scoreItem(it, vendor)));
+    });
+  }
+  return results
+    .filter(x => x.score >= need && x.score >= MIN_SCORE)
     .sort((a, b) => b.score - a.score)
     .map(x => x.it);
+}
+
+// ---- Competitor Prices: status filter + In-Stock-first sorting ----
+let _compMatches = [];        // current query's matches (already sorted In Stock first)
+let _compFilter = 'all';      // status filter: 'all' | 'instock' | 'hideoos'
+let _compVendorFilter = 'all';// vendor/competitor filter: 'all' or a specific vendor/site name
+
+function compStatusRank(status) {
+  return String(status || '').toLowerCase().trim() === 'in stock' ? 0 : 1;
+}
+function compPassesFilter(it, filter) {
+  const s = String((it && it.status) || '').toLowerCase().trim();
+  // Shopify preorders often show status "In Stock" but flag it in the name, e.g. "[Preorder]" / "(Preorder)".
+  const isPreorder = s === 'pre-order' || /preorder/i.test((it && it.name) || '');
+  if (filter === 'instock') return s === 'in stock' && !isPreorder;
+  if (filter === 'hideoos') return s !== 'out of stock' && !isPreorder;
+  if (filter === 'preorder') return isPreorder;
+  return true; // 'all'
+}
+function setCompFilter(f) {
+  _compFilter = f;
+  renderCompetitorPrices();
+}
+function setCompVendorFilter(v) {
+  _compVendorFilter = v;
+  renderCompetitorPrices();
+}
+// Build a vendor product-search URL for a catalog item (by its vendor/site name)
+function compVendorUrl(site, name) {
+  const bases = {
+    'CarBromc': 'https://www.carbromc.com/search?q=',
+    'Horizon Diecast': 'https://horizondiecast.com/search?q=',
+    'Pablo Diecast Garage': 'https://pablosdiecastgarage.com/search?q=',
+    'RC Mart': 'https://www.rcmart.com/search?q='
+  };
+  const base = bases[site];
+  return base ? base + encodeURIComponent(name || '') : '';
+}
+function renderCompetitorPrices() {
+  const list = document.getElementById('compList');
+  if (!list) return;
+  // Highlight the active status filter button in gold
+  document.querySelectorAll('#compFilterBar .comp-filter-btn').forEach(b => {
+    const active = b.getAttribute('data-filter') === _compFilter;
+    b.style.background = active ? 'var(--gold)' : 'transparent';
+    b.style.color = active ? '#111' : 'var(--gray)';
+    b.style.borderColor = active ? 'var(--gold)' : 'var(--border)';
+    b.style.fontWeight = active ? '700' : '400';
+  });
+  // Highlight the active vendor filter button in gold
+  document.querySelectorAll('#compVendorBar .comp-vendor-btn').forEach(b => {
+    const active = b.getAttribute('data-vendor') === _compVendorFilter;
+    b.style.background = active ? 'var(--gold)' : 'transparent';
+    b.style.color = active ? '#111' : 'var(--gray)';
+    b.style.borderColor = active ? 'var(--gold)' : 'var(--border)';
+    b.style.fontWeight = active ? '700' : '400';
+  });
+  // Status filter and vendor filter apply together
+  const items = _compMatches.filter(it =>
+    compPassesFilter(it, _compFilter) &&
+    (_compVendorFilter === 'all' || (it.site || '') === _compVendorFilter)
+  );
+  if (!items.length) {
+    list.innerHTML = `<div style="padding:16px;text-align:center;font-size:12px;color:var(--gray);">No items match this filter.</div>`;
+    return;
+  }
+  const row = it => {
+    const price = (it.price != null && !isNaN(it.price)) ? '$' + parseFloat(it.price).toFixed(2) : '—';
+    const img = it.image || '';
+    const url = compVendorUrl(it.site, it.name);
+    const interactive = !!(img || url);
+    const thumb = img ? `<img src="${escAttr(img)}" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
+    const safeUrl = url ? url.replace(/"/g, '%22').replace(/'/g, '%27') : '';
+    const safeImg = img ? String(img).replace(/"/g, '%22').replace(/'/g, '%27') : '';
+    const safeTitle = escAttr(it.name || '');
+    const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" onclick="cardClick(this)" ondblclick="cardDblClick(this)"` : '';
+    const arrow = interactive ? `<span title="Single click: preview image · Double click: open vendor page" style="color:var(--gray);font-size:13px;margin-left:8px;">↗</span>` : '';
+    return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:${interactive ? 'pointer' : 'default'};"><div style="display:flex;align-items:center;gap:10px;min-width:0;">${thumb}<div style="min-width:0;"><div style="font-size:13px;">${it.name || 'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site || 'Unknown'}${it.status ? ' · ' + it.status : ''}</div></div></div><div style="display:flex;align-items:center;white-space:nowrap;"><span style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);">${price}</span>${arrow}</div></div>`;
+  };
+  const first = items.slice(0, 8);
+  const rest = items.slice(8);
+  let html = first.map(row).join('');
+  if (rest.length > 0) {
+    html += `<div id="comp-more" style="display:none;">${rest.map(row).join('')}</div>`;
+    html += `<button class="show-more-btn" id="comp-btn" onclick="toggleShowMore('comp')">Show More (${rest.length})</button>`;
+  }
+  list.innerHTML = html;
+}
+
+// ============================================================
+// IMAGE IDENTIFICATION (Price Scanner)
+// ============================================================
+function handlePsImageInput(e) {
+  const f = e.target.files && e.target.files[0];
+  if (f) identifyFromFile(f);
+  e.target.value = '';
+}
+
+function identifyFromFile(file) {
+  if (!file || !file.type || !file.type.startsWith('image/')) { toast('Please choose an image file.', 'yellow'); return; }
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const dataUrl = ev.target.result;
+    const base64 = String(dataUrl).split(',')[1];
+    const mediaType = file.type || 'image/png';
+    identifyDiecastImage(base64, mediaType, dataUrl);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function identifyDiecastImage(base64, mediaType, dataUrl) {
+  const loading = document.getElementById('psLoading');
+  const results = document.getElementById('psResults');
+  if (loading) loading.style.display = 'block';
+  if (results) results.innerHTML = '';
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: `You are a diecast car expert. Look at this image and identify the exact diecast model shown. Focus on the car itself, ignore any chat overlay, blurry edges, or background. Return JSON only with these fields: confidence (high/medium/low), model_name (exact name if identified, null if not), brand (brand name or null), scale (1/64 or 1/18 or null), reason (brief explanation), issue (if confidence is low or cannot identify, explain exactly why - e.g. motion blur, chat overlay, partially visible, too dark). If you cannot identify it at all set model_name to null and explain in issue field.`,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: 'Identify this diecast model. Return JSON only.' }
+          ]
+        }]
+      })
+    });
+    if (!res.ok) throw new Error('API ' + res.status);
+    const data = await res.json();
+    const raw = (data.content || []).map(c => c.text || '').join('').replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(raw);
+    if (loading) loading.style.display = 'none';
+    await showIdentifyResult(parsed, dataUrl);
+  } catch (err) {
+    if (loading) loading.style.display = 'none';
+    if (results) results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't analyze the image</div><div style="font-size:13px;color:var(--white);">${err.message}. Please try another photo.</div></div>`;
+  }
+}
+
+async function showIdentifyResult(r, dataUrl) {
+  const results = document.getElementById('psResults');
+  if (!results) return;
+  const conf = String(r.confidence || '').toLowerCase().trim();
+  const model = r.model_name || null;
+  const meta = [r.brand, r.scale].filter(Boolean).join(' · ');
+  const metaStr = meta ? `<div style="font-size:12px;color:var(--gray);margin-top:2px;">${meta}</div>` : '';
+  const reason = r.reason || '';
+  const issue = r.issue || reason || 'The car could not be clearly recognized.';
+  const searchStr = [r.brand, model, r.scale].filter(Boolean).join(' ').trim();
+  const thumb = dataUrl ? `<img src="${dataUrl}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:8px;flex-shrink:0;"/>` : '';
+
+  // CANNOT IDENTIFY — red banner with the exact reason
+  if (!model) {
+    results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't identify this model</div><div style="font-size:13px;color:var(--white);"><strong>Why:</strong> ${issue}</div><button onclick="document.getElementById('psImageInput').click()" style="margin-top:10px;padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div>`;
+    return;
+  }
+
+  // HIGH CONFIDENCE — green banner + auto-run the eBay scan
+  if (conf === 'high') {
+    document.getElementById('psSearchInput').value = searchStr || model;
+    togglePsClear();
+    const banner = `<div style="background:#0D2B0D;border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:center;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--green);margin-bottom:2px;">✅ Identified: ${model}</div>${metaStr}${reason ? `<div style="font-size:12px;color:var(--gray);margin-top:4px;">${reason}</div>` : ''}</div></div>`;
+    await runPriceScan();
+    const pr = document.getElementById('psResults');
+    if (pr) pr.insertAdjacentHTML('afterbegin', banner);
+    return;
+  }
+
+  // MEDIUM / LOW CONFIDENCE — yellow warning with best guess + issue, and options
+  results.innerHTML = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;flex:1;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);margin-bottom:2px;">⚠️ Best guess (${conf || 'low'} confidence): ${model}</div>${metaStr}<div style="font-size:13px;color:var(--white);margin-top:6px;"><strong>Issue:</strong> ${issue}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button onclick="identifySearchAnyway('${escJs(searchStr || model)}')" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;">🔍 Search anyway</button><button onclick="document.getElementById('psImageInput').click()" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div></div>`;
+}
+
+function identifySearchAnyway(str) {
+  const inp = document.getElementById('psSearchInput');
+  if (inp) { inp.value = str; togglePsClear(); }
+  runPriceScan();
 }
 
 async function runPriceScan() {
@@ -2569,8 +4127,16 @@ async function runPriceScan() {
       return html;
     };
     const compMatches = findCompetitorMatches(query);
-    const competitorHtml = compMatches.length > 0
-      ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;"><div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🏷️ COMPETITOR PRICES</div><span style="font-size:11px;color:var(--blue);">${compMatches.length} match${compMatches.length>1?'es':''} from your scans</span></div>${compMatches.slice(0,8).map(it=>{const price=(it.price!=null&&!isNaN(it.price))?'$'+parseFloat(it.price).toFixed(2):'—';return `<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="min-width:0;"><div style="font-size:13px;">${it.name||'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site||'Unknown'}${it.status?' · '+it.status:''}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);white-space:nowrap;">${price}</div></div>`;}).join('')}</div>`
+    // Store globally so the filter buttons can re-render. Sort In Stock first (stable — keeps score order within each group).
+    _compMatches = compMatches.slice().sort((a, b) => compStatusRank(a.status) - compStatusRank(b.status));
+    _compFilter = 'all';
+    _compVendorFilter = 'all';
+    const compBtn = (f, label) => `<button class="comp-filter-btn" data-filter="${f}" onclick="setCompFilter('${f}')" style="font-size:11px;padding:6px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--gray);cursor:pointer;white-space:nowrap;">${label}</button>`;
+    const compVendorBtn = (v, label) => `<button class="comp-vendor-btn" data-vendor="${escAttr(v)}" onclick="setCompVendorFilter('${escJs(v)}')" style="font-size:11px;padding:6px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--gray);cursor:pointer;white-space:nowrap;">${label}</button>`;
+    const compVendors = [...new Set(_compMatches.map(m => m.site).filter(Boolean))].sort();
+    const compVendorBar = `<div id="compVendorBar" style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);">${compVendorBtn('all','All Vendors')}${compVendors.map(v => compVendorBtn(v, v)).join('')}</div>`;
+    const competitorHtml = _compMatches.length > 0
+      ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;"><div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🏷️ COMPETITOR PRICES</div><span style="font-size:11px;color:var(--blue);">${_compMatches.length} match${_compMatches.length>1?'es':''} from scans & catalogs</span></div><div id="compFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);">${compBtn('all','All')}${compBtn('instock','In Stock Only')}${compBtn('preorder','Pre-Order Only')}${compBtn('hideoos','Hide Out of Stock/Pre-Order')}</div>${compVendorBar}<div id="compList"></div></div>`
       : `<div style="background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:18px;margin-bottom:14px;text-align:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;margin-bottom:4px;">🏷️ COMPETITOR PRICES</div><div style="font-size:13px;color:var(--gray);">No competitor data yet — scan in the Competitor tab.</div></div>`;
     const prodImg = ebayActivePrices[0]?.img || '';
     refPhotoDefault = prodImg;
@@ -2623,6 +4189,7 @@ async function runPriceScan() {
           </div>
         </div>
       </div>`;
+    renderCompetitorPrices(); // populate the competitor list + highlight the active filter
     document.getElementById('psLoading').style.display = 'none';
     document.getElementById('psScanBtn').disabled = false;
   }

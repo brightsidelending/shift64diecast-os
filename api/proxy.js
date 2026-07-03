@@ -26,6 +26,22 @@ export default async function handler(req, res) {
     }
   }
 
+  // eBay Browse API - Live Auction Listings (returns currentBidPrice, bidCount, itemEndDate)
+  if (type === 'ebay_auction') {
+    try {
+      const { query } = req.body;
+      const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=50&filter=buyingOptions:{AUCTION}&sort=endTimeSoonest`;
+      const token = await getEbayToken();
+      const r = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' }
+      });
+      const data = await r.json();
+      return res.status(200).json(data);
+    } catch(err) {
+      return res.status(200).json({ error: err.message, itemSummaries: [] });
+    }
+  }
+
   // eBay Browse API - Sold/Completed Listings
   if (type === 'ebay_sold') {
     try {
@@ -81,6 +97,34 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, value });
     } catch (err) {
       return res.status(200).json({ ok: false, error: err.message, value: null });
+    }
+  }
+
+  // Generic JSON scrape proxy — fetch a public product feed server-side to avoid browser CORS
+  if (type === 'scrape') {
+    try {
+      const target = (req.query && req.query.url) || (req.body && req.body.url);
+      if (!target) return res.status(400).json({ error: 'Missing url' });
+      let u;
+      try { u = new URL(target); } catch (e) { return res.status(400).json({ error: 'Invalid url' }); }
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        return res.status(400).json({ error: 'Only http/https URLs allowed' });
+      }
+      const r = await fetch(target, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Shift64DiecastBot/1.0; +https://shift64diecast-os.vercel.app)',
+          'Accept': 'application/json'
+        }
+      });
+      const text = await r.text();
+      let data = null;
+      try { data = JSON.parse(text); } catch (e) { data = null; }
+      if (data === null) {
+        return res.status(200).json({ error: 'Non-JSON response from source', status: r.status });
+      }
+      return res.status(200).json(data);
+    } catch (err) {
+      return res.status(200).json({ error: err.message });
     }
   }
 
