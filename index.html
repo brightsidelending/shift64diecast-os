@@ -876,6 +876,70 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div id="intelContent">
     <div class="empty"><div class="empty-icon">💡</div><div class="empty-title">No Intel Yet</div><div>Scan competitor screenshots to generate market intelligence.</div></div>
   </div>
+
+  <!-- ===== WHATNOT INTEL ===== -->
+  <div style="font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;margin:24px 0 12px;">📺 Whatnot Intel</div>
+
+  <!-- SECTION 1: CSV UPLOAD -->
+  <div class="card">
+    <div class="card-title">⬆️ Upload Whatnot Spy CSV</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <input class="text-input" id="whatnotSeller" placeholder="Seller name (e.g. Pablo)" style="flex:1;min-width:160px;"/>
+      <input class="text-input" id="whatnotDate" type="date" style="flex:1;min-width:160px;"/>
+    </div>
+    <div id="whatnotDrop" onclick="document.getElementById('whatnotFileInput').click()" style="border:2px dashed var(--border);border-radius:12px;padding:34px 18px;text-align:center;cursor:pointer;transition:all 0.15s;color:var(--gray);">
+      <div style="font-size:34px;margin-bottom:8px;">📄</div>
+      <div style="font-size:14px;font-weight:600;color:var(--white);">Drag &amp; drop a Sales or Buyers CSV here</div>
+      <div style="font-size:12px;margin-top:4px;">or click to browse — type is auto-detected from the columns</div>
+    </div>
+    <input type="file" id="whatnotFileInput" accept=".csv,text/csv" multiple style="display:none" onchange="handleWhatnotFiles(this.files)"/>
+    <div id="whatnotUploadStatus" style="font-size:12px;color:var(--gray);margin-top:10px;"></div>
+    <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;margin:18px 0 8px;">Uploaded Shows</div>
+    <div id="whatnotShowsList"></div>
+  </div>
+
+  <!-- SECTION 2: TOP BUYERS LEADERBOARD -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">🏆 Top Buyers Leaderboard</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="wnLbSeller" class="filter-select" onchange="renderWhatnotLeaderboard()"><option value="">All sellers</option></select>
+        <select id="wnLbSort" class="filter-select" onchange="renderWhatnotLeaderboard()">
+          <option value="spent">Sort: Total Spent</option>
+          <option value="purchases">Sort: # Purchases</option>
+          <option value="shows">Sort: # Shows</option>
+        </select>
+      </div>
+    </div>
+    <div id="whatnotLeaderboard"></div>
+  </div>
+
+  <!-- SECTION 3: SALES ANALYSIS -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">💵 Sales Analysis</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="wnSalesShow" class="filter-select" onchange="renderWhatnotSales()"><option value="">All shows</option></select>
+        <select id="wnSalesSort" class="filter-select" onchange="renderWhatnotSales()">
+          <option value="recent">Sort: Most Recent</option>
+          <option value="price">Sort: Price High→Low</option>
+          <option value="type">Sort: Sale Type</option>
+        </select>
+      </div>
+    </div>
+    <div id="whatnotSalesSummary" style="margin-bottom:12px;"></div>
+    <div id="whatnotSales"></div>
+  </div>
+
+  <!-- SECTION 4: AI SOURCING -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">🤖 AI Sourcing Recommendations</div>
+      <button class="btn-blue" onclick="generateSourcingReport()">✨ Generate Sourcing Report</button>
+    </div>
+    <div id="whatnotSourcing"><div style="color:var(--gray);font-size:13px;">Upload sales data, then generate a report to see what to stock, best price ranges, and which brands are moving.</div></div>
+  </div>
+
 </div>
 
 </div><!-- end main -->
@@ -2597,6 +2661,7 @@ async function saveData() {
     localStorage.setItem('s64_scrape_meta', JSON.stringify(vendorScrapeMeta));
     localStorage.setItem('s64_auction_watch', JSON.stringify(auctionWatchlist));
     localStorage.setItem('s64_auction_settings', JSON.stringify(auctionSettings));
+    localStorage.setItem('s64_whatnot_intel', JSON.stringify(whatnotShows));
   } catch(e) {}
   showSaving('💾 Saving…');
   toast('⏳ Saving…', 'yellow');
@@ -2610,7 +2675,8 @@ async function saveData() {
       kvSet('s64_catalogs', vendorCatalogs),
       kvSet('s64_scrape_meta', vendorScrapeMeta),
       kvSet('s64_auction_watch', auctionWatchlist),
-      kvSet('s64_auction_settings', auctionSettings)
+      kvSet('s64_auction_settings', auctionSettings),
+      kvSet('s64_whatnot_intel', whatnotShows)
     ]);
     hideSaving('✅ Saved to cloud');
     toast('✅ Saved to cloud', 'green');
@@ -2627,8 +2693,8 @@ async function loadKey(key) {
   return null;
 }
 async function loadData() {
-  const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta, auctWatch, auctSettings] = await Promise.all([
-    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings')
+  const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta, auctWatch, auctSettings, whatnot] = await Promise.all([
+    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings'), loadKey('s64_whatnot_intel')
   ]);
   if (Array.isArray(items)) allItems = items;
   if (Array.isArray(eric)) ericColl = eric;
@@ -2648,6 +2714,9 @@ async function loadData() {
   applyAuctionSettingsToInputs();
   renderWatchlist();
   startAuctionAutoRefresh();
+  if (Array.isArray(whatnot)) whatnotShows = whatnot;
+  initWhatnotDropzone();
+  renderWhatnotAll();
   maybeAutoScrape(); // background refresh of any vendor whose data is >24h old
 }
 
@@ -3166,6 +3235,336 @@ async function refreshWatchlist(opts) {
 function startAuctionAutoRefresh() {
   if (_auctionRefreshTimer) clearInterval(_auctionRefreshTimer);
   _auctionRefreshTimer = setInterval(() => { refreshWatchlist({ silent: true }); }, 5 * 60 * 1000);
+}
+
+// ============================================================
+// WHATNOT INTEL
+// ============================================================
+let whatnotShows = [];   // [{id, seller, date, type, fileName, rowCount, rows:[{}]}]
+
+// --- CSV parsing ---
+function parseCSV(text) {
+  const rows = []; let cur = [], field = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { cur.push(field); field = ''; }
+      else if (c === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; }
+      else if (c === '\r') { /* ignore */ }
+      else field += c;
+    }
+  }
+  if (field.length || cur.length) { cur.push(field); rows.push(cur); }
+  return rows.filter(r => r.length && !(r.length === 1 && r[0].trim() === ''));
+}
+function csvToObjects(text) {
+  const rows = parseCSV(text);
+  if (!rows.length) return { headers: [], objects: [] };
+  const headers = rows[0].map(h => h.trim());
+  const objects = rows.slice(1).map(r => { const o = {}; headers.forEach((h, i) => o[h] = (r[i] != null ? r[i].trim() : '')); return o; });
+  return { headers, objects };
+}
+function findCol(headers, patterns) {
+  for (const h of headers) { const lh = h.toLowerCase(); for (const p of patterns) { if (lh.includes(p)) return h; } }
+  return null;
+}
+function parseMoney(v) { if (v == null) return 0; const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
+
+// Auto-detect Sales vs Buyers CSV by columns
+function detectCsvType(headers) {
+  const itemCol = findCol(headers, ['item', 'product', 'title', 'listing']);
+  const buyerCol = findCol(headers, ['buyer', 'username', 'user', 'handle', 'customer']);
+  const spentCol = findCol(headers, ['spent', 'total']);
+  if (itemCol) return 'sales';
+  if (buyerCol && spentCol) return 'buyers';
+  if (findCol(headers, ['price', 'amount'])) return 'sales';
+  return 'sales';
+}
+
+// --- Upload handling ---
+function handleWhatnotFiles(fileList) {
+  const files = Array.from(fileList || []);
+  files.forEach(f => {
+    const reader = new FileReader();
+    reader.onload = e => addWhatnotShow(f.name, String(e.target.result));
+    reader.readAsText(f);
+  });
+  const inp = document.getElementById('whatnotFileInput'); if (inp) inp.value = '';
+}
+
+function addWhatnotShow(fileName, text) {
+  const { headers, objects } = csvToObjects(text);
+  if (!headers.length || !objects.length) { toast('Could not read that CSV (no rows).', 'red'); return; }
+  const type = detectCsvType(headers);
+  const seller = ((document.getElementById('whatnotSeller') || {}).value || '').trim() || 'Unknown';
+  const date = ((document.getElementById('whatnotDate') || {}).value || '').trim() || new Date().toISOString().slice(0, 10);
+  const show = {
+    id: Date.now() + '_' + Math.floor(Math.random() * 1000),
+    seller, date, type, fileName, headers, rowCount: objects.length, rows: objects
+  };
+  whatnotShows.push(show);
+  const status = document.getElementById('whatnotUploadStatus');
+  if (status) status.innerHTML = `✅ <strong>${escHtmlA(fileName)}</strong> — detected <strong>${type === 'sales' ? 'Sales' : 'Buyers'} CSV</strong>, ${objects.length} rows (${escHtmlA(seller)}, ${escHtmlA(date)})`;
+  renderWhatnotAll();
+  saveData();
+  toast('📺 Show added: ' + seller + ' (' + type + ', ' + objects.length + ' rows)', 'green');
+}
+
+function deleteWhatnotShow(id) {
+  const s = whatnotShows.find(w => w.id === id);
+  if (!confirm('Delete this uploaded show' + (s ? ' (' + s.seller + ', ' + s.date + ')' : '') + '?')) return;
+  whatnotShows = whatnotShows.filter(w => w.id !== id);
+  renderWhatnotAll();
+  saveData();
+  toast('🗑️ Show deleted.', 'yellow');
+}
+
+function renderWhatnotShows() {
+  const div = document.getElementById('whatnotShowsList');
+  if (!div) return;
+  if (!whatnotShows.length) { div.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:6px 0;">No shows uploaded yet.</div>'; return; }
+  div.innerHTML = '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">' + whatnotShows.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(s => {
+    const badge = s.type === 'sales'
+      ? '<span style="background:#0D2B0D;color:var(--green);border:1px solid var(--green);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">SALES</span>'
+      : '<span style="background:#0D1520;color:var(--blue);border:1px solid var(--blue);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">BUYERS</span>';
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${escHtmlA(s.date)} ${badge}</div><div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(s.fileName)} · ${s.rowCount} rows</div></div>
+      <button onclick="deleteWhatnotShow('${s.id}')" class="row-action row-del" title="Delete show">🗑️</button>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// --- Aggregation helpers ---
+function wnBuyerRecordsForShow(show) {
+  // Returns [{buyer, spent, purchases}] for one show
+  const h = show.headers;
+  const buyerCol = findCol(h, ['buyer', 'username', 'user', 'handle', 'customer']);
+  if (!buyerCol) return [];
+  if (show.type === 'buyers') {
+    const spentCol = findCol(h, ['spent', 'total', 'amount', 'revenue']);
+    const purCol = findCol(h, ['purchase', 'orders', 'items', 'qty', 'count']);
+    return show.rows.map(r => ({
+      buyer: (r[buyerCol] || '').trim(),
+      spent: parseMoney(spentCol ? r[spentCol] : 0),
+      purchases: purCol ? (parseInt(parseMoney(r[purCol]), 10) || 1) : 1
+    })).filter(x => x.buyer);
+  }
+  // sales CSV: group individual sales by buyer
+  const priceCol = findCol(h, ['price', 'amount', 'sold', 'total']);
+  const map = {};
+  show.rows.forEach(r => {
+    const b = (r[buyerCol] || '').trim(); if (!b) return;
+    if (!map[b]) map[b] = { buyer: b, spent: 0, purchases: 0 };
+    map[b].spent += parseMoney(priceCol ? r[priceCol] : 0);
+    map[b].purchases += 1;
+  });
+  return Object.values(map);
+}
+
+function buildBuyerLeaderboard(sellerFilter) {
+  const agg = {}; // buyer -> {spent, purchases, shows:Set}
+  whatnotShows.forEach(show => {
+    if (sellerFilter && show.seller !== sellerFilter) return;
+    wnBuyerRecordsForShow(show).forEach(rec => {
+      if (!agg[rec.buyer]) agg[rec.buyer] = { buyer: rec.buyer, spent: 0, purchases: 0, shows: new Set() };
+      agg[rec.buyer].spent += rec.spent;
+      agg[rec.buyer].purchases += rec.purchases;
+      agg[rec.buyer].shows.add(show.id);
+    });
+  });
+  return Object.values(agg).map(a => ({
+    buyer: a.buyer, spent: a.spent, purchases: a.purchases,
+    showCount: a.shows.size, avgPerShow: a.shows.size ? a.spent / a.shows.size : 0
+  }));
+}
+
+function renderWhatnotLeaderboard() {
+  const div = document.getElementById('whatnotLeaderboard');
+  if (!div) return;
+  const sellerFilter = (document.getElementById('wnLbSeller') || {}).value || '';
+  const sortMode = (document.getElementById('wnLbSort') || {}).value || 'spent';
+  let list = buildBuyerLeaderboard(sellerFilter);
+  if (!list.length) { div.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:6px 0;">No buyer data yet. Upload a Sales or Buyers CSV.</div>'; return; }
+  if (sortMode === 'purchases') list.sort((a, b) => b.purchases - a.purchases);
+  else if (sortMode === 'shows') list.sort((a, b) => b.showCount - a.showCount || b.spent - a.spent);
+  else list.sort((a, b) => b.spent - a.spent);
+  const medals = ['🥇', '🥈', '🥉'];
+  const totSpent = list.reduce((s, x) => s + x.spent, 0);
+  const totPur = list.reduce((s, x) => s + x.purchases, 0);
+  const rows = list.map((x, i) => {
+    const medal = i < 3 ? medals[i] : (i + 1);
+    const nmeColor = i < 3 ? ['var(--gold)', '#C0C0C0', '#CD7F32'][i] : 'var(--white)';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px;font-weight:700;color:${nmeColor};">${medal}</td>
+      <td style="padding:8px;font-weight:${i < 3 ? '700' : '400'};color:${nmeColor};">${escHtmlA(x.buyer)}</td>
+      <td style="padding:8px;white-space:nowrap;font-weight:700;color:var(--green);">$${x.spent.toFixed(2)}</td>
+      <td style="padding:8px;">${x.purchases}</td>
+      <td style="padding:8px;">${x.showCount}</td>
+      <td style="padding:8px;white-space:nowrap;">$${x.avgPerShow.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+  div.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="text-align:left;color:var(--gray);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border);">
+      <th style="padding:8px;">Rank</th><th style="padding:8px;">Buyer</th><th style="padding:8px;">Total Spent</th><th style="padding:8px;"># Purchases</th><th style="padding:8px;"># Shows</th><th style="padding:8px;">Avg / Show</th>
+    </tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr style="border-top:2px solid var(--border);font-weight:700;"><td style="padding:8px;"></td><td style="padding:8px;">TOTAL (${list.length} buyers)</td><td style="padding:8px;color:var(--green);">$${totSpent.toFixed(2)}</td><td style="padding:8px;">${totPur}</td><td style="padding:8px;"></td><td style="padding:8px;"></td></tr></tfoot>
+  </table></div>`;
+}
+
+// --- Sales analysis ---
+function wnSalesForShow(show) {
+  if (show.type !== 'sales') return [];
+  const h = show.headers;
+  const itemCol = findCol(h, ['item', 'product', 'title', 'listing', 'name']);
+  const priceCol = findCol(h, ['price', 'amount', 'sold', 'total']);
+  const timeCol = findCol(h, ['time', 'date', 'sold at', 'timestamp']);
+  const typeCol = findCol(h, ['type', 'method', 'auction', 'sale type', 'format']);
+  const durCol = findCol(h, ['second', 'duration', 'elapsed', 'time to sell', 'sold in']);
+  return show.rows.map(r => {
+    const dur = durCol ? parseMoney(r[durCol]) : null;
+    return {
+      show: show.seller + ' · ' + show.date, showId: show.id, seller: show.seller,
+      item: itemCol ? r[itemCol] : '(unknown)',
+      price: parseMoney(priceCol ? r[priceCol] : 0),
+      time: timeCol ? r[timeCol] : '',
+      saleType: typeCol ? r[typeCol] : '',
+      durationSec: (durCol && dur != null && !isNaN(dur)) ? dur : null
+    };
+  });
+}
+
+function allWhatnotSales(sellerOrShowFilter) {
+  let out = [];
+  whatnotShows.forEach(show => {
+    if (sellerOrShowFilter && show.id !== sellerOrShowFilter && show.seller !== sellerOrShowFilter) return;
+    out = out.concat(wnSalesForShow(show));
+  });
+  return out;
+}
+
+function renderWhatnotSales() {
+  const div = document.getElementById('whatnotSales');
+  const sumDiv = document.getElementById('whatnotSalesSummary');
+  if (!div) return;
+  const filter = (document.getElementById('wnSalesShow') || {}).value || '';
+  const sortMode = (document.getElementById('wnSalesSort') || {}).value || 'recent';
+  let sales = allWhatnotSales(filter);
+  if (!sales.length) {
+    if (sumDiv) sumDiv.innerHTML = '';
+    div.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:6px 0;">No sales data yet. Upload a Sales CSV.</div>';
+    return;
+  }
+  // summary
+  const prices = sales.map(s => s.price).filter(p => p > 0);
+  const total = prices.reduce((s, p) => s + p, 0);
+  const avg = prices.length ? total / prices.length : 0;
+  const hi = prices.length ? Math.max(...prices) : 0;
+  const lo = prices.length ? Math.min(...prices) : 0;
+  if (sumDiv) sumDiv.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+    ${[['Revenue', '$' + total.toFixed(2), 'var(--green)'], ['Avg Sale', '$' + avg.toFixed(2), 'var(--gold)'], ['Highest', '$' + hi.toFixed(2), 'var(--green)'], ['Lowest', '$' + lo.toFixed(2), 'var(--gray)'], ['Sales', String(sales.length), 'var(--white)']].map(([l, v, c]) => `<div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;"><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${c};">${v}</div><div style="font-size:10px;color:var(--gray);text-transform:uppercase;">${l}</div></div>`).join('')}
+  </div>`;
+  // sort
+  if (sortMode === 'price') sales.sort((a, b) => b.price - a.price);
+  else if (sortMode === 'type') sales.sort((a, b) => String(a.saleType).localeCompare(String(b.saleType)));
+  else sales.reverse();
+  const rows = sales.map(s => {
+    const hot = (s.durationSec != null && s.durationSec > 0 && s.durationSec < 60);
+    const hotBadge = hot ? '<span style="background:#2B0D0D;color:var(--red);border:1px solid var(--red);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;">🔥 HOT ITEM</span>' : '';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px;font-size:13px;">${escHtmlA(s.item)}${hotBadge}</td>
+      <td style="padding:8px;white-space:nowrap;font-weight:700;color:var(--gold);">$${s.price.toFixed(2)}</td>
+      <td style="padding:8px;white-space:nowrap;font-size:12px;color:var(--gray);">${escHtmlA(s.time)}</td>
+      <td style="padding:8px;white-space:nowrap;font-size:12px;">${escHtmlA(s.saleType) || '—'}</td>
+      <td style="padding:8px;white-space:nowrap;font-size:12px;color:${hot ? 'var(--red)' : 'var(--gray)'};">${s.durationSec != null ? s.durationSec + 's' : '—'}</td>
+    </tr>`;
+  }).join('');
+  div.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="text-align:left;color:var(--gray);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border);">
+      <th style="padding:8px;">Item</th><th style="padding:8px;">Price</th><th style="padding:8px;">Time</th><th style="padding:8px;">Sale Type</th><th style="padding:8px;">Sold In</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// Refresh the seller/show dropdowns from current shows
+function refreshWhatnotFilters() {
+  const sellers = [...new Set(whatnotShows.map(s => s.seller).filter(Boolean))].sort();
+  const lb = document.getElementById('wnLbSeller');
+  if (lb) { const prev = lb.value; lb.innerHTML = '<option value="">All sellers</option>' + sellers.map(s => `<option value="${escAttr(s)}">${escHtmlA(s)}</option>`).join(''); lb.value = prev; }
+  const ss = document.getElementById('wnSalesShow');
+  if (ss) {
+    const prev = ss.value;
+    const showOpts = whatnotShows.filter(s => s.type === 'sales').map(s => `<option value="${escAttr(s.id)}">${escHtmlA(s.seller + ' · ' + s.date)}</option>`).join('');
+    ss.innerHTML = '<option value="">All shows</option>' + showOpts;
+    ss.value = prev;
+  }
+}
+
+function renderWhatnotAll() {
+  renderWhatnotShows();
+  refreshWhatnotFilters();
+  renderWhatnotLeaderboard();
+  renderWhatnotSales();
+}
+
+// --- AI sourcing report ---
+async function generateSourcingReport() {
+  const out = document.getElementById('whatnotSourcing');
+  const sales = allWhatnotSales('');
+  if (!sales.length) { toast('Upload a Sales CSV first.', 'yellow'); return; }
+  if (out) out.innerHTML = '<div style="color:var(--gray);font-size:13px;">🤖 Analyzing your sales data…</div>';
+  // Compact summary to keep the payload small
+  const summary = sales.slice(0, 400).map(s => ({
+    item: (s.item || '').slice(0, 80), price: Math.round(s.price * 100) / 100,
+    type: (s.saleType || '').slice(0, 20), soldInSec: s.durationSec
+  }));
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 1200,
+        system: `You are a diecast reselling sourcing analyst. You are given a JSON array of Whatnot livestream sales (item name, sale price, sale type, and how many seconds it took to sell). Analyze what sold, at what prices, and how fast. Return ONLY JSON: {"stock_more":["..."],"best_price_ranges":["..."],"brands_moving":["..."],"notes":["..."]}. Each array holds short, specific, actionable bullet strings. Base everything strictly on the data provided.`,
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'Sales data (JSON):\n' + JSON.stringify(summary) + '\n\nReturn the sourcing recommendations JSON only.' }] }]
+      })
+    });
+    if (!res.ok) throw new Error('API ' + res.status);
+    const data = await res.json();
+    const raw = (data.content || []).map(c => c.text || '').join('').replace(/```json|```/g, '').trim();
+    const rec = JSON.parse(raw);
+    renderSourcingReport(rec);
+  } catch (err) {
+    if (out) out.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:8px;padding:14px;font-size:13px;">Could not generate the report (${escHtmlA(err.message)}). Try again.</div>`;
+  }
+}
+
+function renderSourcingReport(rec) {
+  const out = document.getElementById('whatnotSourcing');
+  if (!out) return;
+  const block = (title, arr, color) => {
+    if (!arr || !arr.length) return '';
+    return `<div style="margin-bottom:14px;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;color:${color};margin-bottom:6px;">${title}</div><ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.7;">${arr.map(x => `<li>${escHtmlA(String(x))}</li>`).join('')}</ul></div>`;
+  };
+  out.innerHTML = `<div style="background:var(--black);border:1px solid var(--gold);border-radius:10px;padding:16px 18px;">
+    ${block('📦 Stock more of', rec.stock_more, 'var(--green)')}
+    ${block('💰 Best price ranges', rec.best_price_ranges, 'var(--gold)')}
+    ${block('🏷️ Brands moving', rec.brands_moving, 'var(--blue)')}
+    ${block('📝 Notes', rec.notes, 'var(--gray)')}
+    <div style="font-size:11px;color:var(--gray);margin-top:8px;">AI-generated from your uploaded sales data.</div>
+  </div>`;
+}
+
+// Drag & drop wiring for the upload zone
+function initWhatnotDropzone() {
+  const dz = document.getElementById('whatnotDrop');
+  if (!dz || dz._wired) return;
+  dz._wired = true;
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dz.style.borderColor = 'var(--gold)'; dz.style.color = 'var(--gold)'; }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dz.style.borderColor = 'var(--border)'; dz.style.color = 'var(--gray)'; }));
+  dz.addEventListener('drop', e => { const files = e.dataTransfer && e.dataTransfer.files; if (files && files.length) handleWhatnotFiles(files); });
+  const d = document.getElementById('whatnotDate');
+  if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
 }
 
 // Voice search via Web Speech API — continuous listening, keeps text until user stops
