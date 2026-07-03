@@ -352,12 +352,12 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <button id="psClearBtn" onclick="clearPsSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
       </div>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
-      <button id="psIdBtn" onclick="document.getElementById('psImageInput').click()" title="Identify a diecast from a photo" style="padding:14px 24px;font-size:15px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;min-height:50px;">📷 Identify by Photo</button>
     </div>
     <input type="file" id="psImageInput" accept="image/*" style="display:none" onchange="handlePsImageInput(event)"/>
-    <div style="font-size:12px;color:var(--gray);margin-top:8px;">📷 Snap or upload a photo of a diecast — or paste one with Ctrl+V — to auto-identify the model.</div>
-    <div class="mic-wrap" style="margin-top:10px;">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
       <button id="micBtn" class="mic-btn" onclick="startVoiceSearch()" title="Search by voice">🎤</button>
+      <button id="psIdBtn" onclick="document.getElementById('psImageInput').click()" title="Identify a diecast from a photo" style="flex:1;min-width:220px;padding:15px 24px;font-size:15px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:10px;cursor:pointer;min-height:52px;">📷 Identify by Photo — snap, upload, or paste Ctrl+V</button>
+      <div style="flex-basis:100%;font-size:12px;color:var(--gray);">Works on mobile camera, photo library, or desktop paste — auto-identifies the diecast model.</div>
     </div>
     <div class="qsearch-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
       <button class="qsearch-btn" onclick="openAliExpress()" style="border-color:var(--orange);color:var(--orange);">🛒 AliExpress</button>
