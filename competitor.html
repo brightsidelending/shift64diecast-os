@@ -298,6 +298,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <input class="text-input" id="newVendorName" placeholder="New vendor name..." style="flex:1;min-width:160px;"/>
       <button class="btn-blue" onclick="addVendor()">+ Add Vendor</button>
     </div>
+    <div style="position:relative;margin-bottom:14px;">
+      <input class="text-input" id="catalogSearch" placeholder="🔍 Search all catalogs by item name or brand..." oninput="filterCatalogs()" style="width:100%;box-sizing:border-box;padding-right:40px;"/>
+      <button id="catalogSearchClear" onclick="clearCatalogSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:20px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
+    </div>
     <div id="catalogsContainer"></div>
   </div>
 
@@ -1543,7 +1547,8 @@ function renderCatalogs() {
       const priceNum = parseFloat(it.price);
       const price = !isNaN(priceNum) ? '$' + priceNum.toFixed(2) : '-';
       const cls = statusClass[it.status] || 'b-unknown';
-      return `<tr>
+      const hay = ((it.name || '') + ' ' + (it.brand || '')).toLowerCase();
+      return `<tr data-search="${escAttr(hay)}">
         <td>${it.name || '-'}</td><td>${it.brand || '-'}</td><td>${it.scale || '-'}</td>
         <td class="price-td">${price}</td>
         <td><span class="badge ${cls}">${it.status || 'Unknown'}</span></td>
@@ -1577,6 +1582,42 @@ function renderCatalogs() {
       </div>
     </div>`;
   }).join('');
+  filterCatalogs(); // re-apply any active search filter after re-render
+}
+
+// Live filter across every vendor table by item name or brand
+function filterCatalogs() {
+  const inp = document.getElementById('catalogSearch');
+  const clearBtn = document.getElementById('catalogSearchClear');
+  const q = (inp ? inp.value : '').trim().toLowerCase();
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+  const cont = document.getElementById('catalogsContainer');
+  if (!cont) return;
+  Array.from(cont.children).forEach(sec => {
+    const rows = sec.querySelectorAll('tbody tr[data-search]');
+    let visible = 0;
+    rows.forEach(tr => {
+      const show = !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1;
+      tr.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    // While searching, hide vendors with no matches and expand those with matches
+    if (q) {
+      sec.style.display = visible ? '' : 'none';
+      const body = sec.querySelector('.vsec-body');
+      if (visible && body) body.style.display = '';
+    } else {
+      sec.style.display = '';
+    }
+  });
+}
+
+function clearCatalogSearch() {
+  const inp = document.getElementById('catalogSearch');
+  if (!inp) return;
+  inp.value = '';
+  filterCatalogs();
+  inp.focus();
 }
 
 function toggleVendorSection(headerEl) {
