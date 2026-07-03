@@ -2855,9 +2855,12 @@ function findCompetitorMatches(query) {
   const scoreItem = (it, site) => {
     const hay = ((it.name || '') + ' ' + (it.brand || '')).toLowerCase();
     const score = qWords.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
+    // Shopify preorders are often stored as "In Stock" but flagged in the name (e.g. "[Preorder]").
+    // Override the status so the Pre-Order filters work correctly. Applies to both scans and catalogs.
+    const status = /preorder/i.test(it.name || '') ? 'Pre-Order' : it.status;
     return {
       score,
-      it: { name: it.name, brand: it.brand, price: it.price, status: it.status, site: site || it.site || '' }
+      it: { name: it.name, brand: it.brand, price: it.price, status: status, site: site || it.site || '' }
     };
   };
   const results = [];
