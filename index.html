@@ -1945,6 +1945,7 @@ function renderCatalogs() {
       </tr>`;
     }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No items yet. Add manually or from a scan.</td></tr>`;
     const scrapable = !!VENDOR_SCRAPERS[vendor];
+    console.log('vendor:', vendor, 'scrapable:', scrapable, 'VENDOR_SCRAPERS keys:', Object.keys(VENDOR_SCRAPERS));
     const meta = vendorScrapeMeta[vendor];
     const lastTxt = scrapable
       ? `<span style="color:var(--gray);font-size:11px;font-weight:400;margin-left:8px;white-space:nowrap;">⏱ Last scraped: ${meta && meta.lastScraped ? timeAgo(meta.lastScraped) : 'never'}</span>`
