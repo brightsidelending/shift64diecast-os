@@ -283,6 +283,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
   </div>
 
+  <!-- REVIEW STEP (populated after a scan) -->
+  <div id="reviewDiv"></div>
+
   <!-- ===== VENDOR CATALOGS (Phase 1: Buying Intelligence Engine) ===== -->
   <div class="card" style="margin-top:10px;">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
@@ -788,14 +791,22 @@ Return ONLY this JSON (no markdown, no explanation):
   const priceConflicts = [];
   let skipped = 0;
   newConfirmed.forEach(ni => {
-    const dup = findDuplicateItem(ni, allItems) || findDuplicateItem(ni, toAdd);
-    if (dup) {
+    const batchDup = findDuplicateItem(ni, toAdd);      // same item on an overlapping strip = near a strip boundary
+    if (batchDup) {
       skipped++;
-      const np = parseFloat(ni.price), op = parseFloat(dup.price);
-      if (!isNaN(np) && (isNaN(op) || np !== op)) priceConflicts.push({ existing: dup, newPrice: np, oldPrice: op });
-    } else {
-      toAdd.push(ni);
+      batchDup.nearBoundary = true;
+      const np = parseFloat(ni.price), op = parseFloat(batchDup.price);
+      if (!isNaN(np) && (isNaN(op) || np !== op)) priceConflicts.push({ existing: batchDup, newPrice: np, oldPrice: op });
+      return;
     }
+    const existDup = findDuplicateItem(ni, allItems);   // already in the list from an earlier scan
+    if (existDup) {
+      skipped++;
+      const np = parseFloat(ni.price), op = parseFloat(existDup.price);
+      if (!isNaN(np) && (isNaN(op) || np !== op)) priceConflicts.push({ existing: existDup, newPrice: np, oldPrice: op });
+      return;
+    }
+    toAdd.push(ni);
   });
   if (priceConflicts.length) {
     const msg = priceConflicts.length + ' item' + (priceConflicts.length > 1 ? 's' : '') +
@@ -816,6 +827,11 @@ Return ONLY this JSON (no markdown, no explanation):
   if (skipped) parts.push('ℹ️ ' + skipped + ' duplicate' + (skipped > 1 ? 's' : '') + ' skipped');
   if (newUnclear.length > 0) parts.push('⚠️ ' + newUnclear.length + ' need review below');
   toast(parts.join(' · ') || '✅ Scan complete', skipped || newUnclear.length ? 'yellow' : 'green');
+
+  // Review step: let the user verify/correct prices before saving to a catalog
+  scanReviewItems = toAdd;
+  computeReviewConfidence(scanReviewItems);
+  renderReview();
 }
 
 // ---- Fuzzy duplicate detection (brand + model keyword overlap) ----
@@ -840,6 +856,82 @@ function itemsSimilar(a, b) {
 }
 function findDuplicateItem(item, list) {
   return (list || []).find(ex => itemsSimilar(item, ex));
+}
+
+// ---- Post-scan REVIEW step: verify/correct prices before saving to a catalog ----
+let scanReviewItems = [];
+function computeReviewConfidence(items) {
+  const freq = {};
+  items.forEach(it => { const p = parseFloat(it.price); if (!isNaN(p)) freq[p.toFixed(2)] = (freq[p.toFixed(2)] || 0) + 1; });
+  items.forEach(it => {
+    const p = parseFloat(it.price);
+    const sharedPrice = !isNaN(p) && freq[p.toFixed(2)] >= 2;   // same price on multiple different items
+    it.lowConfidence = !!(sharedPrice || it.nearBoundary);
+    it.lowConfReason = sharedPrice ? 'Same price as other items' : (it.nearBoundary ? 'Near strip boundary' : '');
+  });
+}
+function renderReview() {
+  const div = document.getElementById('reviewDiv');
+  if (!div) return;
+  if (!scanReviewItems || !scanReviewItems.length) { div.innerHTML = ''; return; }
+  const vendorOpts = Object.keys(vendorCatalogs).map(n => `<option value="${escAttr(n)}">${n}</option>`).join('');
+  const rows = scanReviewItems.map((it, idx) => {
+    const warn = it.lowConfidence;
+    const priceVal = (it.price != null && !isNaN(parseFloat(it.price))) ? parseFloat(it.price).toFixed(2) : '';
+    return `<tr style="${warn ? 'background:rgba(230,126,34,0.12);' : ''}">
+      <td>${it.name || '-'}</td>
+      <td>${it.brand || '-'}</td>
+      <td>${it.scale || '-'}</td>
+      <td><input type="number" step="0.01" class="review-price" data-idx="${idx}" value="${priceVal}" style="width:90px;background:var(--black);border:1px solid ${warn ? 'var(--orange)' : 'var(--border)'};border-radius:6px;padding:6px 8px;color:var(--white);font-size:13px;"/></td>
+      <td><span class="badge ${{'In Stock':'b-instock','Out of Stock':'b-outstock','Pre-Order':'b-preorder','Low Stock':'b-lowstock'}[it.status] || 'b-unknown'}">${it.status || 'Unknown'}</span></td>
+      <td>${warn
+        ? `<span style="color:var(--orange);font-weight:700;font-size:12px;">⚠️ Low Confidence — verify price</span><div style="font-size:10px;color:var(--gray);">${it.lowConfReason}</div>`
+        : `<span style="color:var(--green);font-size:12px;">✓ OK</span>`}</td>
+    </tr>`;
+  }).join('');
+  div.innerHTML = `<div class="card" style="border:1px solid var(--gold);margin-top:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--gold);">📝 Review Scanned Items (${scanReviewItems.length}) — verify prices before saving</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:12px;color:var(--gray);">Save to:</span>
+        <select id="reviewVendor" class="filter-select" style="min-width:150px;">${vendorOpts}</select>
+      </div>
+    </div>
+    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">
+      <thead><tr><th>Item</th><th>Brand</th><th>Scale</th><th>Price</th><th>Status</th><th>Confidence</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div style="margin-top:14px;text-align:right;"><button class="btn-green" onclick="saveReviewToCatalog()">💾 Save All to Catalog</button></div>
+  </div>`;
+}
+function saveReviewToCatalog() {
+  const vendorSel = document.getElementById('reviewVendor');
+  const vendor = vendorSel ? vendorSel.value : '';
+  if (!vendor) { toast('Pick a vendor.', 'yellow'); return; }
+  if (!scanReviewItems || !scanReviewItems.length) { toast('Nothing to save.', 'yellow'); return; }
+  // apply any manual price edits
+  document.querySelectorAll('#reviewDiv .review-price').forEach(inp => {
+    const idx = parseInt(inp.dataset.idx, 10);
+    const v = parseFloat(inp.value);
+    if (scanReviewItems[idx]) scanReviewItems[idx].price = isNaN(v) ? null : v;
+  });
+  if (!vendorCatalogs[vendor]) vendorCatalogs[vendor] = [];
+  scanReviewItems.forEach(it => {
+    const p = parseFloat(it.price);
+    vendorCatalogs[vendor].push({
+      id: nextCatId(),
+      name: it.name || '', brand: it.brand || '', scale: it.scale || '',
+      price: !isNaN(p) ? p : null,
+      status: it.status || 'Unknown', dateAdded: catToday()
+    });
+  });
+  const n = scanReviewItems.length;
+  scanReviewItems = [];
+  document.getElementById('reviewDiv').innerHTML = '';
+  renderResults();       // reflect any edited prices in the results table
+  renderCatalogs();
+  saveData();
+  toast('✅ Saved ' + n + ' item' + (n > 1 ? 's' : '') + ' to ' + vendor + ' catalog.', 'green');
 }
 
 // ============================================================
