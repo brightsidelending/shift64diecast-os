@@ -2294,12 +2294,14 @@ function mapShopifyProduct(p) {
   const price = parseFloat(first.price);
   const inStock = variants.some(v => v && v.available);
   const tags = Array.isArray(p.tags) ? p.tags.join(' ') : (p.tags || '');
+  const image = (Array.isArray(p.images) && p.images[0] && p.images[0].src) ? p.images[0].src : '';
   return {
     name: p.title || '',
     brand: p.vendor || brandFromName(p.title || ''),
     scale: detectScale((p.title || '') + ' ' + tags + ' ' + (p.body_html || '')),
     price: !isNaN(price) ? price : null,
-    status: inStock ? 'In Stock' : 'Out of Stock'
+    status: inStock ? 'In Stock' : 'Out of Stock',
+    image: image
   };
 }
 
@@ -2311,12 +2313,14 @@ function mapWooProduct(p) {
     const raw = parseFloat(p.prices.price);
     if (!isNaN(raw)) price = raw / Math.pow(10, isNaN(minor) ? 2 : minor);
   }
+  const image = (Array.isArray(p.images) && p.images[0] && p.images[0].src) ? p.images[0].src : '';
   return {
     name: p.name || '',
     brand: brandFromName(p.name || ''),
     scale: detectScale((p.name || '') + ' ' + (p.short_description || '') + ' ' + (p.description || '')),
     price: price,
-    status: p.is_in_stock ? 'In Stock' : 'Out of Stock'
+    status: p.is_in_stock ? 'In Stock' : 'Out of Stock',
+    image: image
   };
 }
 
@@ -2341,6 +2345,7 @@ function mergeScrapedItems(vendor, scraped) {
       if (s.status) existing.status = s.status;
       if (s.scale && !existing.scale) existing.scale = s.scale;
       if (s.brand && !existing.brand) existing.brand = s.brand;
+      if (s.image && !existing.image) existing.image = s.image;
       existing.dateAdded = catToday();
       updated++;
     } else {
@@ -2351,6 +2356,7 @@ function mergeScrapedItems(vendor, scraped) {
         scale: s.scale || '',
         price: s.price != null ? s.price : null,
         status: s.status || 'Unknown',
+        image: s.image || '',
         dateAdded: catToday()
       };
       arr.push(entry);
@@ -2860,7 +2866,7 @@ function findCompetitorMatches(query) {
     const status = /preorder/i.test(it.name || '') ? 'Pre-Order' : it.status;
     return {
       score,
-      it: { name: it.name, brand: it.brand, price: it.price, status: status, site: site || it.site || '' }
+      it: { name: it.name, brand: it.brand, price: it.price, status: status, site: site || it.site || '', image: it.image || '' }
     };
   };
   const results = [];
@@ -2934,7 +2940,8 @@ function renderCompetitorPrices() {
   }
   const row = it => {
     const price = (it.price != null && !isNaN(it.price)) ? '$' + parseFloat(it.price).toFixed(2) : '—';
-    return `<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="min-width:0;"><div style="font-size:13px;">${it.name || 'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site || 'Unknown'}${it.status ? ' · ' + it.status : ''}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);white-space:nowrap;">${price}</div></div>`;
+    const thumb = it.image ? `<img src="${escAttr(it.image)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
+    return `<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="display:flex;align-items:center;gap:10px;min-width:0;">${thumb}<div style="min-width:0;"><div style="font-size:13px;">${it.name || 'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site || 'Unknown'}${it.status ? ' · ' + it.status : ''}</div></div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);white-space:nowrap;">${price}</div></div>`;
   };
   const first = items.slice(0, 8);
   const rest = items.slice(8);
