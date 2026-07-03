@@ -2910,10 +2910,18 @@ function renderCompetitorPrices() {
     list.innerHTML = `<div style="padding:16px;text-align:center;font-size:12px;color:var(--gray);">No items match this filter.</div>`;
     return;
   }
-  list.innerHTML = items.slice(0, 8).map(it => {
+  const row = it => {
     const price = (it.price != null && !isNaN(it.price)) ? '$' + parseFloat(it.price).toFixed(2) : '—';
     return `<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="min-width:0;"><div style="font-size:13px;">${it.name || 'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site || 'Unknown'}${it.status ? ' · ' + it.status : ''}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);white-space:nowrap;">${price}</div></div>`;
-  }).join('');
+  };
+  const first = items.slice(0, 8);
+  const rest = items.slice(8);
+  let html = first.map(row).join('');
+  if (rest.length > 0) {
+    html += `<div id="comp-more" style="display:none;">${rest.map(row).join('')}</div>`;
+    html += `<button class="show-more-btn" id="comp-btn" onclick="toggleShowMore('comp')">Show More (${rest.length})</button>`;
+  }
+  list.innerHTML = html;
 }
 
 async function runPriceScan() {
