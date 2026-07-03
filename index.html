@@ -269,6 +269,51 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   .imp-cost { gap: 16px 12px !important; }
   .imp-cost label { font-size: 12px !important; white-space: normal !important; line-height: 1.35; }
 }
+
+/* ===== PHONE OPTIMIZATION (390px–430px) ===== */
+@media (max-width: 480px) {
+  /* general: no horizontal overflow, tighter cards, readable base font */
+  html, body { overflow-x: hidden; max-width: 100%; }
+  .main { padding: 16px 12px 40px !important; }
+  .card { padding: 16px !important; }
+  .card td, .card th, .tbl-wrap td, .tbl-wrap th { font-size: 13px; }
+
+  /* 1: nav tabs — horizontal scroll, never wrap */
+  .nav { overflow-x: auto !important; white-space: nowrap !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; }
+  .nav-tab { flex: 0 0 auto !important; }
+
+  /* 2: Import Cost Settings — stack all 6 fields vertically */
+  #impCostBody { grid-template-columns: 1fr !important; }
+
+  /* 3: Price Scanner search row — SCAN button full width under the input */
+  .search-row { flex-direction: column !important; align-items: stretch !important; }
+  .search-row .text-input, #psScanBtn, .search-row .btn-red { width: 100% !important; }
+
+  /* 7: thumb-friendly minimum tap height on all buttons */
+  .btn-red, .btn-blue, .btn-green, .btn-gold, .btn-gray, .btn-sm,
+  .qsearch-btn, .site-btn, .filter-select, .mic-btn, .row-action { min-height: 44px !important; }
+
+  /* 8: 📷 Identify by Photo — full width, 52px tall */
+  #psIdBtn { width: 100% !important; flex: 1 1 100% !important; min-height: 52px !important; font-size: 15px !important; }
+
+  /* horizontal-scroll fallbacks for wide tables */
+  .tbl-wrap, .vsec-body, #auctWatchlist, #resultsDiv { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+
+  /* 4: Vendor Catalogs table — hide Scale(3) + Added(6) */
+  #catalogsContainer table th:nth-child(3), #catalogsContainer table td:nth-child(3),
+  #catalogsContainer table th:nth-child(6), #catalogsContainer table td:nth-child(6) { display: none !important; }
+
+  /* 5: Auction watchlist — hide Est Tax(7), Avg Sold(9), Max Bid(11) */
+  #auctWatchlist table th:nth-child(7), #auctWatchlist table td:nth-child(7),
+  #auctWatchlist table th:nth-child(9), #auctWatchlist table td:nth-child(9),
+  #auctWatchlist table th:nth-child(11), #auctWatchlist table td:nth-child(11) { display: none !important; }
+
+  /* 9: Eric & Khai collection tables — hide Scale(3) + Notes(14) */
+  #eric .tbl-wrap table th:nth-child(3), #eric .tbl-wrap table td:nth-child(3),
+  #eric .tbl-wrap table th:nth-child(14), #eric .tbl-wrap table td:nth-child(14),
+  #khai .tbl-wrap table th:nth-child(3), #khai .tbl-wrap table td:nth-child(3),
+  #khai .tbl-wrap table th:nth-child(14), #khai .tbl-wrap table td:nth-child(14) { display: none !important; }
+}
 </style>
 </head>
 <body>
