@@ -2855,7 +2855,10 @@ function openSiteSearch(site) {
 function findCompetitorMatches(query) {
   const qWords = query.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
   if (!qWords.length) return [];
-  const need = Math.min(2, qWords.length);
+  // Require at least 3 query words to appear in the item (capped by how many words the query has),
+  // plus an absolute floor so a single loose word match ("Kaido") no longer returns everything.
+  const need = Math.min(3, qWords.length);
+  const MIN_SCORE = 2;
   // Score an item by how many query words appear in its name/brand (same fuzzy logic as before).
   // `site` becomes the source label shown in the UI (competitor site for scans, vendor name for catalogs).
   const scoreItem = (it, site) => {
@@ -2881,7 +2884,7 @@ function findCompetitorMatches(query) {
     });
   }
   return results
-    .filter(x => x.score >= need)
+    .filter(x => x.score >= need && x.score >= MIN_SCORE)
     .sort((a, b) => b.score - a.score)
     .map(x => x.it);
 }
@@ -2954,7 +2957,7 @@ function renderCompetitorPrices() {
     const img = it.image || '';
     const url = compVendorUrl(it.site, it.name);
     const interactive = !!(img || url);
-    const thumb = img ? `<img src="${escAttr(img)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
+    const thumb = img ? `<img src="${escAttr(img)}" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
     const safeUrl = url ? url.replace(/"/g, '%22').replace(/'/g, '%27') : '';
     const safeImg = img ? String(img).replace(/"/g, '%22').replace(/'/g, '%27') : '';
     const safeTitle = escAttr(it.name || '');
