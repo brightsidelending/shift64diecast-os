@@ -2903,6 +2903,7 @@ function compPassesFilter(it, filter) {
   const isPreorder = s === 'pre-order' || /preorder/i.test((it && it.name) || '');
   if (filter === 'instock') return s === 'in stock' && !isPreorder;
   if (filter === 'hideoos') return s !== 'out of stock' && !isPreorder;
+  if (filter === 'preorder') return isPreorder;
   return true; // 'all'
 }
 function setCompFilter(f) {
@@ -3087,7 +3088,7 @@ async function runPriceScan() {
     const compVendors = [...new Set(_compMatches.map(m => m.site).filter(Boolean))].sort();
     const compVendorBar = `<div id="compVendorBar" style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);">${compVendorBtn('all','All Vendors')}${compVendors.map(v => compVendorBtn(v, v)).join('')}</div>`;
     const competitorHtml = _compMatches.length > 0
-      ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;"><div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🏷️ COMPETITOR PRICES</div><span style="font-size:11px;color:var(--blue);">${_compMatches.length} match${_compMatches.length>1?'es':''} from scans & catalogs</span></div><div id="compFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);">${compBtn('all','All')}${compBtn('instock','In Stock Only')}${compBtn('hideoos','Hide Out of Stock/Pre-Order')}</div>${compVendorBar}<div id="compList"></div></div>`
+      ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;"><div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🏷️ COMPETITOR PRICES</div><span style="font-size:11px;color:var(--blue);">${_compMatches.length} match${_compMatches.length>1?'es':''} from scans & catalogs</span></div><div id="compFilterBar" style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);">${compBtn('all','All')}${compBtn('instock','In Stock Only')}${compBtn('preorder','Pre-Order Only')}${compBtn('hideoos','Hide Out of Stock/Pre-Order')}</div>${compVendorBar}<div id="compList"></div></div>`
       : `<div style="background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:18px;margin-bottom:14px;text-align:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;margin-bottom:4px;">🏷️ COMPETITOR PRICES</div><div style="font-size:13px;color:var(--gray);">No competitor data yet — scan in the Competitor tab.</div></div>`;
     const prodImg = ebayActivePrices[0]?.img || '';
     refPhotoDefault = prodImg;
