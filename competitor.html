@@ -1762,6 +1762,22 @@ function detectScale(txt) {
   return m ? '1/' + m[1] : '';
 }
 
+// Known brands checked in order; first substring found in the product name wins.
+const KNOWN_BRANDS = [
+  "Mini GT", "MiniGT", "Pop Race", "PopRace", "Tarmac Works", "Inno64", "INNO64",
+  "LCD", "TPC", "DCM", "Liberty64", "Liberty", "Rotating Wheel", "GlamCraft",
+  "Stance Art", "Rhino Model", "Bizarre Art", "Ignition Model", "Kaido",
+  "Demon King", "Blown AT64", "Raven Art", "Model One", "SLAMERAFT",
+  "Richsing Wheel", "GCM Model"
+];
+function brandFromName(name) {
+  const s = String(name || '');
+  for (let i = 0; i < KNOWN_BRANDS.length; i++) {
+    if (s.indexOf(KNOWN_BRANDS[i]) !== -1) return KNOWN_BRANDS[i];
+  }
+  return '';
+}
+
 // Map one Shopify products.json product to the catalog item shape
 function mapShopifyProduct(p) {
   const variants = Array.isArray(p.variants) ? p.variants : [];
@@ -1771,7 +1787,7 @@ function mapShopifyProduct(p) {
   const tags = Array.isArray(p.tags) ? p.tags.join(' ') : (p.tags || '');
   return {
     name: p.title || '',
-    brand: p.vendor || '',
+    brand: p.vendor || brandFromName(p.title || ''),
     scale: detectScale((p.title || '') + ' ' + tags + ' ' + (p.body_html || '')),
     price: !isNaN(price) ? price : null,
     status: inStock ? 'In Stock' : 'Out of Stock'
@@ -1788,7 +1804,7 @@ function mapWooProduct(p) {
   }
   return {
     name: p.name || '',
-    brand: '',
+    brand: brandFromName(p.name || ''),
     scale: detectScale((p.name || '') + ' ' + (p.short_description || '') + ' ' + (p.description || '')),
     price: price,
     status: p.is_in_stock ? 'In Stock' : 'Out of Stock'
