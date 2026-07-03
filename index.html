@@ -2910,6 +2910,17 @@ function setCompVendorFilter(v) {
   _compVendorFilter = v;
   renderCompetitorPrices();
 }
+// Build a vendor product-search URL for a catalog item (by its vendor/site name)
+function compVendorUrl(site, name) {
+  const bases = {
+    'CarBromc': 'https://www.carbromc.com/search?q=',
+    'Horizon Diecast': 'https://horizondiecast.com/search?q=',
+    'Pablo Diecast Garage': 'https://pablosdiecastgarage.com/search?q=',
+    'RC Mart': 'https://www.rcmart.com/search?q='
+  };
+  const base = bases[site];
+  return base ? base + encodeURIComponent(name || '') : '';
+}
 function renderCompetitorPrices() {
   const list = document.getElementById('compList');
   if (!list) return;
@@ -2940,8 +2951,16 @@ function renderCompetitorPrices() {
   }
   const row = it => {
     const price = (it.price != null && !isNaN(it.price)) ? '$' + parseFloat(it.price).toFixed(2) : '—';
-    const thumb = it.image ? `<img src="${escAttr(it.image)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
-    return `<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="display:flex;align-items:center;gap:10px;min-width:0;">${thumb}<div style="min-width:0;"><div style="font-size:13px;">${it.name || 'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site || 'Unknown'}${it.status ? ' · ' + it.status : ''}</div></div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);white-space:nowrap;">${price}</div></div>`;
+    const img = it.image || '';
+    const url = compVendorUrl(it.site, it.name);
+    const interactive = !!(img || url);
+    const thumb = img ? `<img src="${escAttr(img)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
+    const safeUrl = url ? url.replace(/"/g, '%22').replace(/'/g, '%27') : '';
+    const safeImg = img ? String(img).replace(/"/g, '%22').replace(/'/g, '%27') : '';
+    const safeTitle = escAttr(it.name || '');
+    const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" onclick="cardClick(this)" ondblclick="cardDblClick(this)"` : '';
+    const arrow = interactive ? `<span title="Single click: preview image · Double click: open vendor page" style="color:var(--gray);font-size:13px;margin-left:8px;">↗</span>` : '';
+    return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:${interactive ? 'pointer' : 'default'};"><div style="display:flex;align-items:center;gap:10px;min-width:0;">${thumb}<div style="min-width:0;"><div style="font-size:13px;">${it.name || 'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site || 'Unknown'}${it.status ? ' · ' + it.status : ''}</div></div></div><div style="display:flex;align-items:center;white-space:nowrap;"><span style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);">${price}</span>${arrow}</div></div>`;
   };
   const first = items.slice(0, 8);
   const rest = items.slice(8);
