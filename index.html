@@ -1958,11 +1958,11 @@ function renderCatalogs() {
         <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
           <button class="btn-sm" style="background:var(--blue);" onclick="openCatItemModal('${vEsc}')">+ Item</button>
           <button class="row-action row-del" title="Delete vendor" onclick="removeVendor('${vEsc}')">🗑 Vendor</button>
-          <span class="vsec-toggle" style="color:var(--gray);">▾</span>
+          <span class="vsec-toggle" style="color:var(--gray);">▸</span>
         </div>
       </div>
       ${scrapeLine}
-      <div class="vsec-body" style="overflow-x:auto;">
+      <div class="vsec-body" style="overflow-x:auto;display:none;">
         <table style="width:100%;border-collapse:collapse;">
           <thead><tr><th>Item</th><th>Brand</th><th>Scale</th><th>Price</th><th>Status</th><th>Added</th><th style="text-align:right;">Actions</th></tr></thead>
           <tbody>${rows}</tbody>
