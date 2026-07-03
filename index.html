@@ -347,7 +347,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="font-family:Rajdhani,sans-serif;font-size:22px;font-weight:700;margin-bottom:4px;">MARKET PRICE SCANNER + TRUE MARGIN CALCULATOR</div>
     <div style="color:var(--gray);font-size:13px;margin-bottom:20px;">Type any diecast model. Get price estimates, true landed cost, and real margin after ALL fees.</div>
     <div class="search-row" style="display:flex;gap:12px;">
-      <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red..." style="flex:1;font-size:15px;padding:14px 20px;"/>
+      <div style="position:relative;flex:1;">
+        <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red..." style="width:100%;box-sizing:border-box;font-size:15px;padding:14px 44px 14px 20px;" oninput="togglePsClear()"/>
+        <button id="psClearBtn" onclick="clearPsSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
+      </div>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
     </div>
     <div class="mic-wrap" style="margin-top:10px;">
@@ -574,6 +577,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
   <!-- UNCLEAR ITEMS -->
   <div id="unclearDiv"></div>
+
+  <!-- REVIEW BEFORE SAVE -->
+  <div id="reviewDiv"></div>
 
   <!-- FILTERS -->
   <div class="filter-bar" id="filterBar" style="display:none">
@@ -1238,6 +1244,7 @@ Return ONLY this JSON (no markdown, no explanation):
   allItems = [...allItems, ...newConfirmed];
   renderResults();
   if (newUnclear.length > 0) renderUnclear(newUnclear);
+  renderReviewTable(newConfirmed);
   updateIntel();
   document.getElementById('loadingDiv').style.display = 'none';
   document.getElementById('scanBtn').disabled = false;
@@ -2036,6 +2043,127 @@ function deleteCatItem(vendor, id) {
   toast('🗑️ Item deleted.', 'yellow');
 }
 
+// ============================================================
+// PRE-SAVE REVIEW TABLE (Competitor Scanner)
+// ============================================================
+let reviewItems = [];
+function escHtmlR(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Render the review/edit table for freshly scanned items before they're committed to a catalog
+function renderReviewTable(items) {
+  const div = document.getElementById('reviewDiv');
+  if (!div) return;
+  reviewItems = (items || []).map((it, i) => ({
+    _rid: i,
+    name: it.name || '',
+    brand: it.brand || '',
+    scale: it.scale || '',
+    price: (it.price === 0 || it.price) ? it.price : '',
+    status: it.status || 'Unknown',
+    site: it.site || selectedSite
+  }));
+  if (!reviewItems.length) { div.innerHTML = ''; return; }
+
+  ensureDefaultVendors();
+  const vendorNames = Object.keys(vendorCatalogs).sort();
+  const defVendor = vendorCatalogs[selectedSite] ? selectedSite : (vendorNames[0] || '');
+  const vendorOpts = vendorNames.map(n => `<option value="${escAttr(n)}"${n === defVendor ? ' selected' : ''}>${escHtmlR(n)}</option>`).join('');
+
+  const rows = reviewItems.map(it => {
+    const priceVal = (it.price === 0 || it.price) ? it.price : '';
+    return `<tr id="revRow_${it._rid}" data-rid="${it._rid}">
+      <td id="revWarn_${it._rid}" style="width:24px;text-align:center;font-size:15px;"></td>
+      <td>${escHtmlR(it.name) || '<span style="color:var(--gray)">(no name)</span>'}</td>
+      <td style="color:var(--gray);">${escHtmlR(it.brand) || '-'}</td>
+      <td><input type="number" step="0.01" min="0" class="rev-price" data-rid="${it._rid}" value="${priceVal}" oninput="recomputeReviewDupes()" style="width:92px;padding:6px 8px;font-size:13px;background:#12151b;border:1px solid var(--border);border-radius:6px;color:inherit;"/></td>
+      <td style="color:var(--gray);">${escHtmlR(it.status) || '-'}</td>
+    </tr>`;
+  }).join('');
+
+  div.innerHTML = `<div class="card" style="margin-top:14px;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;margin-bottom:6px;">📝 Review Before Saving <span style="color:var(--gray);font-size:13px;font-weight:400;">(${reviewItems.length} items)</span></div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Check each price and edit if the AI misread it. Rows flagged <span style="color:var(--orange);">⚠️ orange</span> share the same price across different items — a common AI mistake. When it looks right, save to a vendor catalog.</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr><th></th><th style="text-align:left;">Item</th><th style="text-align:left;">Brand</th><th style="text-align:left;">Price</th><th style="text-align:left;">Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:16px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--gray);">Save to vendor:</span>
+        <select id="reviewTargetVendor" class="filter-select" style="min-width:170px;">${vendorOpts}</select>
+      </div>
+      <button class="btn-green" onclick="saveReviewToCatalog()">💾 Save All to Catalog</button>
+    </div>
+  </div>`;
+
+  recomputeReviewDupes();
+}
+
+// Flag rows whose (edited) price matches another row belonging to a DIFFERENT item name
+function recomputeReviewDupes() {
+  const inputs = Array.from(document.querySelectorAll('#reviewDiv .rev-price'));
+  const byPrice = {};
+  inputs.forEach(inp => {
+    const rid = inp.getAttribute('data-rid');
+    const it = reviewItems.find(r => String(r._rid) === String(rid));
+    const p = parseFloat(inp.value);
+    if (isNaN(p)) return;
+    const key = p.toFixed(2);
+    (byPrice[key] = byPrice[key] || []).push((it ? it.name : '').trim().toLowerCase());
+  });
+  const dupPrices = {};
+  Object.keys(byPrice).forEach(key => {
+    const names = new Set(byPrice[key]);
+    if (byPrice[key].length > 1 && names.size > 1) dupPrices[key] = true;
+  });
+  inputs.forEach(inp => {
+    const rid = inp.getAttribute('data-rid');
+    const row = document.getElementById('revRow_' + rid);
+    const warn = document.getElementById('revWarn_' + rid);
+    const p = parseFloat(inp.value);
+    const key = isNaN(p) ? null : p.toFixed(2);
+    const isDup = !!(key && dupPrices[key]);
+    if (row) row.style.background = isDup ? 'rgba(255,140,0,0.14)' : '';
+    if (warn) warn.textContent = isDup ? '⚠️' : '';
+    inp.style.borderColor = isDup ? 'var(--orange)' : 'var(--border)';
+  });
+}
+
+// Commit all reviewed rows (including manual price edits) to the chosen vendor catalog
+function saveReviewToCatalog() {
+  const sel = document.getElementById('reviewTargetVendor');
+  const vendor = sel ? sel.value : '';
+  if (!vendor) { toast('Pick a vendor.', 'yellow'); return; }
+  if (!reviewItems.length) { toast('Nothing to save.', 'yellow'); return; }
+  if (!vendorCatalogs[vendor]) vendorCatalogs[vendor] = [];
+  let n = 0;
+  reviewItems.forEach(it => {
+    const inp = document.querySelector('#reviewDiv .rev-price[data-rid="' + it._rid + '"]');
+    const priceNum = parseFloat(inp ? inp.value : it.price);
+    vendorCatalogs[vendor].push({
+      id: nextCatId(),
+      name: it.name || '',
+      brand: it.brand || '',
+      scale: it.scale || '',
+      price: !isNaN(priceNum) ? priceNum : null,
+      status: it.status || 'Unknown',
+      dateAdded: catToday()
+    });
+    n++;
+  });
+  document.getElementById('reviewDiv').innerHTML = '';
+  reviewItems = [];
+  renderCatalogs();
+  saveData();
+  toast('✅ Saved ' + n + ' item' + (n > 1 ? 's' : '') + ' to ' + vendor + ' catalog.', 'green');
+}
+
 function saveScanToCatalog() {
   const vendor = document.getElementById('scanTargetVendor').value;
   if (!vendor) { toast('Pick a vendor.', 'yellow'); return; }
@@ -2215,7 +2343,22 @@ function getTariffs() {
 
 function quickPriceScan(term) {
   document.getElementById('psSearchInput').value = term;
+  togglePsClear();
   runPriceScan();
+}
+
+// Show the clear (×) button only when the search field has text
+function togglePsClear() {
+  const inp = document.getElementById('psSearchInput');
+  const btn = document.getElementById('psClearBtn');
+  if (inp && btn) btn.style.display = inp.value.length ? 'block' : 'none';
+}
+function clearPsSearch() {
+  const inp = document.getElementById('psSearchInput');
+  if (!inp) return;
+  inp.value = '';
+  togglePsClear();
+  inp.focus();
 }
 
 document.addEventListener('keydown', function(e) {
@@ -2408,6 +2551,7 @@ function startVoiceSearch() {
     }
     const spoken = (voiceFinal + interim).replace(/\s+/g, ' ').trim();
     input.value = voiceBaseText ? (voiceBaseText + ' ' + spoken).trim() : spoken;
+    togglePsClear();
   };
   recognition.onerror = (e) => {
     console.log('Speech recognition error:', e.error);

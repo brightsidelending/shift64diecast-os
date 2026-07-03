@@ -84,6 +84,34 @@ export default async function handler(req, res) {
     }
   }
 
+  // Generic JSON scrape proxy — fetch a public product feed server-side to avoid browser CORS
+  if (type === 'scrape') {
+    try {
+      const target = (req.query && req.query.url) || (req.body && req.body.url);
+      if (!target) return res.status(400).json({ error: 'Missing url' });
+      let u;
+      try { u = new URL(target); } catch (e) { return res.status(400).json({ error: 'Invalid url' }); }
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        return res.status(400).json({ error: 'Only http/https URLs allowed' });
+      }
+      const r = await fetch(target, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Shift64DiecastBot/1.0; +https://shift64diecast-os.vercel.app)',
+          'Accept': 'application/json'
+        }
+      });
+      const text = await r.text();
+      let data = null;
+      try { data = JSON.parse(text); } catch (e) { data = null; }
+      if (data === null) {
+        return res.status(200).json({ error: 'Non-JSON response from source', status: r.status });
+      }
+      return res.status(200).json(data);
+    } catch (err) {
+      return res.status(200).json({ error: err.message });
+    }
+  }
+
   // Anthropic AI
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
