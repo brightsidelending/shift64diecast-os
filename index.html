@@ -346,13 +346,16 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div class="card">
     <div style="font-family:Rajdhani,sans-serif;font-size:22px;font-weight:700;margin-bottom:4px;">MARKET PRICE SCANNER + TRUE MARGIN CALCULATOR</div>
     <div style="color:var(--gray);font-size:13px;margin-bottom:20px;">Type any diecast model. Get price estimates, true landed cost, and real margin after ALL fees.</div>
-    <div class="search-row" style="display:flex;gap:12px;">
-      <div style="position:relative;flex:1;">
+    <div class="search-row" style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div style="position:relative;flex:1;min-width:200px;">
         <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red..." style="width:100%;box-sizing:border-box;font-size:15px;padding:14px 44px 14px 20px;" oninput="togglePsClear()"/>
         <button id="psClearBtn" onclick="clearPsSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
       </div>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
+      <button id="psIdBtn" onclick="document.getElementById('psImageInput').click()" title="Identify a diecast from a photo" style="padding:14px 24px;font-size:15px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:10px;cursor:pointer;white-space:nowrap;min-height:50px;">📷 Identify by Photo</button>
     </div>
+    <input type="file" id="psImageInput" accept="image/*" style="display:none" onchange="handlePsImageInput(event)"/>
+    <div style="font-size:12px;color:var(--gray);margin-top:8px;">📷 Snap or upload a photo of a diecast — or paste one with Ctrl+V — to auto-identify the model.</div>
     <div class="mic-wrap" style="margin-top:10px;">
       <button id="micBtn" class="mic-btn" onclick="startVoiceSearch()" title="Search by voice">🎤</button>
     </div>
@@ -640,8 +643,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <input class="text-input" id="newVendorName" placeholder="New vendor name..." style="flex:1;min-width:160px;"/>
       <button class="btn-blue" onclick="addVendor()">+ Add Vendor</button>
     </div>
+    <style>#catalogSearch::placeholder{color:#C9CEDA;opacity:1;}</style>
     <div style="position:relative;margin-bottom:14px;">
-      <input class="text-input" id="catalogSearch" placeholder="🔍 Search all catalogs by item name or brand..." oninput="filterCatalogs()" style="width:100%;box-sizing:border-box;padding-right:40px;"/>
+      <input class="text-input" id="catalogSearch" placeholder="🔍 Search all catalogs by item name or brand..." oninput="filterCatalogs()" style="width:100%;box-sizing:border-box;padding-right:40px;border:2px solid var(--gold);background:#1E2430;color:var(--white);box-shadow:0 0 0 3px rgba(201,168,76,0.12);"/>
       <button id="catalogSearchClear" onclick="clearCatalogSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:20px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
     </div>
     <div id="catalogsContainer"></div>
@@ -1087,7 +1091,12 @@ document.addEventListener('paste', async function(e) {
   for (let i = 0; i < items.length; i++) {
     if (items[i].type.startsWith('image/')) {
       const file = items[i].getAsFile();
-      await addScreenshot(file);
+      const psActive = document.getElementById('price_scanner') && document.getElementById('price_scanner').classList.contains('active');
+      if (psActive) {
+        identifyFromFile(file); // Price Scanner tab: paste = identify a diecast
+      } else {
+        await addScreenshot(file); // Competitor tab: paste = add a screenshot
+      }
       break;
     }
   }
@@ -2974,6 +2983,100 @@ function renderCompetitorPrices() {
     html += `<button class="show-more-btn" id="comp-btn" onclick="toggleShowMore('comp')">Show More (${rest.length})</button>`;
   }
   list.innerHTML = html;
+}
+
+// ============================================================
+// IMAGE IDENTIFICATION (Price Scanner)
+// ============================================================
+function handlePsImageInput(e) {
+  const f = e.target.files && e.target.files[0];
+  if (f) identifyFromFile(f);
+  e.target.value = '';
+}
+
+function identifyFromFile(file) {
+  if (!file || !file.type || !file.type.startsWith('image/')) { toast('Please choose an image file.', 'yellow'); return; }
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const dataUrl = ev.target.result;
+    const base64 = String(dataUrl).split(',')[1];
+    const mediaType = file.type || 'image/png';
+    identifyDiecastImage(base64, mediaType, dataUrl);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function identifyDiecastImage(base64, mediaType, dataUrl) {
+  const loading = document.getElementById('psLoading');
+  const results = document.getElementById('psResults');
+  if (loading) loading.style.display = 'block';
+  if (results) results.innerHTML = '';
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: `You are a diecast car expert. Look at this image and identify the exact diecast model shown. Focus on the car itself, ignore any chat overlay, blurry edges, or background. Return JSON only with these fields: confidence (high/medium/low), model_name (exact name if identified, null if not), brand (brand name or null), scale (1/64 or 1/18 or null), reason (brief explanation), issue (if confidence is low or cannot identify, explain exactly why - e.g. motion blur, chat overlay, partially visible, too dark). If you cannot identify it at all set model_name to null and explain in issue field.`,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: 'Identify this diecast model. Return JSON only.' }
+          ]
+        }]
+      })
+    });
+    if (!res.ok) throw new Error('API ' + res.status);
+    const data = await res.json();
+    const raw = (data.content || []).map(c => c.text || '').join('').replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(raw);
+    if (loading) loading.style.display = 'none';
+    await showIdentifyResult(parsed, dataUrl);
+  } catch (err) {
+    if (loading) loading.style.display = 'none';
+    if (results) results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't analyze the image</div><div style="font-size:13px;color:var(--white);">${err.message}. Please try another photo.</div></div>`;
+  }
+}
+
+async function showIdentifyResult(r, dataUrl) {
+  const results = document.getElementById('psResults');
+  if (!results) return;
+  const conf = String(r.confidence || '').toLowerCase().trim();
+  const model = r.model_name || null;
+  const meta = [r.brand, r.scale].filter(Boolean).join(' · ');
+  const metaStr = meta ? `<div style="font-size:12px;color:var(--gray);margin-top:2px;">${meta}</div>` : '';
+  const reason = r.reason || '';
+  const issue = r.issue || reason || 'The car could not be clearly recognized.';
+  const searchStr = [r.brand, model, r.scale].filter(Boolean).join(' ').trim();
+  const thumb = dataUrl ? `<img src="${dataUrl}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:8px;flex-shrink:0;"/>` : '';
+
+  // CANNOT IDENTIFY — red banner with the exact reason
+  if (!model) {
+    results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't identify this model</div><div style="font-size:13px;color:var(--white);"><strong>Why:</strong> ${issue}</div><button onclick="document.getElementById('psImageInput').click()" style="margin-top:10px;padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div>`;
+    return;
+  }
+
+  // HIGH CONFIDENCE — green banner + auto-run the eBay scan
+  if (conf === 'high') {
+    document.getElementById('psSearchInput').value = searchStr || model;
+    togglePsClear();
+    const banner = `<div style="background:#0D2B0D;border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:center;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--green);margin-bottom:2px;">✅ Identified: ${model}</div>${metaStr}${reason ? `<div style="font-size:12px;color:var(--gray);margin-top:4px;">${reason}</div>` : ''}</div></div>`;
+    await runPriceScan();
+    const pr = document.getElementById('psResults');
+    if (pr) pr.insertAdjacentHTML('afterbegin', banner);
+    return;
+  }
+
+  // MEDIUM / LOW CONFIDENCE — yellow warning with best guess + issue, and options
+  results.innerHTML = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;flex:1;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);margin-bottom:2px;">⚠️ Best guess (${conf || 'low'} confidence): ${model}</div>${metaStr}<div style="font-size:13px;color:var(--white);margin-top:6px;"><strong>Issue:</strong> ${issue}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button onclick="identifySearchAnyway('${escJs(searchStr || model)}')" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;">🔍 Search anyway</button><button onclick="document.getElementById('psImageInput').click()" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div></div>`;
+}
+
+function identifySearchAnyway(str) {
+  const inp = document.getElementById('psSearchInput');
+  if (inp) { inp.value = str; togglePsClear(); }
+  runPriceScan();
 }
 
 async function runPriceScan() {
