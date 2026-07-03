@@ -395,7 +395,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="color:var(--gray);font-size:13px;margin-bottom:20px;">Type any diecast model. Get price estimates, true landed cost, and real margin after ALL fees.</div>
     <div class="search-row" style="display:flex;gap:12px;flex-wrap:wrap;">
       <div style="position:relative;flex:1;min-width:200px;">
-        <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red... — or paste an image with Ctrl+V" style="width:100%;box-sizing:border-box;font-size:15px;padding:14px 44px 14px 20px;" oninput="togglePsClear()"/>
+        <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red... — or paste an image with Ctrl+V" style="width:100%;box-sizing:border-box;font-size:15px;padding:14px 44px 14px 20px;border:2px solid var(--gold);box-shadow:0 0 8px rgba(201,168,76,0.3);background:#1E2330;" oninput="togglePsClear()"/>
         <button id="psClearBtn" onclick="clearPsSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
       </div>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
