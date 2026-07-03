@@ -2914,7 +2914,7 @@ async function searchAuctions() {
   if (!q) { toast('Enter a search term.', 'yellow'); return; }
   const div = document.getElementById('auctSearchResults');
   if (div) div.innerHTML = '<div style="padding:14px;color:var(--gray);font-size:13px;">Searching eBay auctions…</div>';
-  const raw = await fetchEbayItems('ebay_active', q);
+  const raw = await fetchEbayItems('ebay_auction', q);
   auctionSearchResults = (raw || []).map(mapAuctionItem).filter(a => a.currentBid > 0);
   renderAuctionSearchResults();
 }
@@ -3101,7 +3101,7 @@ async function refreshWatchlist(opts) {
   if (!opts.silent) toast('🔄 Refreshing watchlist…', 'yellow');
   for (const it of auctionWatchlist) {
     try {
-      const mapped = (await fetchEbayItems('ebay_active', it.title) || []).map(mapAuctionItem);
+      const mapped = (await fetchEbayItems('ebay_auction', it.title) || []).map(mapAuctionItem);
       const match = mapped.find(m => m.url && it.url && m.url === it.url);
       if (match) {
         it.currentBid = match.currentBid;

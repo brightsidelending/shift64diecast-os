@@ -26,6 +26,22 @@ export default async function handler(req, res) {
     }
   }
 
+  // eBay Browse API - Live Auction Listings (returns currentBidPrice, bidCount, itemEndDate)
+  if (type === 'ebay_auction') {
+    try {
+      const { query } = req.body;
+      const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=50&filter=buyingOptions:{AUCTION}&sort=endTimeSoonest`;
+      const token = await getEbayToken();
+      const r = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' }
+      });
+      const data = await r.json();
+      return res.status(200).json(data);
+    } catch(err) {
+      return res.status(200).json({ error: err.message, itemSummaries: [] });
+    }
+  }
+
   // eBay Browse API - Sold/Completed Listings
   if (type === 'ebay_sold') {
     try {
