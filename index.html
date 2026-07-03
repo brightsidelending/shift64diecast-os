@@ -348,7 +348,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="color:var(--gray);font-size:13px;margin-bottom:20px;">Type any diecast model. Get price estimates, true landed cost, and real margin after ALL fees.</div>
     <div class="search-row" style="display:flex;gap:12px;flex-wrap:wrap;">
       <div style="position:relative;flex:1;min-width:200px;">
-        <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red..." style="width:100%;box-sizing:border-box;font-size:15px;padding:14px 44px 14px 20px;" oninput="togglePsClear()"/>
+        <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red... — or paste an image with Ctrl+V" style="width:100%;box-sizing:border-box;font-size:15px;padding:14px 44px 14px 20px;" oninput="togglePsClear()"/>
         <button id="psClearBtn" onclick="clearPsSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
       </div>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
@@ -645,9 +645,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <input class="text-input" id="newVendorName" placeholder="New vendor name..." style="flex:1;min-width:160px;"/>
       <button class="btn-blue" onclick="addVendor()">+ Add Vendor</button>
     </div>
-    <style>#catalogSearch::placeholder{color:#C9CEDA;opacity:1;}</style>
+    <style>#catalogSearch::placeholder{color:#DDE2EC;opacity:1;}</style>
     <div style="position:relative;margin-bottom:14px;">
-      <input class="text-input" id="catalogSearch" placeholder="🔍 Search all catalogs by item name or brand..." oninput="filterCatalogs()" style="width:100%;box-sizing:border-box;padding-right:40px;border:2px solid var(--gold);background:#1E2430;color:var(--white);box-shadow:0 0 0 3px rgba(201,168,76,0.12);"/>
+      <span aria-hidden="true" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:16px;line-height:1;pointer-events:none;color:var(--gold);">🔍</span>
+      <input class="text-input" id="catalogSearch" placeholder="Search all catalogs by item name or brand..." oninput="filterCatalogs()" style="width:100%;box-sizing:border-box;padding:13px 40px 13px 42px;font-size:14px;border:2px solid var(--gold);background:#232A38;color:var(--white);box-shadow:0 0 0 3px rgba(201,168,76,0.15);"/>
       <button id="catalogSearchClear" onclick="clearCatalogSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:20px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
     </div>
     <div id="catalogsContainer"></div>
