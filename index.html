@@ -363,6 +363,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <button class="nav-tab active" onclick="showTab('price_scanner',this)">🔍 Price Scanner</button>
   <button class="nav-tab" onclick="showTab('scanner',this)">🕵️ Competitor Scanner</button>
   <button class="nav-tab" onclick="showTab('auction_watch',this)">🎯 Auction Watch</button>
+  <button class="nav-tab" onclick="showTab('buy_report',this)">📋 Buy Report</button>
   <button class="nav-tab" onclick="showTab('inventory',this)">📦 Inventory</button>
   <button class="nav-tab" onclick="showTab('suppliers',this)">🤝 Suppliers</button>
   <button class="nav-tab" onclick="showTab('negotiation',this)">💬 Negotiation</button>
@@ -573,6 +574,27 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <tbody id="txBody"><tr><td colspan="7" style="text-align:center;color:var(--gray);padding:40px;">No transactions yet.</td></tr></tbody>
     </table></div>
   </div>
+</div>
+
+<!-- ===== BUY REPORT ===== -->
+<div id="buy_report" class="section">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
+      <div style="min-width:200px;flex:1;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;">🏆 Top 10 Buy Report</div>
+        <div style="color:var(--gray);font-size:13px;margin-top:2px;">Your best buying opportunities right now based on demand, price advantage, and margin.</div>
+      </div>
+      <div style="text-align:right;">
+        <button id="buyGenBtn" onclick="generateBuyReport()" style="padding:14px 26px;font-size:15px;font-weight:800;background:#C9A84C;color:#000;border:2px solid #F0D97A;border-radius:10px;cursor:pointer;box-shadow:0 2px 10px rgba(201,168,76,0.35);white-space:nowrap;">⚡ Generate Report</button>
+        <div id="buyLastGen" style="font-size:11px;color:var(--gray);margin-top:6px;">Not generated yet</div>
+      </div>
+    </div>
+    <div id="buyLoading" style="display:none;text-align:center;padding:20px;">
+      <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px;"></div>
+      <div id="buyProgress" style="font-size:13px;color:var(--gray);">Analyzing…</div>
+    </div>
+  </div>
+  <div id="buyReportCards"></div>
 </div>
 
 <!-- ===== AUCTION WATCH ===== -->
@@ -2662,6 +2684,7 @@ async function saveData() {
     localStorage.setItem('s64_auction_watch', JSON.stringify(auctionWatchlist));
     localStorage.setItem('s64_auction_settings', JSON.stringify(auctionSettings));
     localStorage.setItem('s64_whatnot_intel', JSON.stringify(whatnotShows));
+    localStorage.setItem('s64_buy_report', JSON.stringify(buyReport));
   } catch(e) {}
   showSaving('💾 Saving…');
   toast('⏳ Saving…', 'yellow');
@@ -2676,7 +2699,8 @@ async function saveData() {
       kvSet('s64_scrape_meta', vendorScrapeMeta),
       kvSet('s64_auction_watch', auctionWatchlist),
       kvSet('s64_auction_settings', auctionSettings),
-      kvSet('s64_whatnot_intel', whatnotShows)
+      kvSet('s64_whatnot_intel', whatnotShows),
+      kvSet('s64_buy_report', buyReport)
     ]);
     hideSaving('✅ Saved to cloud');
     toast('✅ Saved to cloud', 'green');
@@ -2693,8 +2717,8 @@ async function loadKey(key) {
   return null;
 }
 async function loadData() {
-  const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta, auctWatch, auctSettings, whatnot] = await Promise.all([
-    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings'), loadKey('s64_whatnot_intel')
+  const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta, auctWatch, auctSettings, whatnot, buyRep] = await Promise.all([
+    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings'), loadKey('s64_whatnot_intel'), loadKey('s64_buy_report')
   ]);
   if (Array.isArray(items)) allItems = items;
   if (Array.isArray(eric)) ericColl = eric;
@@ -2717,6 +2741,8 @@ async function loadData() {
   if (Array.isArray(whatnot)) whatnotShows = whatnot;
   initWhatnotDropzone();
   renderWhatnotAll();
+  if (buyRep && typeof buyRep === 'object' && Array.isArray(buyRep.items)) buyReport = buyRep;
+  renderBuyReport();
   maybeAutoScrape(); // background refresh of any vendor whose data is >24h old
 }
 
@@ -3565,6 +3591,133 @@ function initWhatnotDropzone() {
   dz.addEventListener('drop', e => { const files = e.dataTransfer && e.dataTransfer.files; if (files && files.length) handleWhatnotFiles(files); });
   const d = document.getElementById('whatnotDate');
   if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);
+}
+
+// ============================================================
+// BUY REPORT (Top 10 opportunities)
+// ============================================================
+let buyReport = null;          // { generatedAt, items:[...] }
+let _buyReportRunning = false;
+function buySleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Demand from eBay sold count in last 30 days (proxy returns up to ~10 comps)
+function buyDemand(soldCount) {
+  if (soldCount >= 6) return { label: 'High', num: 100, color: 'var(--green)' };
+  if (soldCount >= 3) return { label: 'Medium', num: 60, color: 'var(--yellow)' };
+  return { label: 'Low', num: 25, color: 'var(--gray)' };
+}
+// Buy-signal strength from true margin %
+function buySignal(margin) {
+  if (margin > 50) return { e: '🔥', t: 'STRONG', c: 'var(--green)' };
+  if (margin >= 30) return { e: '✅', t: 'GOOD', c: 'var(--gold)' };
+  if (margin >= 15) return { e: '⚠️', t: 'FAIR', c: 'var(--orange)' };
+  return { e: '', t: 'LOW', c: 'var(--gray)' };
+}
+
+async function generateBuyReport() {
+  if (_buyReportRunning) return;
+  const fees = getTariffs();
+  const feeRate = (fees.ebayFee || 0) + (fees.paymentFee || 0); // eBay + payment fees from existing settings
+  // Candidates: In Stock, vendor price present and under $150
+  const candidates = [];
+  Object.keys(vendorCatalogs).forEach(vendor => {
+    (vendorCatalogs[vendor] || []).forEach(it => {
+      const price = parseFloat(it.price);
+      const inStock = String(it.status || '').toLowerCase().trim() === 'in stock';
+      if (inStock && !isNaN(price) && price > 0 && price < 150) {
+        candidates.push({
+          vendor, name: it.name || '', brand: it.brand || '', image: it.image || '',
+          vendorPrice: price, shipping: (it.shipping != null && !isNaN(it.shipping)) ? parseFloat(it.shipping) : 0
+        });
+      }
+    });
+  });
+  if (!candidates.length) { toast('No in-stock vendor items under $150 to analyze. Add or scrape catalog items first.', 'yellow'); return; }
+
+  _buyReportRunning = true;
+  const btn = document.getElementById('buyGenBtn'); if (btn) btn.disabled = true;
+  const spin = document.getElementById('buyLoading'); if (spin) spin.style.display = 'block';
+  const prog = document.getElementById('buyProgress');
+  const list = candidates.slice(0, 60); // cap to limit API calls
+  const scored = [];
+  for (let i = 0; i < list.length; i++) {
+    const c = list[i];
+    if (prog) prog.textContent = `Analyzing item ${i + 1} of ${list.length}…`;
+    let avgSold = null, soldCount = 0;
+    try {
+      const prices = mapSoldItems(await fetchEbayItems('ebay_sold', c.name) || [], c.name).map(m => m.price).filter(p => p > 0);
+      soldCount = prices.length;
+      if (prices.length) avgSold = prices.reduce((s, p) => s + p, 0) / prices.length;
+    } catch (e) { /* skip on error */ }
+    if (avgSold != null && avgSold > 0) {
+      const taxes = 0;
+      const margin = ((avgSold - c.vendorPrice - c.shipping) * (1 - feeRate) - taxes) / avgSold * 100;
+      const priceAdv = ((avgSold - (c.vendorPrice + c.shipping)) / avgSold) * 100;
+      const demand = buyDemand(soldCount);
+      const score = (margin * 0.5) + (demand.num * 0.3) + (priceAdv * 0.2);
+      scored.push({ ...c, avgSold, soldCount, margin, priceAdv, demandLabel: demand.label, demandColor: demand.color, score });
+    }
+    await buySleep(320); // gentle pacing to avoid rate limits
+  }
+  scored.sort((a, b) => b.score - a.score);
+  buyReport = { generatedAt: Date.now(), items: scored.slice(0, 10).map((x, idx) => ({ ...x, rank: idx + 1 })) };
+
+  _buyReportRunning = false;
+  if (btn) btn.disabled = false;
+  if (spin) spin.style.display = 'none';
+  if (prog) prog.textContent = '';
+  renderBuyReport();
+  saveData();
+  toast('🏆 Buy Report ready: ' + buyReport.items.length + ' opportunities.', 'green');
+}
+
+function renderBuyReport() {
+  const cont = document.getElementById('buyReportCards');
+  const ts = document.getElementById('buyLastGen');
+  if (ts) ts.textContent = (buyReport && buyReport.generatedAt) ? ('Last generated: ' + timeAgo(buyReport.generatedAt)) : 'Not generated yet';
+  if (!cont) return;
+  if (!buyReport || !buyReport.items || !buyReport.items.length) {
+    cont.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:10px 2px;">No report yet. Click Generate Report to find your best buys from your vendor catalogs.</div>';
+    return;
+  }
+  const cards = buyReport.items.map(x => {
+    const sig = buySignal(x.margin);
+    const marginColor = x.margin > 50 ? 'var(--green)' : (x.margin >= 30 ? 'var(--gold)' : (x.margin >= 15 ? 'var(--orange)' : 'var(--red)'));
+    const img = x.image
+      ? `<img src="${escAttr(x.image)}" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;" onerror="this.style.display='none'"/>`
+      : `<div style="width:60px;height:60px;border-radius:8px;background:var(--black);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">🏎️</div>`;
+    const ebayUrl = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(x.name);
+    const vendorUrl = compVendorUrl(x.vendor, x.name);
+    const vendorBtn = vendorUrl
+      ? `<a href="${escAttr(vendorUrl)}" target="_blank" rel="noopener noreferrer" style="flex:1;text-align:center;padding:9px;font-size:12px;font-weight:700;background:var(--blue);color:#fff;border-radius:7px;text-decoration:none;">🛒 Buy from Vendor</a>`
+      : `<span style="flex:1;text-align:center;padding:9px;font-size:12px;font-weight:700;background:var(--border);color:var(--gray);border-radius:7px;">🛒 ${escHtmlA(x.vendor)}</span>`;
+    const row = (l, v, c) => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;"><span style="color:var(--gray);">${l}</span><span style="font-weight:700;color:${c || 'var(--white)'};">${v}</span></div>`;
+    return `<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="font-family:Rajdhani,sans-serif;font-size:30px;font-weight:800;color:var(--gold);line-height:1;min-width:44px;">#${x.rank}</div>
+        ${img}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;">${escHtmlA(x.name) || 'Unnamed'}</div>
+          <div style="font-size:11px;color:var(--gray);">${escHtmlA(x.brand) || '—'} · ${escHtmlA(x.vendor)}</div>
+          <div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;">
+            <span style="background:var(--black);border:1px solid ${x.demandColor};color:${x.demandColor};border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;">DEMAND: ${x.demandLabel}</span>
+            <span style="background:var(--black);border:1px solid ${sig.c};color:${sig.c};border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;">${sig.e} ${sig.t}</span>
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:8px;">
+        ${row('Vendor price', '$' + x.vendorPrice.toFixed(2), 'var(--gold)')}
+        ${row('Shipping', x.shipping ? '$' + x.shipping.toFixed(2) : 'Free/—', 'var(--white)')}
+        ${row('eBay avg sold', '$' + x.avgSold.toFixed(2) + ' (' + x.soldCount + ' sold)', 'var(--blue)')}
+        ${row('True margin', (x.margin >= 0 ? '+' : '') + x.margin.toFixed(0) + '%', marginColor)}
+      </div>
+      <div style="display:flex;gap:8px;">
+        <a href="${escAttr(ebayUrl)}" target="_blank" rel="noopener noreferrer" style="flex:1;text-align:center;padding:9px;font-size:12px;font-weight:700;background:var(--card);border:1px solid var(--border);color:var(--white);border-radius:7px;text-decoration:none;">📷 View on eBay</a>
+        ${vendorBtn}
+      </div>
+    </div>`;
+  }).join('');
+  cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;">${cards}</div>`;
 }
 
 // Voice search via Web Speech API — continuous listening, keeps text until user stops
