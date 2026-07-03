@@ -361,6 +361,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div style="flex:1;min-width:180px;font-size:12px;color:var(--gray);">Works on mobile camera, photo library, or desktop paste — auto-identifies the diecast model.</div>
     </div>
     <div class="qsearch-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
+      <button class="qsearch-btn" onclick="openGoogleSearch()" style="border-color:#4285F4;color:#fff;font-weight:700;"><span style="color:#4285F4;">G</span><span style="color:#EA4335;">o</span><span style="color:#FBBC05;">o</span><span style="color:#4285F4;">g</span><span style="color:#34A853;">l</span><span style="color:#EA4335;">e</span> 🔍</button>
       <button class="qsearch-btn" onclick="openAliExpress()" style="border-color:var(--orange);color:var(--orange);">🛒 AliExpress</button>
       <button class="qsearch-btn" onclick="openSiteSearch('horizon')">Horizon Diecast</button>
       <button class="qsearch-btn" onclick="openSiteSearch('carbromc')">CarBromc</button>
@@ -3184,6 +3185,13 @@ function openAliExpress() {
   const q = document.getElementById('psSearchInput').value.trim();
   if (!q) { alert('Type a model in the search box first.'); return; }
   window.open('https://www.aliexpress.com/wholesale?SearchText=' + encodeURIComponent(q), '_blank', 'noopener');
+}
+
+// Open a Google search for the current query, scoped to diecast 1/64
+function openGoogleSearch() {
+  const q = document.getElementById('psSearchInput').value.trim();
+  if (!q) { alert('Type a model in the search box first.'); return; }
+  window.open('https://www.google.com/search?q=' + encodeURIComponent(q + ' diecast 1/64'), '_blank', 'noopener');
 }
 
 // Open a competitor store's search page for whatever is typed in the scanner box
