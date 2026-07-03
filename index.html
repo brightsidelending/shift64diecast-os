@@ -2884,10 +2884,12 @@ let _compFilter = 'all';    // 'all' | 'instock' | 'hideoos'
 function compStatusRank(status) {
   return String(status || '').toLowerCase().trim() === 'in stock' ? 0 : 1;
 }
-function compPassesFilter(status, filter) {
-  const s = String(status || '').toLowerCase().trim();
-  if (filter === 'instock') return s === 'in stock';
-  if (filter === 'hideoos') return s !== 'out of stock' && s !== 'pre-order';
+function compPassesFilter(it, filter) {
+  const s = String((it && it.status) || '').toLowerCase().trim();
+  // Shopify preorders often show status "In Stock" but flag it in the name, e.g. "[Preorder]" / "(Preorder)".
+  const isPreorder = s === 'pre-order' || /preorder/i.test((it && it.name) || '');
+  if (filter === 'instock') return s === 'in stock' && !isPreorder;
+  if (filter === 'hideoos') return s !== 'out of stock' && !isPreorder;
   return true; // 'all'
 }
 function setCompFilter(f) {
@@ -2905,7 +2907,7 @@ function renderCompetitorPrices() {
     b.style.borderColor = active ? 'var(--gold)' : 'var(--border)';
     b.style.fontWeight = active ? '700' : '400';
   });
-  const items = _compMatches.filter(it => compPassesFilter(it.status, _compFilter));
+  const items = _compMatches.filter(it => compPassesFilter(it, _compFilter));
   if (!items.length) {
     list.innerHTML = `<div style="padding:16px;text-align:center;font-size:12px;color:var(--gray);">No items match this filter.</div>`;
     return;
