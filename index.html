@@ -4240,6 +4240,25 @@ async function identifyDiecastImages(images, correction) {
   }
 }
 
+// Turn a long enriched identification into a concise 5–7 word eBay search term.
+// Keeps brand + model + colorway/variant + SKU; drops parentheticals, scale, "Limited Edition",
+// "web-enriched", collab "x Brand" notation, and any context after a dash/em-dash.
+function simplifyEbaySearch(name, productCode) {
+  let s = String(name || '');
+  s = s.replace(/\([^)]*\)/g, ' ').replace(/\[[^\]]*\]/g, ' ');          // drop (…) and […]
+  s = s.split(/\s+[—–-]\s+/)[0];                                          // drop context after a dash/em-dash
+  s = s.replace(/\s+x\s+[A-Za-z0-9.]+(?:\s+[A-Za-z0-9.]+)?/gi, ' ');      // drop collab "x Brand" (e.g. Kaido House x Mini GT)
+  s = s.replace(/\b1\s*[:/]\s*\d{2,3}\b/g, ' ');                          // drop scale 1:64, 1/18, …
+  s = s.replace(/\b(limited|special|exclusive|collector'?s?)\s+edition\b/gi, ' ');
+  s = s.replace(/\bweb[-\s]?enriched\b/gi, ' ');
+  s = s.replace(/\bconfidence\b/gi, ' ');
+  s = s.replace(/[|]/g, ' ').replace(/\s+/g, ' ').trim();
+  let words = s.split(' ').filter(Boolean).slice(0, 7);                  // concise 5–7 words
+  const code = String(productCode || '').trim();
+  if (code && !words.some(w => w.toLowerCase() === code.toLowerCase())) words.push(code);
+  return words.join(' ').trim();
+}
+
 async function showIdentifyResult(r, dataUrl) {
   const results = document.getElementById('psResults');
   if (!results) return;
@@ -4274,7 +4293,7 @@ async function showIdentifyResult(r, dataUrl) {
   // HIGH CONFIDENCE — green banner + auto-run the eBay scan
   if (conf === 'high') {
     _autoScanAfterId = false;
-    document.getElementById('psSearchInput').value = searchStr || model;
+    document.getElementById('psSearchInput').value = simplifyEbaySearch(searchStr || model, r.product_code);
     togglePsClear();
     const banner = `<div style="background:#0D2B0D;border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--green);">✅ Identified: ${escHtmlA(model)}<span style="color:var(--green);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}${notesHtml}</div></div>`;
     await runPriceScan();
@@ -4286,7 +4305,7 @@ async function showIdentifyResult(r, dataUrl) {
   // SMART FLOW (SCAN with photos): scan the best guess even at lower confidence
   if (_autoScanAfterId && model) {
     _autoScanAfterId = false;
-    document.getElementById('psSearchInput').value = searchStr || model;
+    document.getElementById('psSearchInput').value = simplifyEbaySearch(searchStr || model, r.product_code);
     togglePsClear();
     const banner = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);">🔎 Identified from photo: ${escHtmlA(model)}<span style="color:var(--yellow);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}<div style="font-size:12px;color:var(--gray);margin-top:6px;">Lower-confidence match — showing prices for this best guess. Correct it below if needed.</div></div></div>`;
     await runPriceScan();
