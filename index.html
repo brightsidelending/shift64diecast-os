@@ -3964,11 +3964,37 @@ function parseJsonFromContent(data) {
   } catch (e) { return null; }
 }
 
-async function identifyDiecastImage(base64, mediaType, dataUrl) {
+// Remember the last uploaded image + correction so the user can re-run the ID with a hint
+let _lastIdImage = null;   // { base64, mediaType, dataUrl }
+let _lastCorrection = '';
+
+// Correction/retry row rendered below every ID result card
+function idCorrectionRowHtml() {
+  return `<div id="idCorrectRow" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+    <input class="text-input" id="idCorrectInput" placeholder="Correct it e.g. Demon King red Lambo" value="${escAttr(_lastCorrection)}" style="flex:1;min-width:200px;" onkeydown="if(event.key==='Enter')retryIdentify()"/>
+    <button onclick="retryIdentify()" style="padding:10px 18px;font-size:13px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;">🔄 Retry</button>
+  </div>`;
+}
+
+// Re-run identification on the same image, injecting the user's correction as strong context
+function retryIdentify() {
+  const inp = document.getElementById('idCorrectInput');
+  const corr = inp ? inp.value.trim() : '';
+  if (!corr) { toast('Type what it actually is, then hit Retry.', 'yellow'); return; }
+  if (!_lastIdImage || !_lastIdImage.base64) { toast('Upload or paste an image first.', 'yellow'); return; }
+  _lastCorrection = corr;
+  identifyDiecastImage(_lastIdImage.base64, _lastIdImage.mediaType, _lastIdImage.dataUrl, corr);
+}
+
+async function identifyDiecastImage(base64, mediaType, dataUrl, correction) {
   const loading = document.getElementById('psLoading');
   const results = document.getElementById('psResults');
   if (loading) loading.style.display = 'block';
   if (results) results.innerHTML = '';
+  _lastIdImage = { base64, mediaType, dataUrl };  // remember for Retry
+  const userText = correction
+    ? `Your previous identification was incorrect. The user says this item is: '${correction}'. Re-examine the image carefully with this correction as strong context and identify the specific diecast model, brand, scale, and color. Read any text printed on the packaging. Return JSON only.`
+    : 'Identify this diecast model. Read any text printed on the packaging. Return JSON only.';
   try {
     // PASS 1 — vision: read the car AND the packaging text (codes, editions, event names)
     const visionRes = await fetch(PROXY_URL, {
@@ -3982,7 +4008,7 @@ async function identifyDiecastImage(base64, mediaType, dataUrl) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: 'Identify this diecast model. Read any text printed on the packaging. Return JSON only.' }
+            { type: 'text', text: userText }
           ]
         }]
       })
@@ -4062,7 +4088,7 @@ async function showIdentifyResult(r, dataUrl) {
 
   // CANNOT IDENTIFY — red banner with the exact reason
   if (!model) {
-    results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't identify this model</div><div style="font-size:13px;color:var(--white);"><strong>Why:</strong> ${escHtmlA(issue)}</div><button onclick="document.getElementById('psImageInput').click()" style="margin-top:10px;padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div>`;
+    results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't identify this model</div><div style="font-size:13px;color:var(--white);"><strong>Why:</strong> ${escHtmlA(issue)}</div><button onclick="document.getElementById('psImageInput').click()" style="margin-top:10px;padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div>` + idCorrectionRowHtml();
     return;
   }
 
@@ -4073,12 +4099,12 @@ async function showIdentifyResult(r, dataUrl) {
     const banner = `<div style="background:#0D2B0D;border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--green);">✅ Identified: ${escHtmlA(model)}<span style="color:var(--green);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}${notesHtml}</div></div>`;
     await runPriceScan();
     const pr = document.getElementById('psResults');
-    if (pr) pr.insertAdjacentHTML('afterbegin', banner);
+    if (pr) pr.insertAdjacentHTML('afterbegin', banner + idCorrectionRowHtml());
     return;
   }
 
   // MEDIUM / LOW CONFIDENCE — yellow warning with best guess + details + options
-  results.innerHTML = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;flex:1;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);">⚠️ Best guess: ${escHtmlA(model)}<span style="color:var(--yellow);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}<div style="font-size:13px;color:var(--white);margin-top:6px;"><strong>Issue:</strong> ${escHtmlA(issue)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button onclick="identifySearchAnyway('${escJs(searchStr || model)}')" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;">🔍 Search anyway</button><button onclick="document.getElementById('psImageInput').click()" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div></div>`;
+  results.innerHTML = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;flex:1;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);">⚠️ Best guess: ${escHtmlA(model)}<span style="color:var(--yellow);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}<div style="font-size:13px;color:var(--white);margin-top:6px;"><strong>Issue:</strong> ${escHtmlA(issue)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button onclick="identifySearchAnyway('${escJs(searchStr || model)}')" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;">🔍 Search anyway</button><button onclick="document.getElementById('psImageInput').click()" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div></div>` + idCorrectionRowHtml();
 }
 
 function identifySearchAnyway(str) {
