@@ -396,7 +396,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="search-row" style="display:flex;gap:12px;flex-wrap:wrap;">
       <div style="position:relative;flex:1;min-width:200px;">
         <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red... — or paste an image with Ctrl+V" style="width:100%;box-sizing:border-box;font-size:15px;padding:14px 44px 14px 20px;border:2px solid var(--gold);box-shadow:0 0 8px rgba(201,168,76,0.3);background:#1E2330;" oninput="togglePsClear()"/>
-        <button id="psClearBtn" onclick="clearPsSearch()" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
+        <button id="psClearBtn" onclick="clearPsSearch(); resetIdImages();" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
       </div>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
     </div>
@@ -2827,13 +2827,14 @@ function togglePsClear() {
   const inp = document.getElementById('psSearchInput');
   const btn = document.getElementById('psClearBtn');
   if (inp && btn) btn.style.display = inp.value.length ? 'block' : 'none';
-  // Clearing / emptying the search also resets the Image ID grid back to one empty slot
-  if (inp && inp.value.length === 0 && typeof idImages !== 'undefined' && idImages && idImages.length) resetIdImages();
+  // Emptying the search also resets the Image ID grid back to one empty slot
+  if (inp && inp.value.length === 0) resetIdImages();
 }
 function clearPsSearch() {
   const inp = document.getElementById('psSearchInput');
   if (!inp) return;
   inp.value = '';
+  resetIdImages();   // clear the Image ID grid too
   togglePsClear();
   inp.focus();
 }
