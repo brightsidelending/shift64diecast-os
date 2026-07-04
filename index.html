@@ -400,11 +400,13 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </div>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
     </div>
-    <input type="file" id="psImageInput" accept="image/*" style="display:none" onchange="handlePsImageInput(event)"/>
+    <input type="file" id="psImageInput" accept="image/*" multiple style="display:none" onchange="handlePsImageInput(event)"/>
+    <div style="margin-top:12px;font-size:12px;color:var(--gray);">📷 Add multiple angles for better accuracy (base plate, front, rear, side) — up to 5. Paste with Ctrl+V or tap ＋ Add angle.</div>
+    <div id="idImageGrid" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"></div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
       <button id="micBtn" class="mic-btn" onclick="startVoiceSearch()" title="Search by voice">🎤</button>
-      <button id="psIdBtn" class="qsearch-btn" onclick="document.getElementById('psImageInput').click()" title="Identify a diecast from a photo" style="border-color:var(--gold);color:var(--gold);font-weight:700;">📷 Identify by Photo</button>
-      <div style="flex:1;min-width:180px;font-size:12px;color:var(--gray);">Works on mobile camera, photo library, or desktop paste — auto-identifies the diecast model.</div>
+      <button id="psIdBtn" class="qsearch-btn" onclick="runImageId()" title="Identify a diecast from your photos" style="border-color:var(--gold);color:var(--gold);font-weight:700;">📷 Identify by Photo</button>
+      <div style="flex:1;min-width:180px;font-size:12px;color:var(--gray);">Works on mobile camera, photo library, or desktop paste.</div>
     </div>
     <div class="qsearch-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
       <button class="qsearch-btn" onclick="openGoogleSearch()" style="border-color:#4285F4;color:#fff;font-weight:700;"><span style="color:#4285F4;">G</span><span style="color:#EA4335;">o</span><span style="color:#FBBC05;">o</span><span style="color:#4285F4;">g</span><span style="color:#34A853;">l</span><span style="color:#EA4335;">e</span> 🔍</button>
@@ -1280,7 +1282,8 @@ document.addEventListener('paste', async function(e) {
       const file = items[i].getAsFile();
       const psActive = document.getElementById('price_scanner') && document.getElementById('price_scanner').classList.contains('active');
       if (psActive) {
-        identifyFromFile(file); // Price Scanner tab: paste = identify a diecast
+        await addIdImageFromFile(file); // Price Scanner tab: paste = add an angle to the ID grid
+        toast('📷 Image added — tap Identify by Photo when ready.', 'green');
       } else {
         await addScreenshot(file); // Competitor tab: paste = add a screenshot
       }
@@ -2743,6 +2746,7 @@ async function loadData() {
   renderWhatnotAll();
   if (buyRep && typeof buyRep === 'object' && Array.isArray(buyRep.items)) buyReport = buyRep;
   renderBuyReport();
+  renderIdImageGrid(); // show the empty "add angle" slot for the Image ID grid
   maybeAutoScrape(); // background refresh of any vendor whose data is >24h old
 }
 
@@ -3933,22 +3937,51 @@ function renderCompetitorPrices() {
 // ============================================================
 // IMAGE IDENTIFICATION (Price Scanner)
 // ============================================================
+let idImages = [];        // up to ID_MAX loaded images: {base64, mediaType, dataUrl}
+const ID_MAX = 5;
+
 function handlePsImageInput(e) {
-  const f = e.target.files && e.target.files[0];
-  if (f) identifyFromFile(f);
+  const files = Array.from(e.target.files || []);
+  (async () => { for (const f of files) { await addIdImageFromFile(f); } })();
   e.target.value = '';
 }
 
-function identifyFromFile(file) {
-  if (!file || !file.type || !file.type.startsWith('image/')) { toast('Please choose an image file.', 'yellow'); return; }
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    const dataUrl = ev.target.result;
-    const base64 = String(dataUrl).split(',')[1];
-    const mediaType = file.type || 'image/png';
-    identifyDiecastImage(base64, mediaType, dataUrl);
-  };
-  reader.readAsDataURL(file);
+// Read an image file into the ID grid (up to ID_MAX). Returns a promise.
+function addIdImageFromFile(file) {
+  return new Promise(resolve => {
+    if (!file || !file.type || !file.type.startsWith('image/')) { toast('Please choose an image file.', 'yellow'); return resolve(); }
+    if (idImages.length >= ID_MAX) { toast('Up to ' + ID_MAX + ' images.', 'yellow'); return resolve(); }
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      const dataUrl = ev.target.result;
+      idImages.push({ base64: String(dataUrl).split(',')[1], mediaType: file.type || 'image/png', dataUrl });
+      renderIdImageGrid();
+      resolve();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function removeIdImage(idx) { idImages.splice(idx, 1); renderIdImageGrid(); }
+
+// Render the thumbnail grid + the "add angle" slot (shown until ID_MAX reached)
+function renderIdImageGrid() {
+  const grid = document.getElementById('idImageGrid');
+  if (!grid) return;
+  let html = idImages.map((im, i) => `<div style="position:relative;width:76px;height:76px;border-radius:8px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;">
+      <img src="${im.dataUrl}" alt="" style="width:100%;height:100%;object-fit:cover;"/>
+      <button onclick="removeIdImage(${i})" title="Remove" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border:none;border-radius:4px;background:rgba(0,0,0,0.72);color:#fff;font-size:12px;line-height:1;cursor:pointer;">✕</button>
+    </div>`).join('');
+  if (idImages.length < ID_MAX) {
+    html += `<div onclick="document.getElementById('psImageInput').click()" title="Add image" style="width:76px;height:76px;border-radius:8px;border:2px dashed var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--gray);font-size:11px;gap:2px;flex-shrink:0;"><div style="font-size:22px;line-height:1;">＋</div>Add angle</div>`;
+  }
+  grid.innerHTML = html;
+}
+
+// Main trigger: identify using every loaded slot (opens the picker if none yet)
+function runImageId() {
+  if (!idImages.length) { document.getElementById('psImageInput').click(); return; }
+  identifyDiecastImages(idImages, '');
 }
 
 // Pull the first JSON object out of a Claude Messages response (skips tool-use blocks)
@@ -3964,8 +3997,7 @@ function parseJsonFromContent(data) {
   } catch (e) { return null; }
 }
 
-// Remember the last uploaded image + correction so the user can re-run the ID with a hint
-let _lastIdImage = null;   // { base64, mediaType, dataUrl }
+// Remember the last correction so the user can re-run the ID with a hint (images live in idImages)
 let _lastCorrection = '';
 
 // Correction/retry row rendered below every ID result card
@@ -3976,25 +4008,30 @@ function idCorrectionRowHtml() {
   </div>`;
 }
 
-// Re-run identification on the same image, injecting the user's correction as strong context
+// Re-run identification on the same image(s), injecting the user's correction as strong context
 function retryIdentify() {
   const inp = document.getElementById('idCorrectInput');
   const corr = inp ? inp.value.trim() : '';
   if (!corr) { toast('Type what it actually is, then hit Retry.', 'yellow'); return; }
-  if (!_lastIdImage || !_lastIdImage.base64) { toast('Upload or paste an image first.', 'yellow'); return; }
+  if (!idImages.length) { toast('Add or paste an image first.', 'yellow'); return; }
   _lastCorrection = corr;
-  identifyDiecastImage(_lastIdImage.base64, _lastIdImage.mediaType, _lastIdImage.dataUrl, corr);
+  identifyDiecastImages(idImages, corr);
 }
 
-async function identifyDiecastImage(base64, mediaType, dataUrl, correction) {
+async function identifyDiecastImages(images, correction) {
   const loading = document.getElementById('psLoading');
   const results = document.getElementById('psResults');
+  if (!images || !images.length) { toast('Add at least one photo first.', 'yellow'); return; }
   if (loading) loading.style.display = 'block';
   if (results) results.innerHTML = '';
-  _lastIdImage = { base64, mediaType, dataUrl };  // remember for Retry
+  const thumbUrl = (images[0] && images[0].dataUrl) || '';
+  const base = 'You are given multiple angles of the same diecast model. Use all images together to identify the specific brand, model name, scale, and color. Pay special attention to any base plate or underside image as it often contains printed brand and model information. Read any text printed on the packaging. Return JSON only.';
   const userText = correction
-    ? `Your previous identification was incorrect. The user says this item is: '${correction}'. Re-examine the image carefully with this correction as strong context and identify the specific diecast model, brand, scale, and color. Read any text printed on the packaging. Return JSON only.`
-    : 'Identify this diecast model. Read any text printed on the packaging. Return JSON only.';
+    ? `Your previous identification was incorrect. The user says this item is: '${correction}'. Re-examine the images carefully with this correction as strong context. ${base}`
+    : base;
+  // Build a content array: one image block per loaded angle, then the instruction text
+  const content = images.map(im => ({ type: 'image', source: { type: 'base64', media_type: im.mediaType, data: im.base64 } }));
+  content.push({ type: 'text', text: userText });
   try {
     // PASS 1 — vision: read the car AND the packaging text (codes, editions, event names)
     const visionRes = await fetch(PROXY_URL, {
@@ -4003,14 +4040,8 @@ async function identifyDiecastImage(base64, mediaType, dataUrl, correction) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1200,
-        system: `You are a diecast car expert examining a photo. Identify the exact diecast model. Look CAREFULLY at the box and packaging for any printed product codes, model numbers / SKUs, event names, colorway descriptions, and edition details (limited edition, event exclusive, chase, club/convention exclusive, etc.) — do not just read the general car model. Ignore chat overlays, blurry edges, and background. Return JSON ONLY: {"confidence":"high|medium|low","model_name":"exact name or null","brand":"brand or null","scale":"1/64 or 1/18 or null","product_code":"any code/SKU printed on the box or null","edition":"edition/exclusivity notes or null","colorway":"color description or null","reason":"brief explanation","issue":"if low/unclear, exactly why (motion blur, chat overlay, partially visible, too dark) or null"}. If you cannot identify the car at all, set model_name to null and explain in issue.`,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: userText }
-          ]
-        }]
+        system: `You are a diecast car expert examining one or more photos of the SAME model. Identify the exact diecast model using all angles together. Look CAREFULLY at the box, packaging, and especially any base plate / underside for printed product codes, model numbers / SKUs, event names, colorway descriptions, and edition details (limited edition, event exclusive, chase, club/convention exclusive, etc.) — do not just read the general car model. Ignore chat overlays, blurry edges, and background. Return JSON ONLY: {"confidence":"high|medium|low","model_name":"exact name or null","brand":"brand or null","scale":"1/64 or 1/18 or null","product_code":"any code/SKU printed on the box or base or null","edition":"edition/exclusivity notes or null","colorway":"color description or null","reason":"brief explanation","issue":"if low/unclear, exactly why (motion blur, chat overlay, partially visible, too dark) or null"}. If you cannot identify the car at all, set model_name to null and explain in issue.`,
+        messages: [{ role: 'user', content: content }]
       })
     });
     if (!visionRes.ok) throw new Error('API ' + visionRes.status);
@@ -4018,7 +4049,7 @@ async function identifyDiecastImage(base64, mediaType, dataUrl, correction) {
     if (loading) loading.style.display = 'none';
 
     if (!vision || !vision.model_name) {
-      await showIdentifyResult(vision || { confidence: 'low', model_name: null, issue: 'The image could not be read clearly.' }, dataUrl);
+      await showIdentifyResult(vision || { confidence: 'low', model_name: null, issue: 'The image could not be read clearly.' }, thumbUrl);
       return;
     }
 
@@ -4055,7 +4086,7 @@ async function identifyDiecastImage(base64, mediaType, dataUrl, correction) {
       notes: (enrich && enrich.notes) || '',
       enriched: !!enrich
     };
-    await showIdentifyResult(merged, dataUrl);
+    await showIdentifyResult(merged, thumbUrl);
   } catch (err) {
     if (loading) loading.style.display = 'none';
     if (results) results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't analyze the image</div><div style="font-size:13px;color:var(--white);">${err.message}. Please try another photo.</div></div>`;
