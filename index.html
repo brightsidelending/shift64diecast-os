@@ -3296,10 +3296,34 @@ function parseCSV(text) {
 }
 function csvToObjects(text) {
   const rows = parseCSV(text);
-  if (!rows.length) return { headers: [], objects: [] };
-  const headers = rows[0].map(h => h.trim());
-  const objects = rows.slice(1).map(r => { const o = {}; headers.forEach((h, i) => o[h] = (r[i] != null ? r[i].trim() : '')); return o; });
-  return { headers, objects };
+  if (!rows.length) return { headers: [], objects: [], meta: [] };
+  // ResellBot CSVs prepend a metadata header block (e.g. 7 lines) above the real column row.
+  // Scan until we hit the row that starts with "sale_id" (Sales) or "username" (Buyers).
+  let headerIdx = rows.findIndex(r => {
+    const first = (r[0] || '').trim().toLowerCase();
+    return first === 'sale_id' || first === 'username';
+  });
+  if (headerIdx < 0) headerIdx = 0; // fallback: assume the first row is the header
+  const meta = rows.slice(0, headerIdx);
+  const headers = rows[headerIdx].map(h => h.trim());
+  const objects = rows.slice(headerIdx + 1).map(r => { const o = {}; headers.forEach((h, i) => o[h] = (r[i] != null ? r[i].trim() : '')); return o; });
+  return { headers, objects, meta };
+}
+// Return the header whose name exactly matches (case-insensitive), else null
+function exactCol(headers, name) {
+  const n = String(name).toLowerCase();
+  for (const h of headers) if (String(h).trim().toLowerCase() === n) return h;
+  return null;
+}
+// Pull the "Stream Title" value out of the metadata rows above the header
+function extractStreamTitle(meta) {
+  for (const r of (meta || [])) {
+    const key = (r[0] || '').trim().toLowerCase();
+    if (key === 'stream title') return (r[1] || '').trim();
+    const m = (r[0] || '').match(/stream title\s*[:=]\s*(.+)/i);
+    if (m) return m[1].trim();
+  }
+  return '';
 }
 function findCol(headers, patterns) {
   for (const h of headers) { const lh = h.toLowerCase(); for (const p of patterns) { if (lh.includes(p)) return h; } }
@@ -3307,14 +3331,17 @@ function findCol(headers, patterns) {
 }
 function parseMoney(v) { if (v == null) return 0; const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
 
-// Auto-detect Sales vs Buyers CSV by columns
+// Auto-detect Sales vs Buyers CSV — the real header's first column is decisive
 function detectCsvType(headers) {
-  const itemCol = findCol(headers, ['item', 'product', 'title', 'listing']);
+  const first = (headers[0] || '').trim().toLowerCase();
+  if (first === 'sale_id') return 'sales';
+  if (first === 'username') return 'buyers';
+  // Fallbacks for other layouts (note: Buyers has item_count which contains "item")
+  if (exactCol(headers, 'total_spent') && !exactCol(headers, 'title')) return 'buyers';
+  if (findCol(headers, ['title', 'item', 'product', 'listing'])) return 'sales';
   const buyerCol = findCol(headers, ['buyer', 'username', 'user', 'handle', 'customer']);
   const spentCol = findCol(headers, ['spent', 'total']);
-  if (itemCol) return 'sales';
   if (buyerCol && spentCol) return 'buyers';
-  if (findCol(headers, ['price', 'amount'])) return 'sales';
   return 'sales';
 }
 
@@ -3330,18 +3357,25 @@ function handleWhatnotFiles(fileList) {
 }
 
 function addWhatnotShow(fileName, text) {
-  const { headers, objects } = csvToObjects(text);
+  const { headers, objects, meta } = csvToObjects(text);
   if (!headers.length || !objects.length) { toast('Could not read that CSV (no rows).', 'red'); return; }
   const type = detectCsvType(headers);
-  const seller = ((document.getElementById('whatnotSeller') || {}).value || '').trim() || 'Unknown';
+  const streamTitle = extractStreamTitle(meta);
+  // Seller: manual input wins; otherwise derive from the CSV's seller_username column (Sales)
+  let seller = ((document.getElementById('whatnotSeller') || {}).value || '').trim();
+  if (!seller && type === 'sales') {
+    const sc = exactCol(headers, 'seller_username');
+    if (sc && objects[0]) seller = (objects[0][sc] || '').trim();
+  }
+  if (!seller) seller = 'Unknown';
   const date = ((document.getElementById('whatnotDate') || {}).value || '').trim() || new Date().toISOString().slice(0, 10);
   const show = {
     id: Date.now() + '_' + Math.floor(Math.random() * 1000),
-    seller, date, type, fileName, headers, rowCount: objects.length, rows: objects
+    seller, date, type, fileName, headers, streamTitle, rowCount: objects.length, rows: objects
   };
   whatnotShows.push(show);
   const status = document.getElementById('whatnotUploadStatus');
-  if (status) status.innerHTML = `✅ <strong>${escHtmlA(fileName)}</strong> — detected <strong>${type === 'sales' ? 'Sales' : 'Buyers'} CSV</strong>, ${objects.length} rows (${escHtmlA(seller)}, ${escHtmlA(date)})`;
+  if (status) status.innerHTML = `✅ <strong>${escHtmlA(fileName)}</strong> — detected <strong>${type === 'sales' ? 'Sales' : 'Buyers'} CSV</strong>, ${objects.length} rows${streamTitle ? ' · ' + escHtmlA(streamTitle) : ''} (${escHtmlA(seller)}, ${escHtmlA(date)})`;
   renderWhatnotAll();
   saveData();
   toast('📺 Show added: ' + seller + ' (' + type + ', ' + objects.length + ' rows)', 'green');
@@ -3365,7 +3399,7 @@ function renderWhatnotShows() {
       ? '<span style="background:#0D2B0D;color:var(--green);border:1px solid var(--green);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">SALES</span>'
       : '<span style="background:#0D1520;color:var(--blue);border:1px solid var(--blue);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">BUYERS</span>';
     return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">
-      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${escHtmlA(s.date)} ${badge}</div><div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(s.fileName)} · ${s.rowCount} rows</div></div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${escHtmlA(s.date)} ${badge}</div>${s.streamTitle ? `<div style="font-size:12px;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📺 ${escHtmlA(s.streamTitle)}</div>` : ''}<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(s.fileName)} · ${s.rowCount} rows</div></div>
       <button onclick="deleteWhatnotShow('${s.id}')" class="row-action row-del" title="Delete show">🗑️</button>
     </div>`;
   }).join('') + '</div>';
@@ -3375,19 +3409,21 @@ function renderWhatnotShows() {
 function wnBuyerRecordsForShow(show) {
   // Returns [{buyer, spent, purchases}] for one show
   const h = show.headers;
-  const buyerCol = findCol(h, ['buyer', 'username', 'user', 'handle', 'customer']);
-  if (!buyerCol) return [];
   if (show.type === 'buyers') {
-    const spentCol = findCol(h, ['spent', 'total', 'amount', 'revenue']);
-    const purCol = findCol(h, ['purchase', 'orders', 'items', 'qty', 'count']);
+    const buyerCol = exactCol(h, 'display_name') || exactCol(h, 'username') || findCol(h, ['buyer', 'username', 'user', 'handle', 'customer']);
+    if (!buyerCol) return [];
+    const spentCol = exactCol(h, 'total_spent') || findCol(h, ['spent', 'total', 'amount', 'revenue']);
+    const purCol = exactCol(h, 'item_count') || findCol(h, ['purchase', 'orders', 'items', 'qty', 'count']);
     return show.rows.map(r => ({
       buyer: (r[buyerCol] || '').trim(),
       spent: parseMoney(spentCol ? r[spentCol] : 0),
       purchases: purCol ? (parseInt(parseMoney(r[purCol]), 10) || 1) : 1
     })).filter(x => x.buyer);
   }
-  // sales CSV: group individual sales by buyer
-  const priceCol = findCol(h, ['price', 'amount', 'sold', 'total']);
+  // sales CSV: group individual sales by buyer (buyer_display)
+  const buyerCol = exactCol(h, 'buyer_display') || exactCol(h, 'buyer_username') || findCol(h, ['buyer', 'user', 'handle', 'customer']);
+  if (!buyerCol) return [];
+  const priceCol = exactCol(h, 'price') || findCol(h, ['amount', 'sold', 'total']);
   const map = {};
   show.rows.forEach(r => {
     const b = (r[buyerCol] || '').trim(); if (!b) return;
@@ -3452,19 +3488,25 @@ function renderWhatnotLeaderboard() {
 function wnSalesForShow(show) {
   if (show.type !== 'sales') return [];
   const h = show.headers;
-  const itemCol = findCol(h, ['item', 'product', 'title', 'listing', 'name']);
-  const priceCol = findCol(h, ['price', 'amount', 'sold', 'total']);
-  const timeCol = findCol(h, ['time', 'date', 'sold at', 'timestamp']);
-  const typeCol = findCol(h, ['type', 'method', 'auction', 'sale type', 'format']);
+  const itemCol = exactCol(h, 'title') || findCol(h, ['item', 'product', 'listing', 'name']);
+  const priceCol = exactCol(h, 'price') || findCol(h, ['amount', 'sold', 'total']);        // dollars, NOT price_cents
+  const timeCol = exactCol(h, 'updated_at_iso') || findCol(h, ['time', 'date', 'sold at', 'timestamp']);
+  const typeCol = exactCol(h, 'transaction_type') || findCol(h, ['type', 'method', 'sale type', 'format']);
+  const givCol = exactCol(h, 'is_giveaway');
   const durCol = findCol(h, ['second', 'duration', 'elapsed', 'time to sell', 'sold in']);
+  const showLabel = (show.streamTitle ? show.streamTitle + ' · ' : '') + show.seller + ' · ' + show.date;
   return show.rows.map(r => {
     const dur = durCol ? parseMoney(r[durCol]) : null;
+    let saleType = typeCol ? (r[typeCol] || '') : '';
+    if (givCol && /^(true|1|yes)$/i.test((r[givCol] || '').trim())) saleType = 'Giveaway';
+    else if (/buy_it_now/i.test(saleType)) saleType = 'Buy Now';
+    else if (/auction/i.test(saleType)) saleType = 'Auction';
     return {
-      show: show.seller + ' · ' + show.date, showId: show.id, seller: show.seller,
+      show: showLabel, showId: show.id, seller: show.seller,
       item: itemCol ? r[itemCol] : '(unknown)',
       price: parseMoney(priceCol ? r[priceCol] : 0),
       time: timeCol ? r[timeCol] : '',
-      saleType: typeCol ? r[typeCol] : '',
+      saleType: saleType,
       durationSec: (durCol && dur != null && !isNaN(dur)) ? dur : null
     };
   });
