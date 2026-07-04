@@ -3311,23 +3311,47 @@ function splitCsvLine(line) {
   out.push(field);
   return out;
 }
-// ResellBot CSVs have a metadata block (~7 lines) before the real header row.
-// 1) split into lines  2) find the header line (starts with "sale_id" for Sales / "username" for Buyers)
-// 3) that line = headers, every subsequent line = a data row. Returns { headers, objects, meta:[rawLines] }.
-function csvToObjects(text) {
-  const lines = String(text || '').split(/\r?\n/);
-  let headerIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const t = lines[i].replace(/^﻿/, '').trim().toLowerCase();
-    if (t === 'sale_id' || t.startsWith('sale_id,') || t === 'username' || t.startsWith('username,')) { headerIdx = i; break; }
+// Extend splitCsvLine's logic to the WHOLE text: scan char-by-char and split into complete rows.
+// A newline only ends a row when we're NOT inside a quoted field, so quoted fields may contain
+// embedded newlines (e.g. multi-line description cells) without breaking row boundaries.
+function parseCsvRows(text) {
+  const s = String(text || '');
+  const rows = []; let row = [], field = '', inQ = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQ) {
+      if (c === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c; // commas AND newlines inside quotes are literal text
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r') { /* ignore bare CR outside quotes (handles \r\n) */ }
+      else field += c;
+    }
   }
-  if (headerIdx < 0) return { headers: [], objects: [], meta: lines };
-  const meta = lines.slice(0, headerIdx);
-  const headers = splitCsvLine(lines[headerIdx].replace(/^﻿/, '')).map(h => h.trim());
+  row.push(field); rows.push(row); // flush the final row
+  // Drop fully-empty rows (e.g. a trailing newline)
+  return rows.filter(r => r.length && !(r.length === 1 && r[0].trim() === ''));
+}
+
+// ResellBot CSVs have a metadata block (~7 lines) before the real header row.
+// 1) parse the whole text into complete rows (quote-aware, embedded-newline-safe)
+// 2) find the header row (starts with "sale_id" for Sales / "username" for Buyers)
+// 3) that row = headers, every subsequent row = a data record. Returns { headers, objects, meta:[rawLines] }.
+function csvToObjects(text) {
+  const rows = parseCsvRows(text);
+  if (!rows.length) return { headers: [], objects: [], meta: [] };
+  let headerIdx = rows.findIndex(r => {
+    const first = String(r[0] || '').replace(/^﻿/, '').trim().toLowerCase();
+    return first === 'sale_id' || first === 'username';
+  });
+  if (headerIdx < 0) return { headers: [], objects: [], meta: rows.map(r => r.join(',')) };
+  const meta = rows.slice(0, headerIdx).map(r => r.join(','));
+  const headers = rows[headerIdx].map(h => String(h).replace(/^﻿/, '').trim());
   const objects = [];
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue; // skip blank lines
-    const cells = splitCsvLine(lines[i]);
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const cells = rows[i];
     const o = {};
     headers.forEach((h, idx) => o[h] = (cells[idx] != null ? String(cells[idx]).trim() : ''));
     objects.push(o);
