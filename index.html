@@ -406,7 +406,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
       <button id="micBtn" class="mic-btn" onclick="startVoiceSearch()" title="Search by voice">🎤</button>
       <button id="psIdBtn" class="qsearch-btn" onclick="runImageId()" title="Identify a diecast from your photos" style="border-color:var(--gold);color:var(--gold);font-weight:700;">📷 Identify by Photo</button>
-      <div style="flex:1;min-width:180px;font-size:12px;color:var(--gray);">Works on mobile camera, photo library, or desktop paste.</div>
+      <button id="idFastToggle" class="qsearch-btn" onclick="toggleFastMode()" title="Toggle Fast Mode — skips web-search enrichment for faster results" style="border-color:var(--border);color:var(--gray);">🔍 Accurate Mode — enrichment ON</button>
+      <div style="flex:1;min-width:160px;font-size:12px;color:var(--gray);">Works on mobile camera, photo library, or desktop paste.</div>
     </div>
     <div class="qsearch-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
       <button class="qsearch-btn" onclick="openGoogleSearch()" style="border-color:#4285F4;color:#fff;font-weight:700;"><span style="color:#4285F4;">G</span><span style="color:#EA4335;">o</span><span style="color:#FBBC05;">o</span><span style="color:#4285F4;">g</span><span style="color:#34A853;">l</span><span style="color:#EA4335;">e</span> 🔍</button>
@@ -2747,6 +2748,7 @@ async function loadData() {
   if (buyRep && typeof buyRep === 'object' && Array.isArray(buyRep.items)) buyReport = buyRep;
   renderBuyReport();
   renderIdImageGrid(); // show the empty "add angle" slot for the Image ID grid
+  updateFastModeUI();  // reflect the persisted Fast Mode state on the toggle
   maybeAutoScrape(); // background refresh of any vendor whose data is >24h old
 }
 
@@ -4039,6 +4041,31 @@ function renderCompetitorPrices() {
 // ============================================================
 let idImages = [];        // up to ID_MAX loaded images: {base64, mediaType, dataUrl}
 let _autoScanAfterId = false; // set by the SCAN button's smart flow so identification auto-runs a price scan
+let idFastMode = false;       // ⚡ Fast Mode: skip the web-search enrichment pass
+try { idFastMode = localStorage.getItem('s64_fast_mode') === '1'; } catch (e) {}
+
+function toggleFastMode() {
+  idFastMode = !idFastMode;
+  try { localStorage.setItem('s64_fast_mode', idFastMode ? '1' : '0'); } catch (e) {}
+  updateFastModeUI();
+}
+function updateFastModeUI() {
+  const btn = document.getElementById('idFastToggle');
+  if (!btn) return;
+  if (idFastMode) {
+    btn.textContent = '⚡ Fast Mode — ON (skips enrichment)';
+    btn.style.borderColor = 'var(--gold)';
+    btn.style.color = 'var(--gold)';
+    btn.style.background = 'rgba(201,168,76,0.14)';
+    btn.style.fontWeight = '700';
+  } else {
+    btn.textContent = '🔍 Accurate Mode — enrichment ON';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--gray)';
+    btn.style.background = 'transparent';
+    btn.style.fontWeight = '400';
+  }
+}
 const ID_MAX = 5;
 
 function handlePsImageInput(e) {
@@ -4203,9 +4230,11 @@ async function identifyDiecastImages(images, correction) {
       return;
     }
 
-    // PASS 2 — web-search enrichment (best-effort; falls back to vision-only on any failure)
+    // PASS 2 — web-search enrichment (best-effort; falls back to vision-only on any failure).
+    // Fast Mode skips this pass entirely to go straight to the price scan.
     let enrich = null;
     try {
+      if (idFastMode) throw new Error('fast-mode-skip'); // caught below → vision-only
       if (results) results.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;color:var(--gray);font-size:13px;display:flex;align-items:center;gap:10px;"><div style="width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;"></div>🔎 Enriching “${escHtmlA(vision.model_name)}” with a web search…</div>`;
       const q = [vision.brand, vision.model_name, vision.scale, vision.product_code].filter(Boolean).join(' ');
       const enrichRes = await fetch(PROXY_URL, {
@@ -4257,15 +4286,16 @@ function simplifyEbaySearch(name, productCode) {
   s = s.replace(/\b(limited|special|exclusive|collector'?s?)\s+edition\b/gi, ' ');
   // 3) remove noise words
   s = s.replace(/\b(blister|left[-\s]?hand|drive|box|base|sku|lhd|web[-\s]?enriched|confidence)\b/gi, ' ');
+  // Strip SKU / product codes — eBay matches better on brand + model only (e.g. MGT01103, KHMG164).
+  const code = String(productCode || '').trim();
+  if (code) s = s.replace(new RegExp('\\b' + code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi'), ' ');
+  // Generic SKU pattern: 3+ letters directly followed by 3+ digits (spares model codes like F40, R34, GT350, INNO64)
+  s = s.replace(/\b[A-Za-z]{3,}\d{3,}[A-Za-z0-9]*\b/g, ' ');
   // 4) replace ★ and other special characters with a space (keep letters, numbers, space, / and -)
   s = s.replace(/[^A-Za-z0-9\s/-]/g, ' ');
   s = s.replace(/\s+/g, ' ').trim();
-  let words = s.split(' ').filter(Boolean);
-  const code = String(productCode || '').trim();
-  const needCode = code && !words.some(w => w.toLowerCase() === code.toLowerCase());
-  // 5) hard cap at 7 words total (reserve a slot for the SKU so it survives the cap)
-  if (needCode) { words = words.slice(0, 6); words.push(code); }
-  else { words = words.slice(0, 7); }
+  // 5) hard cap at 7 words total
+  const words = s.split(' ').filter(Boolean).slice(0, 7);
   return words.join(' ').trim();
 }
 
