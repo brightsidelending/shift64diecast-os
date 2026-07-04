@@ -3951,34 +3951,85 @@ function identifyFromFile(file) {
   reader.readAsDataURL(file);
 }
 
+// Pull the first JSON object out of a Claude Messages response (skips tool-use blocks)
+function parseJsonFromContent(data) {
+  try {
+    const raw = ((data && data.content) || []).map(c => (typeof c.text === 'string' ? c.text : '')).join('').replace(/```json|```/g, '').trim();
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) {
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) { try { return JSON.parse(m[0]); } catch (e2) { return null; } }
+      return null;
+    }
+  } catch (e) { return null; }
+}
+
 async function identifyDiecastImage(base64, mediaType, dataUrl) {
   const loading = document.getElementById('psLoading');
   const results = document.getElementById('psResults');
   if (loading) loading.style.display = 'block';
   if (results) results.innerHTML = '';
   try {
-    const res = await fetch(PROXY_URL, {
+    // PASS 1 — vision: read the car AND the packaging text (codes, editions, event names)
+    const visionRes = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: `You are a diecast car expert. Look at this image and identify the exact diecast model shown. Focus on the car itself, ignore any chat overlay, blurry edges, or background. Return JSON only with these fields: confidence (high/medium/low), model_name (exact name if identified, null if not), brand (brand name or null), scale (1/64 or 1/18 or null), reason (brief explanation), issue (if confidence is low or cannot identify, explain exactly why - e.g. motion blur, chat overlay, partially visible, too dark). If you cannot identify it at all set model_name to null and explain in issue field.`,
+        max_tokens: 1200,
+        system: `You are a diecast car expert examining a photo. Identify the exact diecast model. Look CAREFULLY at the box and packaging for any printed product codes, model numbers / SKUs, event names, colorway descriptions, and edition details (limited edition, event exclusive, chase, club/convention exclusive, etc.) — do not just read the general car model. Ignore chat overlays, blurry edges, and background. Return JSON ONLY: {"confidence":"high|medium|low","model_name":"exact name or null","brand":"brand or null","scale":"1/64 or 1/18 or null","product_code":"any code/SKU printed on the box or null","edition":"edition/exclusivity notes or null","colorway":"color description or null","reason":"brief explanation","issue":"if low/unclear, exactly why (motion blur, chat overlay, partially visible, too dark) or null"}. If you cannot identify the car at all, set model_name to null and explain in issue.`,
         messages: [{
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: 'Identify this diecast model. Return JSON only.' }
+            { type: 'text', text: 'Identify this diecast model. Read any text printed on the packaging. Return JSON only.' }
           ]
         }]
       })
     });
-    if (!res.ok) throw new Error('API ' + res.status);
-    const data = await res.json();
-    const raw = (data.content || []).map(c => c.text || '').join('').replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(raw);
+    if (!visionRes.ok) throw new Error('API ' + visionRes.status);
+    const vision = parseJsonFromContent(await visionRes.json());
     if (loading) loading.style.display = 'none';
-    await showIdentifyResult(parsed, dataUrl);
+
+    if (!vision || !vision.model_name) {
+      await showIdentifyResult(vision || { confidence: 'low', model_name: null, issue: 'The image could not be read clearly.' }, dataUrl);
+      return;
+    }
+
+    // PASS 2 — web-search enrichment (best-effort; falls back to vision-only on any failure)
+    let enrich = null;
+    try {
+      if (results) results.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;color:var(--gray);font-size:13px;display:flex;align-items:center;gap:10px;"><div style="width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;"></div>🔎 Enriching “${escHtmlA(vision.model_name)}” with a web search…</div>`;
+      const q = [vision.brand, vision.model_name, vision.scale, vision.product_code].filter(Boolean).join(' ');
+      const enrichRes = await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1200,
+          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+          system: `You are a diecast research assistant. Use web search to enrich a diecast identification. Given a brand, model name, scale, and any product code, find the specific model number / SKU, colorway, edition, and exclusivity (event exclusives, convention/club exclusives, limited editions, chase variants). Return ONLY a JSON object: {"model_name":"refined exact name or null","brand":"or null","scale":"or null","product_code":"model number/SKU or null","colorway":"or null","edition":"or null","exclusivity":"or null","confidence":"high|medium|low","notes":"one short line or null"}. Use null for anything you cannot verify. Base answers strictly on search results — never invent product codes.`,
+          messages: [{ role: 'user', content: [{ type: 'text', text: `Diecast to research: ${q}\nVision notes: ${vision.reason || ''}\nReturn the enriched JSON only.` }] }]
+        })
+      });
+      if (enrichRes.ok) enrich = parseJsonFromContent(await enrichRes.json());
+    } catch (e) { /* enrichment is optional */ }
+
+    // Merge — enrichment fills gaps and refines; vision is the fallback
+    const merged = {
+      model_name: (enrich && enrich.model_name) || vision.model_name,
+      brand: (enrich && enrich.brand) || vision.brand || null,
+      scale: (enrich && enrich.scale) || vision.scale || null,
+      product_code: (enrich && enrich.product_code) || vision.product_code || null,
+      colorway: (enrich && enrich.colorway) || vision.colorway || null,
+      edition: (enrich && (enrich.edition || enrich.exclusivity)) || vision.edition || null,
+      confidence: (enrich && enrich.confidence) || vision.confidence,
+      reason: vision.reason || '',
+      issue: vision.issue || '',
+      notes: (enrich && enrich.notes) || '',
+      enriched: !!enrich
+    };
+    await showIdentifyResult(merged, dataUrl);
   } catch (err) {
     if (loading) loading.style.display = 'none';
     if (results) results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't analyze the image</div><div style="font-size:13px;color:var(--white);">${err.message}. Please try another photo.</div></div>`;
@@ -3990,16 +4041,28 @@ async function showIdentifyResult(r, dataUrl) {
   if (!results) return;
   const conf = String(r.confidence || '').toLowerCase().trim();
   const model = r.model_name || null;
-  const meta = [r.brand, r.scale].filter(Boolean).join(' · ');
-  const metaStr = meta ? `<div style="font-size:12px;color:var(--gray);margin-top:2px;">${meta}</div>` : '';
   const reason = r.reason || '';
   const issue = r.issue || reason || 'The car could not be clearly recognized.';
   const searchStr = [r.brand, model, r.scale].filter(Boolean).join(' ').trim();
   const thumb = dataUrl ? `<img src="${dataUrl}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:8px;flex-shrink:0;"/>` : '';
 
+  // Enriched detail rows (brand, scale, SKU, colorway, edition/exclusivity)
+  const detailRows = [];
+  if (r.brand) detailRows.push(['Brand', r.brand]);
+  if (r.scale) detailRows.push(['Scale', r.scale]);
+  if (r.product_code) detailRows.push(['Product code / SKU', r.product_code]);
+  if (r.colorway) detailRows.push(['Colorway', r.colorway]);
+  if (r.edition) detailRows.push(['Edition / Exclusivity', r.edition]);
+  const detailsHtml = detailRows.length
+    ? `<div style="margin-top:8px;font-size:12px;line-height:1.65;">${detailRows.map(([l, v]) => `<div><span style="color:var(--gray);">${l}:</span> <strong>${escHtmlA(String(v))}</strong></div>`).join('')}</div>`
+    : '';
+  const confBadge = conf ? `<span style="font-size:10px;font-weight:700;text-transform:uppercase;border-radius:5px;padding:1px 7px;margin-left:8px;border:1px solid currentColor;">${conf} confidence</span>` : '';
+  const enrichedTag = r.enriched ? '<span style="font-size:10px;color:var(--blue);margin-left:8px;">🔎 web-enriched</span>' : '';
+  const notesHtml = r.notes ? `<div style="font-size:12px;color:var(--gray);margin-top:6px;">${escHtmlA(r.notes)}</div>` : (reason ? `<div style="font-size:12px;color:var(--gray);margin-top:6px;">${escHtmlA(reason)}</div>` : '');
+
   // CANNOT IDENTIFY — red banner with the exact reason
   if (!model) {
-    results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't identify this model</div><div style="font-size:13px;color:var(--white);"><strong>Why:</strong> ${issue}</div><button onclick="document.getElementById('psImageInput').click()" style="margin-top:10px;padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div>`;
+    results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't identify this model</div><div style="font-size:13px;color:var(--white);"><strong>Why:</strong> ${escHtmlA(issue)}</div><button onclick="document.getElementById('psImageInput').click()" style="margin-top:10px;padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div>`;
     return;
   }
 
@@ -4007,15 +4070,15 @@ async function showIdentifyResult(r, dataUrl) {
   if (conf === 'high') {
     document.getElementById('psSearchInput').value = searchStr || model;
     togglePsClear();
-    const banner = `<div style="background:#0D2B0D;border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:center;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--green);margin-bottom:2px;">✅ Identified: ${model}</div>${metaStr}${reason ? `<div style="font-size:12px;color:var(--gray);margin-top:4px;">${reason}</div>` : ''}</div></div>`;
+    const banner = `<div style="background:#0D2B0D;border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--green);">✅ Identified: ${escHtmlA(model)}<span style="color:var(--green);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}${notesHtml}</div></div>`;
     await runPriceScan();
     const pr = document.getElementById('psResults');
     if (pr) pr.insertAdjacentHTML('afterbegin', banner);
     return;
   }
 
-  // MEDIUM / LOW CONFIDENCE — yellow warning with best guess + issue, and options
-  results.innerHTML = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;flex:1;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);margin-bottom:2px;">⚠️ Best guess (${conf || 'low'} confidence): ${model}</div>${metaStr}<div style="font-size:13px;color:var(--white);margin-top:6px;"><strong>Issue:</strong> ${issue}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button onclick="identifySearchAnyway('${escJs(searchStr || model)}')" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;">🔍 Search anyway</button><button onclick="document.getElementById('psImageInput').click()" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div></div>`;
+  // MEDIUM / LOW CONFIDENCE — yellow warning with best guess + details + options
+  results.innerHTML = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;flex:1;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);">⚠️ Best guess: ${escHtmlA(model)}<span style="color:var(--yellow);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}<div style="font-size:13px;color:var(--white);margin-top:6px;"><strong>Issue:</strong> ${escHtmlA(issue)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button onclick="identifySearchAnyway('${escJs(searchStr || model)}')" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;">🔍 Search anyway</button><button onclick="document.getElementById('psImageInput').click()" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div></div>`;
 }
 
 function identifySearchAnyway(str) {
