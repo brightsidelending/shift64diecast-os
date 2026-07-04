@@ -42,17 +42,45 @@ export default async function handler(req, res) {
     }
   }
 
-  // eBay Browse API - Sold/Completed Listings
+  // eBay Finding API - Sold/Completed Listings (findCompletedItems with SoldItemsOnly=true).
+  // The Browse API only returns ACTIVE listings, which is why Sold previously mirrored Active.
+  // findCompletedItems returns genuinely sold items; we transform them into the Browse-style
+  // itemSummaries shape the frontend already maps, so the Sold column displays correctly.
   if (type === 'ebay_sold') {
     try {
       const { query } = req.body;
-      const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=10&filter=buyingOptions:{FIXED_PRICE}&sort=endTimeSoonest`;
-      const token = await getEbayToken();
-      const r = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' }
+      const appId = process.env.EBAY_APP_ID;
+      const params = new URLSearchParams({
+        'OPERATION-NAME': 'findCompletedItems',
+        'SERVICE-VERSION': '1.13.0',
+        'SECURITY-APPNAME': appId || '',
+        'GLOBAL-ID': 'EBAY-US',
+        'RESPONSE-DATA-FORMAT': 'JSON',
+        'REST-PAYLOAD': 'true',
+        'keywords': query || '',
+        'itemFilter(0).name': 'SoldItemsOnly',
+        'itemFilter(0).value': 'true',
+        'sortOrder': 'EndTimeSoonest',
+        'paginationInput.entriesPerPage': '10'
       });
+      const r = await fetch('https://svcs.ebay.com/services/search/FindingService/v1?' + params.toString());
       const data = await r.json();
-      return res.status(200).json(data);
+      const resp = (data && data.findCompletedItemsResponse && data.findCompletedItemsResponse[0]) || {};
+      const rawItems = (resp.searchResult && resp.searchResult[0] && resp.searchResult[0].item) || [];
+      const itemSummaries = rawItems.map(it => {
+        const price = it.sellingStatus && it.sellingStatus[0] && it.sellingStatus[0].currentPrice && it.sellingStatus[0].currentPrice[0];
+        const ship = it.shippingInfo && it.shippingInfo[0] && it.shippingInfo[0].shippingServiceCost && it.shippingInfo[0].shippingServiceCost[0];
+        return {
+          title: (it.title && it.title[0]) || '',
+          price: price ? { value: price.__value__, currency: price['@currencyId'] } : undefined,
+          condition: (it.condition && it.condition[0] && it.condition[0].conditionDisplayName && it.condition[0].conditionDisplayName[0]) || 'Used',
+          itemWebUrl: (it.viewItemURL && it.viewItemURL[0]) || null,
+          image: { imageUrl: (it.galleryURL && it.galleryURL[0]) || null },
+          itemEndDate: (it.listingInfo && it.listingInfo[0] && it.listingInfo[0].endTime && it.listingInfo[0].endTime[0]) || null,
+          shippingOptions: ship ? [{ shippingCost: { value: ship.__value__ } }] : []
+        };
+      });
+      return res.status(200).json({ itemSummaries });
     } catch(err) {
       return res.status(200).json({ error: err.message, itemSummaries: [] });
     }
