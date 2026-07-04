@@ -3946,17 +3946,52 @@ function handlePsImageInput(e) {
   e.target.value = '';
 }
 
-// Read an image file into the ID grid (up to ID_MAX). Returns a promise.
+// Downscale + re-encode an image dataUrl so several photos stay well under Vercel's 4.5MB body limit.
+// Scales the longest side to maxDim (default 800px) and exports JPEG at the given quality. Promise<dataUrl>.
+function compressImage(dataUrl, maxDim, quality) {
+  maxDim = maxDim || 800;
+  quality = (quality != null) ? quality : 0.7;
+  return new Promise(function (resolve, reject) {
+    try {
+      const img = new Image();
+      img.onload = function () {
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        if (!w || !h) { resolve(dataUrl); return; }
+        const scale = Math.min(1, maxDim / Math.max(w, h));
+        const cw = Math.max(1, Math.round(w * scale));
+        const ch = Math.max(1, Math.round(h * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = cw;
+        canvas.height = ch;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, cw, ch);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = function () { reject(new Error('image load failed')); };
+      img.src = dataUrl;
+    } catch (e) { reject(e); }
+  });
+}
+
+// Read an image file into the ID grid (up to ID_MAX), compressing it first. Returns a promise.
 function addIdImageFromFile(file) {
   return new Promise(resolve => {
     if (!file || !file.type || !file.type.startsWith('image/')) { toast('Please choose an image file.', 'yellow'); return resolve(); }
     if (idImages.length >= ID_MAX) { toast('Up to ' + ID_MAX + ' images.', 'yellow'); return resolve(); }
     const reader = new FileReader();
     reader.onload = function (ev) {
-      const dataUrl = ev.target.result;
-      idImages.push({ base64: String(dataUrl).split(',')[1], mediaType: file.type || 'image/png', dataUrl });
-      renderIdImageGrid();
-      resolve();
+      const original = ev.target.result;
+      compressImage(original, 800, 0.7).then(function (compressed) {
+        idImages.push({ base64: String(compressed).split(',')[1], mediaType: 'image/jpeg', dataUrl: compressed });
+        renderIdImageGrid();
+        resolve();
+      }).catch(function () {
+        // Fallback to the original if compression fails for any reason
+        idImages.push({ base64: String(original).split(',')[1], mediaType: file.type || 'image/png', dataUrl: original });
+        renderIdImageGrid();
+        resolve();
+      });
     };
     reader.readAsDataURL(file);
   });
