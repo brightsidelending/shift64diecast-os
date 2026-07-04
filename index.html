@@ -3880,27 +3880,30 @@ function stripScale(q) {
 }
 
 function openAliExpress() {
-  const q = document.getElementById('psSearchInput').value.trim();
-  if (!q) { alert('Type a model in the search box first.'); return; }
+  const raw = document.getElementById('psSearchInput').value.trim();
+  if (!raw) { alert('Type a model in the search box first.'); return; }
+  const q = simplifyEbaySearch(raw);
   window.open('https://www.aliexpress.com/wholesale?SearchText=' + encodeURIComponent(q), '_blank', 'noopener');
 }
 
 // Open a Google search for the current query, scoped to diecast 1/64
 function openGoogleSearch() {
-  const q = document.getElementById('psSearchInput').value.trim();
-  if (!q) { alert('Type a model in the search box first.'); return; }
+  const raw = document.getElementById('psSearchInput').value.trim();
+  if (!raw) { alert('Type a model in the search box first.'); return; }
+  const q = simplifyEbaySearch(raw);
   window.open('https://www.google.com/search?q=' + encodeURIComponent(q + ' diecast 1/64'), '_blank', 'noopener');
 }
 
-// Open a competitor store's search page for whatever is typed in the scanner box
+// Open a competitor store's search page — all use the simplified short search term
 function openSiteSearch(site) {
-  const q = document.getElementById('psSearchInput').value.trim();
-  if (!q) { alert('Type a model in the search box first.'); return; }
+  const raw = document.getElementById('psSearchInput').value.trim();
+  if (!raw) { alert('Type a model in the search box first.'); return; }
+  const q = simplifyEbaySearch(raw);
   const enc = encodeURIComponent(q);
   const urls = {
     horizon: 'https://horizondiecast.com/search?q=' + enc,
     carbromc: 'https://carbromc.com/search?q=' + enc,
-    rcmart: 'https://www.rcmart.com/product-search?search=' + encodeURIComponent(stripScale(q)),
+    rcmart: 'https://www.rcmart.com/product-search?search=' + enc,   // same clean short term as the others
     pablo: 'https://pablosdiecastgarage.com/search?q=' + enc
   };
   if (urls[site]) window.open(urls[site], '_blank', 'noopener');
@@ -4245,17 +4248,24 @@ async function identifyDiecastImages(images, correction) {
 // "web-enriched", collab "x Brand" notation, and any context after a dash/em-dash.
 function simplifyEbaySearch(name, productCode) {
   let s = String(name || '');
-  s = s.replace(/\([^)]*\)/g, ' ').replace(/\[[^\]]*\]/g, ' ');          // drop (…) and […]
+  s = s.replace(/\([^)]*\)/g, ' ');                                       // 1) remove (...) incl. parens
+  s = s.split(';')[0];                                                    // 2) drop everything after the first semicolon
   s = s.split(/\s+[—–-]\s+/)[0];                                          // drop context after a dash/em-dash
-  s = s.replace(/\s+x\s+[A-Za-z0-9.]+(?:\s+[A-Za-z0-9.]+)?/gi, ' ');      // drop collab "x Brand" (e.g. Kaido House x Mini GT)
+  s = s.replace(/\[[^\]]*\]/g, ' ');
+  s = s.replace(/\s+x\s+[A-Za-z0-9.]+(?:\s+[A-Za-z0-9.]+)?/gi, ' ');      // drop collab "x Brand"
   s = s.replace(/\b1\s*[:/]\s*\d{2,3}\b/g, ' ');                          // drop scale 1:64, 1/18, …
   s = s.replace(/\b(limited|special|exclusive|collector'?s?)\s+edition\b/gi, ' ');
-  s = s.replace(/\bweb[-\s]?enriched\b/gi, ' ');
-  s = s.replace(/\bconfidence\b/gi, ' ');
-  s = s.replace(/[|]/g, ' ').replace(/\s+/g, ' ').trim();
-  let words = s.split(' ').filter(Boolean).slice(0, 7);                  // concise 5–7 words
+  // 3) remove noise words
+  s = s.replace(/\b(blister|left[-\s]?hand|drive|box|base|sku|lhd|web[-\s]?enriched|confidence)\b/gi, ' ');
+  // 4) replace ★ and other special characters with a space (keep letters, numbers, space, / and -)
+  s = s.replace(/[^A-Za-z0-9\s/-]/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+  let words = s.split(' ').filter(Boolean);
   const code = String(productCode || '').trim();
-  if (code && !words.some(w => w.toLowerCase() === code.toLowerCase())) words.push(code);
+  const needCode = code && !words.some(w => w.toLowerCase() === code.toLowerCase());
+  // 5) hard cap at 7 words total (reserve a slot for the SKU so it survives the cap)
+  if (needCode) { words = words.slice(0, 6); words.push(code); }
+  else { words = words.slice(0, 7); }
   return words.join(' ').trim();
 }
 
