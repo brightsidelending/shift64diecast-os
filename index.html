@@ -3982,7 +3982,7 @@ function addIdImageFromFile(file) {
     const reader = new FileReader();
     reader.onload = function (ev) {
       const original = ev.target.result;
-      compressImage(original, 800, 0.7).then(function (compressed) {
+      compressImage(original, 1200, 0.7).then(function (compressed) {
         idImages.push({ base64: String(compressed).split(',')[1], mediaType: 'image/jpeg', dataUrl: compressed });
         renderIdImageGrid();
         resolve();
@@ -4060,7 +4060,7 @@ async function identifyDiecastImages(images, correction) {
   if (loading) loading.style.display = 'block';
   if (results) results.innerHTML = '';
   const thumbUrl = (images[0] && images[0].dataUrl) || '';
-  const base = 'You are given multiple angles of the same diecast model. Use all images together to identify the specific brand, model name, scale, and color. Pay special attention to any base plate or underside image as it often contains printed brand and model information. Read any text printed on the packaging. Return JSON only.';
+  const base = 'You are given multiple angles of the same diecast model. Carefully READ any visible printed text in every image — especially on the base plate or underside, packaging, or any label. Brand names, model names, scale (1:64, 1:18), and part numbers are often printed directly on the base. Use all text and visual details together to identify the exact brand, model name, scale, and color. Return JSON only.';
   const userText = correction
     ? `Your previous identification was incorrect. The user says this item is: '${correction}'. Re-examine the images carefully with this correction as strong context. ${base}`
     : base;
