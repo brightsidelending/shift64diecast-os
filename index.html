@@ -3294,19 +3294,44 @@ function parseCSV(text) {
   if (field.length || cur.length) { cur.push(field); rows.push(cur); }
   return rows.filter(r => r.length && !(r.length === 1 && r[0].trim() === ''));
 }
+// Split ONE CSV line into fields, honoring double-quoted values that may contain commas
+function splitCsvLine(line) {
+  const s = String(line); const out = []; let field = '', inQ = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQ) {
+      if (c === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { out.push(field); field = ''; }
+      else field += c;
+    }
+  }
+  out.push(field);
+  return out;
+}
+// ResellBot CSVs have a metadata block (~7 lines) before the real header row.
+// 1) split into lines  2) find the header line (starts with "sale_id" for Sales / "username" for Buyers)
+// 3) that line = headers, every subsequent line = a data row. Returns { headers, objects, meta:[rawLines] }.
 function csvToObjects(text) {
-  const rows = parseCSV(text);
-  if (!rows.length) return { headers: [], objects: [], meta: [] };
-  // ResellBot CSVs prepend a metadata header block (e.g. 7 lines) above the real column row.
-  // Scan until we hit the row that starts with "sale_id" (Sales) or "username" (Buyers).
-  let headerIdx = rows.findIndex(r => {
-    const first = (r[0] || '').trim().toLowerCase();
-    return first === 'sale_id' || first === 'username';
-  });
-  if (headerIdx < 0) headerIdx = 0; // fallback: assume the first row is the header
-  const meta = rows.slice(0, headerIdx);
-  const headers = rows[headerIdx].map(h => h.trim());
-  const objects = rows.slice(headerIdx + 1).map(r => { const o = {}; headers.forEach((h, i) => o[h] = (r[i] != null ? r[i].trim() : '')); return o; });
+  const lines = String(text || '').split(/\r?\n/);
+  let headerIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].replace(/^﻿/, '').trim().toLowerCase();
+    if (t === 'sale_id' || t.startsWith('sale_id,') || t === 'username' || t.startsWith('username,')) { headerIdx = i; break; }
+  }
+  if (headerIdx < 0) return { headers: [], objects: [], meta: lines };
+  const meta = lines.slice(0, headerIdx);
+  const headers = splitCsvLine(lines[headerIdx].replace(/^﻿/, '')).map(h => h.trim());
+  const objects = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue; // skip blank lines
+    const cells = splitCsvLine(lines[i]);
+    const o = {};
+    headers.forEach((h, idx) => o[h] = (cells[idx] != null ? String(cells[idx]).trim() : ''));
+    objects.push(o);
+  }
   return { headers, objects, meta };
 }
 // Return the header whose name exactly matches (case-insensitive), else null
@@ -3315,13 +3340,16 @@ function exactCol(headers, name) {
   for (const h of headers) if (String(h).trim().toLowerCase() === n) return h;
   return null;
 }
-// Pull the "Stream Title" value out of the metadata rows above the header
-function extractStreamTitle(meta) {
-  for (const r of (meta || [])) {
-    const key = (r[0] || '').trim().toLowerCase();
-    if (key === 'stream title') return (r[1] || '').trim();
-    const m = (r[0] || '').match(/stream title\s*[:=]\s*(.+)/i);
-    if (m) return m[1].trim();
+// Pull the "Stream Title" from the metadata: find the line starting with "Stream Title," and take everything after the first comma
+function extractStreamTitle(metaLines) {
+  for (const line of (metaLines || [])) {
+    const s = String(line).replace(/^﻿/, '');
+    if (/^\s*stream title\s*,/i.test(s)) {
+      const v = s.slice(s.indexOf(',') + 1).trim();
+      return v.replace(/^"(.*)"$/, '$1').trim();
+    }
+    const m = s.match(/^\s*stream title\s*[:=]\s*(.+)$/i);
+    if (m) return m[1].trim().replace(/^"(.*)"$/, '$1').trim();
   }
   return '';
 }
