@@ -3941,6 +3941,7 @@ function renderCompetitorPrices() {
 // IMAGE IDENTIFICATION (Price Scanner)
 // ============================================================
 let idImages = [];        // up to ID_MAX loaded images: {base64, mediaType, dataUrl}
+let _autoScanAfterId = false; // set by the SCAN button's smart flow so identification auto-runs a price scan
 const ID_MAX = 5;
 
 function handlePsImageInput(e) {
@@ -4019,6 +4020,7 @@ function renderIdImageGrid() {
 // Main trigger: identify using every loaded slot (opens the picker if none yet)
 function runImageId() {
   if (!idImages.length) { document.getElementById('psImageInput').click(); return; }
+  _autoScanAfterId = false; // standalone Identify behaves exactly as before (no forced scan)
   identifyDiecastImages(idImages, '');
 }
 
@@ -4170,12 +4172,14 @@ async function showIdentifyResult(r, dataUrl) {
 
   // CANNOT IDENTIFY — red banner with the exact reason
   if (!model) {
+    _autoScanAfterId = false;
     results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't identify this model</div><div style="font-size:13px;color:var(--white);"><strong>Why:</strong> ${escHtmlA(issue)}</div><button onclick="tryAnotherPhoto()" style="margin-top:10px;padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div>` + idCorrectionRowHtml();
     return;
   }
 
   // HIGH CONFIDENCE — green banner + auto-run the eBay scan
   if (conf === 'high') {
+    _autoScanAfterId = false;
     document.getElementById('psSearchInput').value = searchStr || model;
     togglePsClear();
     const banner = `<div style="background:#0D2B0D;border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--green);">✅ Identified: ${escHtmlA(model)}<span style="color:var(--green);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}${notesHtml}</div></div>`;
@@ -4185,6 +4189,18 @@ async function showIdentifyResult(r, dataUrl) {
     return;
   }
 
+  // SMART FLOW (SCAN with photos): scan the best guess even at lower confidence
+  if (_autoScanAfterId && model) {
+    _autoScanAfterId = false;
+    document.getElementById('psSearchInput').value = searchStr || model;
+    togglePsClear();
+    const banner = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);">🔎 Identified from photo: ${escHtmlA(model)}<span style="color:var(--yellow);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}<div style="font-size:12px;color:var(--gray);margin-top:6px;">Lower-confidence match — showing prices for this best guess. Correct it below if needed.</div></div></div>`;
+    await runPriceScan();
+    const pr = document.getElementById('psResults');
+    if (pr) pr.insertAdjacentHTML('afterbegin', banner + idCorrectionRowHtml());
+    return;
+  }
+  _autoScanAfterId = false;
   // MEDIUM / LOW CONFIDENCE — yellow warning with best guess + details + options
   results.innerHTML = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;flex:1;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);">⚠️ Best guess: ${escHtmlA(model)}<span style="color:var(--yellow);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}<div style="font-size:13px;color:var(--white);margin-top:6px;"><strong>Issue:</strong> ${escHtmlA(issue)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button onclick="identifySearchAnyway('${escJs(searchStr || model)}')" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer;">🔍 Search anyway</button><button onclick="tryAnotherPhoto()" style="padding:9px 16px;font-size:13px;font-weight:700;background:var(--gold);color:#111;border:none;border-radius:8px;cursor:pointer;">📷 Try another photo</button></div></div></div>` + idCorrectionRowHtml();
 }
@@ -4197,6 +4213,12 @@ function identifySearchAnyway(str) {
 
 async function runPriceScan() {
   const query = document.getElementById('psSearchInput').value.trim();
+  // Smart combined flow: photos loaded + empty search -> identify first, then auto-scan with the model name
+  if (!query && typeof idImages !== 'undefined' && idImages.length) {
+    _autoScanAfterId = true;
+    identifyDiecastImages(idImages, '');
+    return;
+  }
   if (!query) return;
   const fees = getTariffs();
   document.getElementById('psLoading').style.display = 'block';
