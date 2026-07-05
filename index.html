@@ -399,6 +399,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <button id="psClearBtn" onclick="clearPsSearch(); resetIdImages();" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
       </div>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
+      <button id="psQuickToggle" class="qsearch-btn" onclick="toggleQuickPrice()" title="Quick Price — prices only, skips margin analysis for faster searches" style="border-color:var(--border);color:var(--gray);">⚡ Quick Price — OFF</button>
     </div>
     <input type="file" id="psImageInput" accept="image/*" multiple style="display:none" onchange="handlePsImageInput(event)"/>
     <div style="margin-top:12px;font-size:12px;color:var(--gray);">📷 Add multiple angles for better accuracy (base plate, front, rear, side) — up to 5. Paste with Ctrl+V or tap ＋ Add angle.</div>
@@ -428,7 +429,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   </div>
   <div id="psLoading" style="text-align:center;padding:40px;display:none;">
     <div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 14px;"></div>
-    <div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;">Scanning market and calculating margins...</div>
+    <div id="psTimer" style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;">Scanning... 0s</div>
   </div>
   <div id="psResults">
     <div style="text-align:center;padding:60px;color:var(--gray);">
@@ -2749,6 +2750,7 @@ async function loadData() {
   renderBuyReport();
   renderIdImageGrid(); // show the empty "add angle" slot for the Image ID grid
   updateFastModeUI();  // reflect the persisted Fast Mode state on the toggle
+  updateQuickPriceUI();// reflect the persisted Quick Price state on the toggle
   maybeAutoScrape(); // background refresh of any vendor whose data is >24h old
 }
 
@@ -4066,6 +4068,45 @@ function updateFastModeUI() {
     btn.style.fontWeight = '400';
   }
 }
+
+// ⚡ Quick Price: prices only, skips the sold-listings fetch + margin breakdown
+let psQuickPrice = false;
+try { psQuickPrice = localStorage.getItem('s64_quick_price') === '1'; } catch (e) {}
+function toggleQuickPrice() {
+  psQuickPrice = !psQuickPrice;
+  try { localStorage.setItem('s64_quick_price', psQuickPrice ? '1' : '0'); } catch (e) {}
+  updateQuickPriceUI();
+}
+function updateQuickPriceUI() {
+  const btn = document.getElementById('psQuickToggle');
+  if (!btn) return;
+  if (psQuickPrice) {
+    btn.textContent = '⚡ Quick Price — ON';
+    btn.style.borderColor = 'var(--gold)';
+    btn.style.color = 'var(--gold)';
+    btn.style.background = 'rgba(201,168,76,0.14)';
+    btn.style.fontWeight = '700';
+  } else {
+    btn.textContent = '⚡ Quick Price — OFF';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--gray)';
+    btn.style.background = 'transparent';
+    btn.style.fontWeight = '400';
+  }
+}
+
+// Live elapsed-seconds timer shown next to the scan spinner
+let _scanTimerInt = null, _scanTimerStart = 0;
+function startScanTimer() {
+  _scanTimerStart = Date.now();
+  const tick = () => { const el = document.getElementById('psTimer'); if (el) el.textContent = 'Scanning... ' + Math.floor((Date.now() - _scanTimerStart) / 1000) + 's'; };
+  tick();
+  if (_scanTimerInt) clearInterval(_scanTimerInt);
+  _scanTimerInt = setInterval(tick, 250);
+}
+function stopScanTimer() {
+  if (_scanTimerInt) { clearInterval(_scanTimerInt); _scanTimerInt = null; }
+}
 const ID_MAX = 5;
 
 function handlePsImageInput(e) {
@@ -4200,6 +4241,7 @@ async function identifyDiecastImages(images, correction) {
   const results = document.getElementById('psResults');
   if (!images || !images.length) { toast('Add at least one photo first.', 'yellow'); return; }
   if (loading) loading.style.display = 'block';
+  startScanTimer();
   if (results) results.innerHTML = '';
   const thumbUrl = (images[0] && images[0].dataUrl) || '';
   const base = 'You are given multiple angles of the same diecast model. Carefully READ any visible printed text in every image — especially on the base plate or underside, packaging, or any label. Brand names, model names, scale (1:64, 1:18), and part numbers are often printed directly on the base. Use all text and visual details together to identify the exact brand, model name, scale, and color. Return JSON only.';
@@ -4223,6 +4265,7 @@ async function identifyDiecastImages(images, correction) {
     });
     if (!visionRes.ok) throw new Error('API ' + visionRes.status);
     const vision = parseJsonFromContent(await visionRes.json());
+    stopScanTimer();
     if (loading) loading.style.display = 'none';
 
     if (!vision || !vision.model_name) {
@@ -4267,6 +4310,7 @@ async function identifyDiecastImages(images, correction) {
     };
     await showIdentifyResult(merged, thumbUrl);
   } catch (err) {
+    stopScanTimer();
     if (loading) loading.style.display = 'none';
     if (results) results.innerHTML = `<div style="background:#2B0D0D;border:1px solid var(--red);border-radius:10px;padding:16px 18px;margin-bottom:14px;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--red);margin-bottom:4px;">❌ Couldn't analyze the image</div><div style="font-size:13px;color:var(--white);">${err.message}. Please try another photo.</div></div>`;
   }
@@ -4375,6 +4419,7 @@ async function runPriceScan() {
   if (!query) return;
   const fees = getTariffs();
   document.getElementById('psLoading').style.display = 'block';
+  startScanTimer();
   document.getElementById('psResults').innerHTML = '';
   document.getElementById('psScanBtn').disabled = true;
 
@@ -4391,10 +4436,12 @@ async function runPriceScan() {
       const mapped = mapActiveItems(await fetchEbayItems('ebay_active', variants[idx]));
       if (mapped.length > 0) { ebayActivePrices = mapped; activeApprox = idx > 0; useRealData = true; }
     }
-    // Sold listings: same fallback chain
-    for (let idx = 0; idx < variants.length && ebaySoldPrices.length === 0; idx++) {
-      const mapped = mapSoldItems(await fetchEbayItems('ebay_sold', variants[idx]), query);
-      if (mapped.length > 0) { ebaySoldPrices = mapped; soldApprox = idx > 0; useRealData = true; }
+    // Sold listings: same fallback chain (skipped in Quick Price mode for speed)
+    if (!psQuickPrice) {
+      for (let idx = 0; idx < variants.length && ebaySoldPrices.length === 0; idx++) {
+        const mapped = mapSoldItems(await fetchEbayItems('ebay_sold', variants[idx]), query);
+        if (mapped.length > 0) { ebaySoldPrices = mapped; soldApprox = idx > 0; useRealData = true; }
+      }
     }
   } catch(e) {
     console.log('eBay API error, using estimates:', e);
@@ -4488,7 +4535,19 @@ async function runPriceScan() {
     refPhotoDefault = prodImg;
     refPriceDefault = ebayActivePrices[0] ? '$' + parseFloat(ebayActivePrices[0].price).toFixed(2) : '';
     refLocked = false;
-    document.getElementById('psResults').innerHTML = `
+    const _quickHtml = `
+      ${prodImg ? `<img class="product-hero" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
+      <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;"><div style="font-size:10px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">⚡ QUICK PRICE · ${query.toUpperCase()}${useRealData ? ' · 🟢 LIVE EBAY' : ' · 🤖 EST.'}</div><div style="font-size:13px;color:var(--gray);">Fast price view — active listings + competitor prices. Turn Quick Price off for full margin analysis.</div></div>
+      <div class="listings-wrap">
+        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-price" id="refPhotoPrice">${refPriceDefault}</div><div class="ps-label" id="refPhotoLabel">Reference Photo</div></div>` : ''}
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;flex:1;min-width:0;">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟡 ACTIVE LISTINGS</div><span style="font-size:11px;color:var(--gold);">${ebayActivePrices.length > 0 ? ebayActivePrices.length + ' live' : '~' + data.listings + ' est.'}</span></div>
+          ${renderColumn(activeListings,false,'active')}
+        </div>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--gray);margin:-2px 0 14px;">Single click to preview image · Double click to open on eBay</div>
+      ${competitorHtml}`;
+    document.getElementById('psResults').innerHTML = psQuickPrice ? _quickHtml : `
       ${prodImg ? `<img class="product-hero" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">${useRealData?((activeApprox||soldApprox)?'🟢 LIVE EBAY DATA · SIMILAR ITEMS':'🟢 LIVE EBAY DATA'):'🤖 AI ESTIMATE'} · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
@@ -4537,6 +4596,7 @@ async function runPriceScan() {
         </div>
       </div>`;
     renderCompetitorPrices(); // populate the competitor list + highlight the active filter
+    stopScanTimer();
     document.getElementById('psLoading').style.display = 'none';
     document.getElementById('psScanBtn').disabled = false;
   }
