@@ -4377,7 +4377,7 @@ async function showIdentifyResult(r, dataUrl) {
   // HIGH CONFIDENCE — green banner + auto-run the eBay scan
   if (conf === 'high') {
     _autoScanAfterId = false;
-    document.getElementById('psSearchInput').value = simplifyEbaySearch(searchStr || model, r.product_code);
+    document.getElementById('psSearchInput').value = buildIdSearchTerm(r);
     togglePsClear();
     const banner = `<div style="background:#0D2B0D;border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--green);">✅ Identified: ${escHtmlA(model)}<span style="color:var(--green);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}${notesHtml}</div></div>`;
     await runPriceScan();
@@ -4389,7 +4389,7 @@ async function showIdentifyResult(r, dataUrl) {
   // SMART FLOW (SCAN with photos): scan the best guess even at lower confidence
   if (_autoScanAfterId && model) {
     _autoScanAfterId = false;
-    document.getElementById('psSearchInput').value = simplifyEbaySearch(searchStr || model, r.product_code);
+    document.getElementById('psSearchInput').value = buildIdSearchTerm(r);
     togglePsClear();
     const banner = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);">🔎 Identified from photo: ${escHtmlA(model)}<span style="color:var(--yellow);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}<div style="font-size:12px;color:var(--gray);margin-top:6px;">Lower-confidence match — showing prices for this best guess. Correct it below if needed.</div></div></div>`;
     await runPriceScan();
@@ -4406,6 +4406,33 @@ function identifySearchAnyway(str) {
   const inp = document.getElementById('psSearchInput');
   if (inp) { inp.value = str; togglePsClear(); }
   runPriceScan();
+}
+
+// Drill into a specific active listing: copy its exact title into the search and re-scan
+function drillIntoListing(el) {
+  const title = (el && el.getAttribute('data-title')) || '';
+  if (!title.trim()) return;
+  const inp = document.getElementById('psSearchInput');
+  if (inp) { inp.value = title.trim(); togglePsClear(); }
+  runPriceScan();
+}
+
+// Build a specific eBay search term from an Image ID result — includes colorway + edition,
+// strips SKU/scale/parens/collab, caps at 8 words. (Keeps edition words, unlike simplifyEbaySearch.)
+function buildIdSearchTerm(r) {
+  let s = String([r.brand, r.model_name, r.colorway, r.edition].filter(Boolean).join(' ') || r.model_name || '');
+  s = s.replace(/\([^)]*\)/g, ' ').replace(/\[[^\]]*\]/g, ' ');            // remove (…) / […]
+  s = s.replace(/\s+x\s+[A-Za-z0-9.]+(?:\s+[A-Za-z0-9.]+)?/gi, ' ');       // drop collab "x Brand"
+  s = s.replace(/\b1\s*[:/]\s*\d{2,3}\b/g, ' ');                           // drop scale
+  s = s.replace(/\bweb[-\s]?enriched\b/gi, ' ');
+  const code = String(r.product_code || '').trim();
+  if (code) s = s.replace(new RegExp('\\b' + code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi'), ' ');
+  s = s.replace(/\b[A-Za-z]{3,}\d{3,}[A-Za-z0-9]*\b/g, ' ');               // strip SKU codes
+  s = s.replace(/[^A-Za-z0-9\s/-]/g, ' ').replace(/\s+/g, ' ').trim();
+  // de-duplicate words (colorway/edition may repeat model words), keep order, cap at 8
+  const seen = new Set(); const out = [];
+  s.split(' ').forEach(w => { const k = w.toLowerCase(); if (w && !seen.has(k)) { seen.add(k); out.push(w); } });
+  return out.slice(0, 8).join(' ').trim();
 }
 
 async function runPriceScan() {
@@ -4507,7 +4534,9 @@ async function runPriceScan() {
       const interactive = safeUrl || safeImg;
       const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" data-price="${priceStr}" onclick="cardClick(this)" ondblclick="cardDblClick(this)" onmouseenter="cardHoverImg(this)" onmouseleave="cardHoverReset()"` : '';
       const pin = (interactive && safeImg) ? `<input type="checkbox" class="card-pin" title="Pin as reference photo" onclick="event.stopPropagation();togglePin(this)" ondblclick="event.stopPropagation()"/>` : '';
-      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div></div>`;
+      // Active listings get a drill-in checkbox: search this exact listing title
+      const drill = !isSold ? `<input type="checkbox" class="drill-check" title="Search this exact listing title" onclick="event.stopPropagation();drillIntoListing(this)" ondblclick="event.stopPropagation()" data-title="${safeTitle}" style="cursor:pointer;flex-shrink:0;"/>` : '';
+      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}${drill}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div></div>`;
     }).join('');
     const renderColumn = (items, isSold, colId) => {
       const first = items.slice(0, 4);
