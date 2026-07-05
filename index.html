@@ -2492,22 +2492,6 @@ function brandFromName(name) {
 }
 
 // Map one Shopify products.json product to the catalog item shape
-// Horizon Diecast is a Canadian store but sometimes lists USD. Best-effort currency detection.
-function detectHorizonCurrency(text, price, scale) {
-  const t = String(text || '').toLowerCase();
-  // 1) explicit currency indicators in the product text (CAD/USD, C$/US$)
-  if (/us\$|\busd\b/.test(t)) return 'USD';
-  if (/c\$|\bcad\b/.test(t)) return 'CAD';
-  // 2) price-based heuristic
-  const is164 = /1\s*[:/]\s*64/.test(String(scale || '')) || /1\s*[:/]\s*64/.test(t);
-  if (price != null && !isNaN(price)) {
-    if (is164 && price < 15) return 'CAD';   // very low for premium USD 1:64
-    if (price > 50) return 'UNKNOWN';         // high enough to need manual verification
-  }
-  // 3) default: Canadian store → CAD
-  return 'CAD';
-}
-
 function mapShopifyProduct(p, vendor) {
   const variants = Array.isArray(p.variants) ? p.variants : [];
   const first = variants[0] || {};
@@ -2517,9 +2501,8 @@ function mapShopifyProduct(p, vendor) {
   const image = (Array.isArray(p.images) && p.images[0] && p.images[0].src) ? p.images[0].src : '';
   const priceNum = !isNaN(price) ? price : null;
   const scale = detectScale((p.title || '') + ' ' + tags + ' ' + (p.body_html || ''));
-  let currency = '';
-  if (vendor === 'CarBromc') currency = 'CAD';   // CarBromc consistently prices in CAD
-  else if (vendor === 'Horizon Diecast') currency = detectHorizonCurrency((p.title || '') + ' ' + tags + ' ' + (p.body_html || ''), priceNum, scale);
+  // Only CarBromc prices in CAD; everything else (incl. Horizon Diecast) is treated as USD.
+  const currency = (vendor === 'CarBromc') ? 'CAD' : '';
   return {
     name: p.title || '',
     brand: p.vendor || brandFromName(p.title || ''),
@@ -3646,21 +3629,82 @@ function renderWhatnotLeaderboard() {
   const rows = list.map((x, i) => {
     const medal = i < 3 ? medals[i] : (i + 1);
     const nmeColor = i < 3 ? ['var(--gold)', '#C0C0C0', '#CD7F32'][i] : 'var(--white)';
-    return `<tr style="border-bottom:1px solid var(--border);">
+    // 🔁 Shows: badge for repeat buyers; 3+ shows also tints the whole row gold
+    let showsCell = String(x.showCount);
+    if (x.showCount >= 3) showsCell += ' <span title="Loyal repeat buyer (3+ shows)">🔥</span>';
+    else if (x.showCount === 2) showsCell += ' <span title="Repeat buyer (2 shows)">⭐</span>';
+    const rowTint = x.showCount >= 3 ? 'background:rgba(201,168,76,0.10);' : '';
+    return `<tr style="border-bottom:1px solid var(--border);${rowTint}">
       <td style="padding:8px;font-weight:700;color:${nmeColor};">${medal}</td>
-      <td style="padding:8px;font-weight:${i < 3 ? '700' : '400'};color:${nmeColor};">${escHtmlA(x.buyer)}</td>
+      <td style="padding:8px;font-weight:${i < 3 ? '700' : '400'};"><span onclick="openBuyerProfile('${escJs(x.buyer)}')" title="View buyer profile" style="color:${nmeColor};cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${escHtmlA(x.buyer)}</span></td>
       <td style="padding:8px;white-space:nowrap;font-weight:700;color:var(--green);">$${x.spent.toFixed(2)}</td>
       <td style="padding:8px;">${x.purchases}</td>
-      <td style="padding:8px;">${x.showCount}</td>
+      <td style="padding:8px;white-space:nowrap;font-weight:${x.showCount >= 2 ? '700' : '400'};">${showsCell}</td>
       <td style="padding:8px;white-space:nowrap;">$${x.avgPerShow.toFixed(2)}</td>
     </tr>`;
   }).join('');
   div.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
     <thead><tr style="text-align:left;color:var(--gray);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border);">
-      <th style="padding:8px;">Rank</th><th style="padding:8px;">Buyer</th><th style="padding:8px;">Total Spent</th><th style="padding:8px;"># Purchases</th><th style="padding:8px;"># Shows</th><th style="padding:8px;">Avg / Show</th>
+      <th style="padding:8px;">Rank</th><th style="padding:8px;">Buyer</th><th style="padding:8px;">Total Spent</th><th style="padding:8px;"># Purchases</th><th style="padding:8px;">🔁 Shows</th><th style="padding:8px;">Avg / Show</th>
     </tr></thead><tbody>${rows}</tbody>
     <tfoot><tr style="border-top:2px solid var(--border);font-weight:700;"><td style="padding:8px;"></td><td style="padding:8px;">TOTAL (${list.length} buyers)</td><td style="padding:8px;color:var(--green);">$${totSpent.toFixed(2)}</td><td style="padding:8px;">${totPur}</td><td style="padding:8px;"></td><td style="padding:8px;"></td></tr></tfoot>
   </table></div>`;
+}
+
+// Build a per-buyer profile: total spend + a breakdown by show (with itemized purchases where available)
+function buildBuyerProfile(buyerName) {
+  const target = String(buyerName || '').trim().toLowerCase();
+  const shows = [];
+  let grandTotal = 0;
+  whatnotShows.forEach(show => {
+    const rec = wnBuyerRecordsForShow(show).find(r => (r.buyer || '').trim().toLowerCase() === target);
+    const items = wnSalesForShow(show)
+      .filter(s => (s.buyer || '').trim().toLowerCase() === target)
+      .map(s => ({ item: s.item, price: s.price }));
+    if (!rec && !items.length) return; // buyer not present in this show
+    const spent = rec ? rec.spent : items.reduce((a, b) => a + (b.price || 0), 0);
+    const purchases = rec ? rec.purchases : items.length;
+    grandTotal += spent;
+    shows.push({
+      title: show.streamTitle || '(untitled show)',
+      seller: show.seller || 'Unknown',
+      date: show.date || '',
+      purchases: purchases,
+      spent: spent,
+      items: items
+    });
+  });
+  shows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return { buyer: buyerName, grandTotal, shows };
+}
+
+function openBuyerProfile(buyerName) {
+  const p = buildBuyerProfile(buyerName);
+  const body = document.getElementById('buyerProfileBody');
+  if (!body) return;
+  const showsHtml = p.shows.length ? p.shows.map(s => {
+    const itemsHtml = s.items.length
+      ? s.items.map(it => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);"><span style="color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(it.item)}</span><span style="color:var(--green);font-weight:700;white-space:nowrap;">$${(it.price || 0).toFixed(2)}</span></div>`).join('')
+      : '<div style="font-size:12px;color:var(--gray);padding:4px 0;">No itemized sales for this show (buyers-only data).</div>';
+    return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--black);">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">📺 ${escHtmlA(s.title)}</div>
+        <div style="font-size:11px;color:var(--gray);">${escHtmlA(s.seller)} · ${escHtmlA(s.date)}</div>
+      </div>
+      <div style="font-size:12px;color:var(--white);margin:6px 0 8px;">${s.purchases} item${s.purchases === 1 ? '' : 's'} · spent <strong style="color:var(--green);">$${s.spent.toFixed(2)}</strong></div>
+      ${itemsHtml}
+    </div>`;
+  }).join('') : '<div style="color:var(--gray);font-size:13px;">No shows found for this buyer.</div>';
+  body.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;">
+      <div>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold);">👤 ${escHtmlA(p.buyer)}</div>
+        <div style="font-size:13px;color:var(--gray);margin-top:2px;">Total spent across ${p.shows.length} show${p.shows.length === 1 ? '' : 's'}: <strong style="color:var(--green);font-size:16px;">$${p.grandTotal.toFixed(2)}</strong></div>
+      </div>
+      <button onclick="closeModal('buyerProfileModal')" title="Close" style="background:transparent;border:none;color:var(--gray);font-size:24px;line-height:1;cursor:pointer;">&times;</button>
+    </div>
+    ${showsHtml}`;
+  openModal('buyerProfileModal');
 }
 
 // --- Sales analysis ---
@@ -3674,6 +3718,7 @@ function wnSalesForShow(show) {
   const typeCol = exactCol(h, 'transaction_type') || findCol(h, ['type', 'method', 'sale type', 'format']);
   const givCol = exactCol(h, 'is_giveaway');
   const durCol = findCol(h, ['second', 'duration', 'elapsed', 'time to sell', 'sold in']);
+  const buyerCol = exactCol(h, 'buyer_display') || exactCol(h, 'buyer_username') || findCol(h, ['buyer', 'user', 'handle', 'customer']);
   const showLabel = (show.streamTitle ? show.streamTitle + ' · ' : '') + show.seller + ' · ' + show.date;
   return sd.rows.map(r => {
     const dur = durCol ? parseMoney(r[durCol]) : null;
@@ -3683,6 +3728,7 @@ function wnSalesForShow(show) {
     else if (/auction/i.test(saleType)) saleType = 'Auction';
     return {
       show: showLabel, showId: show.id, seller: show.seller,
+      buyer: buyerCol ? (r[buyerCol] || '').trim() : '',
       item: itemCol ? r[itemCol] : '(unknown)',
       price: parseMoney(priceCol ? r[priceCol] : 0),
       time: timeCol ? r[timeCol] : '',
@@ -4185,18 +4231,10 @@ function renderCompetitorPrices() {
     const safeTitle = escAttr(it.name || '');
     const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" onclick="cardClick(this)" ondblclick="cardDblClick(this)"` : '';
     const arrow = interactive ? `<span title="Single click: preview image · Double click: open vendor page" style="color:var(--gray);font-size:13px;margin-left:8px;">↗</span>` : '';
-    // Currency: CarBromc always CAD; Horizon Diecast uses the per-item detected currency
-    // (defaults CAD for legacy items). Convert button shows only when we're confident it's CAD.
+    // Currency: only CarBromc prices in CAD (their products.json feed returns CAD).
+    // Horizon Diecast prices are USD — no label, no convert button.
     let currencyLabel = '', showCadBtn = false;
-    if (priceNum != null) {
-      if (it.site === 'CarBromc') { currencyLabel = 'CAD'; showCadBtn = true; }
-      else if (it.site === 'Horizon Diecast') {
-        const cur = String(it.currency || 'CAD').toUpperCase();
-        if (cur === 'USD') { currencyLabel = 'USD'; showCadBtn = false; }
-        else if (cur === 'CAD') { currencyLabel = 'CAD'; showCadBtn = true; }
-        else { currencyLabel = 'CAD?'; showCadBtn = false; } // UNKNOWN → label only, needs verification
-      }
-    }
+    if (priceNum != null && it.site === 'CarBromc') { currencyLabel = 'CAD'; showCadBtn = true; }
     const rid = 'cad' + (_cadRowSeq++);
     const priceSpan = `<span id="price_${rid}" style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);">${price}</span>`;
     const curFlag = currencyLabel ? `<span class="cad-flag" style="font-size:9px;color:var(--gray);font-weight:700;">${currencyLabel}</span>` : '';
@@ -4977,6 +5015,13 @@ document.addEventListener('DOMContentLoaded', function() {
   renderCatalogs();             // belt-and-suspenders: ensure catalogs render once DOM is ready
 });
 </script>
+
+<!-- BUYER PROFILE MODAL (Whatnot Intel leaderboard drill-in) -->
+<div class="modal-overlay" id="buyerProfileModal">
+  <div class="modal" style="width:640px;">
+    <div id="buyerProfileBody"></div>
+  </div>
+</div>
 
 <!-- INVENTORY MODAL -->
 <div class="modal-overlay" id="addItemModal">
