@@ -3478,35 +3478,56 @@ async function saveWhatnotShows() {
   } catch (e) { console.log('⚠️ Whatnot cloud sync failed (kept local copy):', e); }
 }
 
+// Best-effort seller from a Whatnot Spy buyers filename (resellbot-buyers-[show-slug]-[timestamp].csv)
+function extractSellerFromFilename(fileName) {
+  const m = String(fileName || '').match(/resellbot-(?:buyers|sales)-(.+?)-\d{6,}\.csv$/i);
+  if (!m) return '';
+  return m[1].replace(/[-_]+/g, ' ').trim();
+}
+
 function addWhatnotShow(fileName, text) {
   const { headers, objects, meta } = csvToObjects(text);
   if (!headers.length || !objects.length) { toast('Could not read that CSV (no rows).', 'red'); return; }
   const type = detectCsvType(headers);
   const streamTitle = extractStreamTitle(meta);
-  // Seller: manual input wins; otherwise derive from the CSV's seller_username column (Sales)
-  let seller = ((document.getElementById('whatnotSeller') || {}).value || '').trim();
-  if (!seller && type === 'sales') {
+  // Seller + its source, ranked so a stronger source upgrades a weaker one on merge:
+  // user input > Sales seller_username > (Buyers) filename slug > Unknown
+  let seller = '', sellerSource = 'unknown';
+  const _userSeller = ((document.getElementById('whatnotSeller') || {}).value || '').trim();
+  if (_userSeller) { seller = _userSeller; sellerSource = 'user'; }
+  else if (type === 'sales') {
     const sc = exactCol(headers, 'seller_username');
-    if (sc && objects[0]) seller = (objects[0][sc] || '').trim();
+    const v = (sc && objects[0]) ? (objects[0][sc] || '').trim() : '';
+    if (v) { seller = v; sellerSource = 'sales'; }
   }
-  if (!seller) seller = 'Unknown';
+  if (!seller && type === 'buyers') {
+    const fn = extractSellerFromFilename(fileName);
+    if (fn) { seller = fn; sellerSource = 'filename'; }
+  }
+  if (!seller) { seller = 'Unknown'; sellerSource = 'unknown'; }
+  const SRC_RANK = { unknown: 0, filename: 1, sales: 2, user: 3 };
+
   const date = ((document.getElementById('whatnotDate') || {}).value || '').trim() || new Date().toISOString().slice(0, 10);
   const dataset = { headers, rows: objects, fileName, rowCount: objects.length };
 
-  // Match an existing show by title + date + seller (case-insensitive on title/seller)
+  // Match an existing show by TITLE + DATE only (seller may be missing on a Buyers CSV)
   const norm = v => String(v || '').trim().toLowerCase();
-  const thisKey = norm(streamTitle) + '|' + String(date) + '|' + norm(seller);
-  const showKey = s => norm(s.streamTitle) + '|' + String(s.date) + '|' + norm(s.seller);
+  const thisKey = norm(streamTitle) + '|' + String(date);
+  const showKey = s => norm(s.streamTitle) + '|' + String(s.date);
   const existing = whatnotShows.find(s => showKey(s) === thisKey);
 
   let merged = false;
   if (existing) {
     existing[type] = dataset;                 // add/replace the Sales or Buyers slot on the same show
     if (!existing.streamTitle && streamTitle) existing.streamTitle = streamTitle;
+    // Seller reconciliation by source rank: a stronger source (e.g. Sales seller_username)
+    // upgrades a weaker/Unknown one — so a later Sales upload fixes a Buyers-only "Unknown".
+    const existingSrc = existing.sellerSource || ((existing.seller && existing.seller !== 'Unknown') ? 'sales' : 'unknown');
+    if (SRC_RANK[sellerSource] > SRC_RANK[existingSrc]) { existing.seller = seller; existing.sellerSource = sellerSource; }
     merged = true;
-    console.log('🔀 MERGE: added ' + type.toUpperCase() + ' data into existing show →', seller, '·', date, '·', streamTitle || '(no title)');
+    console.log('🔀 MERGE: added ' + type.toUpperCase() + ' into show →', existing.seller, '·', date, '·', streamTitle || '(no title)');
   } else {
-    const show = { id: Date.now() + '_' + Math.floor(Math.random() * 1000), seller, date, streamTitle };
+    const show = { id: Date.now() + '_' + Math.floor(Math.random() * 1000), seller, sellerSource, date, streamTitle };
     show[type] = dataset;                      // new entry with one dataset slot
     whatnotShows.push(show);
     console.log('➕ NEW SHOW: created entry →', seller, '·', date, '·', (streamTitle || '(no title)'), '(' + type + ')');
