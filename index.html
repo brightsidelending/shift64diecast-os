@@ -2492,20 +2492,42 @@ function brandFromName(name) {
 }
 
 // Map one Shopify products.json product to the catalog item shape
-function mapShopifyProduct(p) {
+// Horizon Diecast is a Canadian store but sometimes lists USD. Best-effort currency detection.
+function detectHorizonCurrency(text, price, scale) {
+  const t = String(text || '').toLowerCase();
+  // 1) explicit currency indicators in the product text (CAD/USD, C$/US$)
+  if (/us\$|\busd\b/.test(t)) return 'USD';
+  if (/c\$|\bcad\b/.test(t)) return 'CAD';
+  // 2) price-based heuristic
+  const is164 = /1\s*[:/]\s*64/.test(String(scale || '')) || /1\s*[:/]\s*64/.test(t);
+  if (price != null && !isNaN(price)) {
+    if (is164 && price < 15) return 'CAD';   // very low for premium USD 1:64
+    if (price > 50) return 'UNKNOWN';         // high enough to need manual verification
+  }
+  // 3) default: Canadian store → CAD
+  return 'CAD';
+}
+
+function mapShopifyProduct(p, vendor) {
   const variants = Array.isArray(p.variants) ? p.variants : [];
   const first = variants[0] || {};
   const price = parseFloat(first.price);
   const inStock = variants.some(v => v && v.available);
   const tags = Array.isArray(p.tags) ? p.tags.join(' ') : (p.tags || '');
   const image = (Array.isArray(p.images) && p.images[0] && p.images[0].src) ? p.images[0].src : '';
+  const priceNum = !isNaN(price) ? price : null;
+  const scale = detectScale((p.title || '') + ' ' + tags + ' ' + (p.body_html || ''));
+  let currency = '';
+  if (vendor === 'CarBromc') currency = 'CAD';   // CarBromc consistently prices in CAD
+  else if (vendor === 'Horizon Diecast') currency = detectHorizonCurrency((p.title || '') + ' ' + tags + ' ' + (p.body_html || ''), priceNum, scale);
   return {
     name: p.title || '',
     brand: p.vendor || brandFromName(p.title || ''),
-    scale: detectScale((p.title || '') + ' ' + tags + ' ' + (p.body_html || '')),
-    price: !isNaN(price) ? price : null,
+    scale: scale,
+    price: priceNum,
     status: inStock ? 'In Stock' : 'Out of Stock',
-    image: image
+    image: image,
+    currency: currency
   };
 }
 
@@ -2550,6 +2572,7 @@ function mergeScrapedItems(vendor, scraped) {
       if (s.scale && !existing.scale) existing.scale = s.scale;
       if (s.brand && !existing.brand) existing.brand = s.brand;
       if (s.image && !existing.image) existing.image = s.image;
+      if (s.currency) existing.currency = s.currency;   // refresh detected currency
       existing.dateAdded = catToday();
       updated++;
     } else {
@@ -2561,6 +2584,7 @@ function mergeScrapedItems(vendor, scraped) {
         price: s.price != null ? s.price : null,
         status: s.status || 'Unknown',
         image: s.image || '',
+        currency: s.currency || '',
         dateAdded: catToday()
       };
       arr.push(entry);
@@ -2595,7 +2619,7 @@ async function scrapeVendor(vendor, opts) {
       if (cfg.platform === 'shopify') {
         const products = (data && Array.isArray(data.products)) ? data.products : [];
         if (!products.length) break;                 // empty page => done
-        mapped = products.map(mapShopifyProduct);
+        mapped = products.map(x => mapShopifyProduct(x, vendor));
       } else { // woocommerce store api returns a top-level array
         const products = Array.isArray(data) ? data : ((data && Array.isArray(data.products)) ? data.products : []);
         if (!products.length) break;                 // empty page => done
@@ -4010,7 +4034,7 @@ function findCompetitorMatches(query) {
     const status = /preorder/i.test(it.name || '') ? 'Pre-Order' : it.status;
     return {
       score,
-      it: { name: it.name, brand: it.brand, price: it.price, status: status, site: site || it.site || '', image: it.image || '' }
+      it: { name: it.name, brand: it.brand, price: it.price, status: status, site: site || it.site || '', image: it.image || '', currency: it.currency || '' }
     };
   };
   const results = [];
@@ -4140,11 +4164,23 @@ function renderCompetitorPrices() {
     const safeTitle = escAttr(it.name || '');
     const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" onclick="cardClick(this)" ondblclick="cardDblClick(this)"` : '';
     const arrow = interactive ? `<span title="Single click: preview image · Double click: open vendor page" style="color:var(--gray);font-size:13px;margin-left:8px;">↗</span>` : '';
-    // CarBromc & Horizon Diecast price in CAD — flag and offer a manual conversion (not Pablo's / eBay)
-    const isCAD = priceNum != null && (it.site === 'CarBromc' || it.site === 'Horizon Diecast');
+    // Currency: CarBromc always CAD; Horizon Diecast uses the per-item detected currency
+    // (defaults CAD for legacy items). Convert button shows only when we're confident it's CAD.
+    let currencyLabel = '', showCadBtn = false;
+    if (priceNum != null) {
+      if (it.site === 'CarBromc') { currencyLabel = 'CAD'; showCadBtn = true; }
+      else if (it.site === 'Horizon Diecast') {
+        const cur = String(it.currency || 'CAD').toUpperCase();
+        if (cur === 'USD') { currencyLabel = 'USD'; showCadBtn = false; }
+        else if (cur === 'CAD') { currencyLabel = 'CAD'; showCadBtn = true; }
+        else { currencyLabel = 'CAD?'; showCadBtn = false; } // UNKNOWN → label only, needs verification
+      }
+    }
     const rid = 'cad' + (_cadRowSeq++);
     const priceSpan = `<span id="price_${rid}" style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);">${price}</span>`;
-    const cadExtra = isCAD ? `<span class="cad-flag" style="font-size:9px;color:var(--gray);font-weight:700;">CAD</span><button class="cad-btn" data-cad="${priceNum.toFixed(2)}" data-target="price_${rid}" onclick="event.stopPropagation();convertCadToUsd(this)" title="Convert CAD → USD" style="font-size:10px;font-weight:700;padding:2px 7px;border:1px solid var(--gold);color:var(--gold);background:transparent;border-radius:5px;cursor:pointer;white-space:nowrap;">🇨🇦 → 🇺🇸 USD</button>` : '';
+    const curFlag = currencyLabel ? `<span class="cad-flag" style="font-size:9px;color:var(--gray);font-weight:700;">${currencyLabel}</span>` : '';
+    const cadBtn = showCadBtn ? `<button class="cad-btn" data-cad="${priceNum.toFixed(2)}" data-target="price_${rid}" onclick="event.stopPropagation();convertCadToUsd(this)" title="Convert CAD → USD" style="font-size:10px;font-weight:700;padding:2px 7px;border:1px solid var(--gold);color:var(--gold);background:transparent;border-radius:5px;cursor:pointer;white-space:nowrap;">🇨🇦 → 🇺🇸 USD</button>` : '';
+    const cadExtra = curFlag + cadBtn;
     const priceArea = `<div style="display:flex;align-items:center;white-space:nowrap;gap:6px;">${priceSpan}${cadExtra}${arrow}</div>`;
     return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:${interactive ? 'pointer' : 'default'};"><div style="display:flex;align-items:center;gap:10px;min-width:0;">${thumb}<div style="min-width:0;"><div style="font-size:13px;">${it.name || 'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site || 'Unknown'}${it.status ? ' · ' + it.status : ''}</div></div></div>${priceArea}</div>`;
   };
