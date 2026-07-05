@@ -2904,15 +2904,25 @@ function toggleShowMore(colId) {
   btn.textContent = opening ? 'Show Less' : ('Show More (' + more.children.length + ')');
 }
 
-// Collapse/expand the SOLD LISTINGS body (toggles #soldBody display)
+// Smoothly collapse/expand the SOLD LISTINGS body (max-height transition, no page jump)
 function toggleSoldListings(headerEl) {
   const card = headerEl.parentElement;
   const body = card ? (card.querySelector('#soldBody') || card.querySelector('.sold-body')) : null;
   const chev = headerEl.querySelector('.sold-chevron');
   if (!body) return;
-  const opening = body.style.display === 'none';
-  body.style.display = opening ? 'block' : 'none';
-  if (chev) chev.textContent = opening ? '▼ Hide' : '▶ Show';
+  const opening = !body.classList.contains('open');
+  if (opening) {
+    body.classList.add('open');
+    body.style.maxHeight = body.scrollHeight + 'px';
+    setTimeout(() => { if (body.classList.contains('open')) body.style.maxHeight = 'none'; }, 320); // let nested Show More expand
+    if (chev) chev.textContent = '▼ Hide';
+  } else {
+    body.style.maxHeight = body.scrollHeight + 'px'; // set explicit height, then animate to 0
+    void body.offsetHeight;                          // force reflow
+    body.style.maxHeight = '0px';
+    body.classList.remove('open');
+    if (chev) chev.textContent = '▶ Show';
+  }
 }
 function showImagePreview(img, title) {
   if (!img) return;
@@ -4054,12 +4064,12 @@ function renderCompetitorPrices() {
 // ============================================================
 let idImages = [];        // up to ID_MAX loaded images: {base64, mediaType, dataUrl}
 let _autoScanAfterId = false; // set by the SCAN button's smart flow so identification auto-runs a price scan
-let idFastMode = true;        // ⚡ Fast Mode: skip enrichment. Default ON (only OFF if explicitly saved '0')
-try { idFastMode = localStorage.getItem('s64_fast_mode') !== '0'; } catch (e) {}
+let idFastMode = true;        // ⚡ Fast Mode: skip enrichment. Default ON (only OFF if explicitly turned off)
+try { idFastMode = localStorage.getItem('s64_fast_mode') !== 'false'; } catch (e) {}
 
 function toggleFastMode() {
   idFastMode = !idFastMode;
-  try { localStorage.setItem('s64_fast_mode', idFastMode ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem('s64_fast_mode', idFastMode ? 'true' : 'false'); } catch (e) {}
   updateFastModeUI();
 }
 function updateFastModeUI() {
@@ -4566,7 +4576,7 @@ async function runPriceScan() {
         <div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟢 SOLD LISTINGS · <span style="color:var(--green);font-size:12px;font-weight:600;">${soldCountLabel} sold/30 days</span></div>
         <span class="sold-chevron" style="font-size:12px;color:var(--blue);font-weight:700;white-space:nowrap;">▶ Show</span>
       </div>
-      <div id="soldBody" class="sold-body" style="display:none;">${rowsHtml}</div>
+      <div id="soldBody" class="sold-body" style="max-height:0;overflow:hidden;transition:max-height 0.28s ease;">${rowsHtml}</div>
       <a href="https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Complete=1&LH_Sold=1" target="_blank" rel="noopener noreferrer" style="display:block;background:var(--gold);color:#000;padding:10px;text-align:center;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px;margin:10px;">🔗 View Sold on eBay →</a>
     </div>`;
     const compMatches = findCompetitorMatches(query);
