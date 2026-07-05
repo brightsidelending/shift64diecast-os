@@ -4012,6 +4012,40 @@ function compVendorUrl(site, name) {
   const base = bases[site];
   return base ? base + encodeURIComponent(name || '') : '';
 }
+
+// ---- CAD → USD conversion for CarBromc & Horizon Diecast (priced in CAD) ----
+let _cadRowSeq = 0;      // unique id counter for CAD price rows
+let _cadUsdRate = null;  // cached once per session
+
+// Get 1 CAD in USD: try the live rate, fall back to 0.73. Cached after first call.
+async function getCadUsdRate() {
+  if (_cadUsdRate != null) return _cadUsdRate;
+  try {
+    const r = await fetch('https://open.er-api.com/v6/latest/CAD');
+    const d = await r.json();
+    const rate = d && d.rates && d.rates.USD;
+    if (typeof rate === 'number' && rate > 0) { _cadUsdRate = rate; return rate; }
+  } catch (e) { /* fall through to fallback */ }
+  _cadUsdRate = 0.73; // hardcoded fallback (1 CAD = 0.73 USD)
+  return _cadUsdRate;
+}
+
+// Convert one CAD price to USD in place, then mark the button done + disabled
+async function convertCadToUsd(btn) {
+  if (!btn || btn.disabled) return;
+  const cad = parseFloat(btn.getAttribute('data-cad'));
+  const priceEl = document.getElementById(btn.getAttribute('data-target'));
+  if (isNaN(cad)) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  const rate = await getCadUsdRate();
+  if (priceEl) priceEl.textContent = '$' + (cad * rate).toFixed(2);
+  btn.textContent = '✅ USD';
+  btn.style.borderColor = 'var(--green)';
+  btn.style.color = 'var(--green)';
+  btn.style.cursor = 'default';
+}
+
 function renderCompetitorPrices() {
   const list = document.getElementById('compList');
   if (!list) return;
@@ -4041,7 +4075,8 @@ function renderCompetitorPrices() {
     return;
   }
   const row = it => {
-    const price = (it.price != null && !isNaN(it.price)) ? '$' + parseFloat(it.price).toFixed(2) : '—';
+    const priceNum = (it.price != null && !isNaN(it.price)) ? parseFloat(it.price) : null;
+    const price = priceNum != null ? '$' + priceNum.toFixed(2) : '—';
     const img = it.image || '';
     const url = compVendorUrl(it.site, it.name);
     const interactive = !!(img || url);
@@ -4051,7 +4086,13 @@ function renderCompetitorPrices() {
     const safeTitle = escAttr(it.name || '');
     const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" onclick="cardClick(this)" ondblclick="cardDblClick(this)"` : '';
     const arrow = interactive ? `<span title="Single click: preview image · Double click: open vendor page" style="color:var(--gray);font-size:13px;margin-left:8px;">↗</span>` : '';
-    return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:${interactive ? 'pointer' : 'default'};"><div style="display:flex;align-items:center;gap:10px;min-width:0;">${thumb}<div style="min-width:0;"><div style="font-size:13px;">${it.name || 'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site || 'Unknown'}${it.status ? ' · ' + it.status : ''}</div></div></div><div style="display:flex;align-items:center;white-space:nowrap;"><span style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);">${price}</span>${arrow}</div></div>`;
+    // CarBromc & Horizon Diecast price in CAD — flag and offer a manual conversion (not Pablo's / eBay)
+    const isCAD = priceNum != null && (it.site === 'CarBromc' || it.site === 'Horizon Diecast');
+    const rid = 'cad' + (_cadRowSeq++);
+    const priceSpan = `<span id="price_${rid}" style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);">${price}</span>`;
+    const cadExtra = isCAD ? `<span class="cad-flag" style="font-size:9px;color:var(--gray);font-weight:700;">CAD</span><button class="cad-btn" data-cad="${priceNum.toFixed(2)}" data-target="price_${rid}" onclick="event.stopPropagation();convertCadToUsd(this)" title="Convert CAD → USD" style="font-size:10px;font-weight:700;padding:2px 7px;border:1px solid var(--gold);color:var(--gold);background:transparent;border-radius:5px;cursor:pointer;white-space:nowrap;">🇨🇦 → 🇺🇸 USD</button>` : '';
+    const priceArea = `<div style="display:flex;align-items:center;white-space:nowrap;gap:6px;">${priceSpan}${cadExtra}${arrow}</div>`;
+    return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:${interactive ? 'pointer' : 'default'};"><div style="display:flex;align-items:center;gap:10px;min-width:0;">${thumb}<div style="min-width:0;"><div style="font-size:13px;">${it.name || 'Unnamed'}</div><div style="font-size:11px;color:var(--gray);">${it.site || 'Unknown'}${it.status ? ' · ' + it.status : ''}</div></div></div>${priceArea}</div>`;
   };
   const first = items.slice(0, 8);
   const rest = items.slice(8);
