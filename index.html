@@ -2691,7 +2691,7 @@ async function saveData() {
     localStorage.setItem('s64_scrape_meta', JSON.stringify(vendorScrapeMeta));
     localStorage.setItem('s64_auction_watch', JSON.stringify(auctionWatchlist));
     localStorage.setItem('s64_auction_settings', JSON.stringify(auctionSettings));
-    localStorage.setItem('s64_whatnot_intel', JSON.stringify(whatnotShows));
+    localStorage.setItem('s64_whatnot_shows', JSON.stringify(whatnotShows));
     localStorage.setItem('s64_buy_report', JSON.stringify(buyReport));
   } catch(e) {}
   showSaving('💾 Saving…');
@@ -2707,7 +2707,7 @@ async function saveData() {
       kvSet('s64_scrape_meta', vendorScrapeMeta),
       kvSet('s64_auction_watch', auctionWatchlist),
       kvSet('s64_auction_settings', auctionSettings),
-      kvSet('s64_whatnot_intel', whatnotShows),
+      kvSet('s64_whatnot_shows', whatnotShows),
       kvSet('s64_buy_report', buyReport)
     ]);
     hideSaving('✅ Saved to cloud');
@@ -2726,7 +2726,7 @@ async function loadKey(key) {
 }
 async function loadData() {
   const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta, auctWatch, auctSettings, whatnot, buyRep] = await Promise.all([
-    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings'), loadKey('s64_whatnot_intel'), loadKey('s64_buy_report')
+    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings'), loadKey('s64_whatnot_shows'), loadKey('s64_buy_report')
   ]);
   if (Array.isArray(items)) allItems = items;
   if (Array.isArray(eric)) ericColl = eric;
@@ -2746,7 +2746,12 @@ async function loadData() {
   applyAuctionSettingsToInputs();
   renderWatchlist();
   startAuctionAutoRefresh();
-  if (Array.isArray(whatnot)) whatnotShows = whatnot;
+  if (Array.isArray(whatnot)) {
+    whatnotShows = whatnot;
+  } else {
+    // Migrate data saved under the old key, if any
+    try { const legacy = await loadKey('s64_whatnot_intel'); if (Array.isArray(legacy) && legacy.length) { whatnotShows = legacy; saveWhatnotShows(); } } catch (e) {}
+  }
   initWhatnotDropzone();
   renderWhatnotAll();
   if (buyRep && typeof buyRep === 'object' && Array.isArray(buyRep.items)) buyReport = buyRep;
@@ -3437,6 +3442,18 @@ function handleWhatnotFiles(fileList) {
   const inp = document.getElementById('whatnotFileInput'); if (inp) inp.value = '';
 }
 
+// Persist the Whatnot shows array to localStorage (s64_whatnot_shows) + Upstash Redis via kvSet
+async function saveWhatnotShows() {
+  try {
+    localStorage.setItem('s64_whatnot_shows', JSON.stringify(whatnotShows));
+    console.log('✅ Whatnot shows saved to localStorage (s64_whatnot_shows):', whatnotShows.length, 'show(s)');
+  } catch (e) { console.log('⚠️ Whatnot localStorage save failed:', e); }
+  try {
+    await kvSet('s64_whatnot_shows', whatnotShows);
+    console.log('☁️ Whatnot shows synced to cloud (s64_whatnot_shows):', whatnotShows.length, 'show(s)');
+  } catch (e) { console.log('⚠️ Whatnot cloud sync failed (kept local copy):', e); }
+}
+
 function addWhatnotShow(fileName, text) {
   const { headers, objects, meta } = csvToObjects(text);
   if (!headers.length || !objects.length) { toast('Could not read that CSV (no rows).', 'red'); return; }
@@ -3454,11 +3471,11 @@ function addWhatnotShow(fileName, text) {
     id: Date.now() + '_' + Math.floor(Math.random() * 1000),
     seller, date, type, fileName, headers, streamTitle, rowCount: objects.length, rows: objects
   };
-  whatnotShows.push(show);
+  whatnotShows.push(show); // append to history rather than overwrite
   const status = document.getElementById('whatnotUploadStatus');
   if (status) status.innerHTML = `✅ <strong>${escHtmlA(fileName)}</strong> — detected <strong>${type === 'sales' ? 'Sales' : 'Buyers'} CSV</strong>, ${objects.length} rows${streamTitle ? ' · ' + escHtmlA(streamTitle) : ''} (${escHtmlA(seller)}, ${escHtmlA(date)})`;
   renderWhatnotAll();
-  saveData();
+  saveWhatnotShows();
   toast('📺 Show added: ' + seller + ' (' + type + ', ' + objects.length + ' rows)', 'green');
 }
 
@@ -3467,7 +3484,7 @@ function deleteWhatnotShow(id) {
   if (!confirm('Delete this uploaded show' + (s ? ' (' + s.seller + ', ' + s.date + ')' : '') + '?')) return;
   whatnotShows = whatnotShows.filter(w => w.id !== id);
   renderWhatnotAll();
-  saveData();
+  saveWhatnotShows();
   toast('🗑️ Show deleted.', 'yellow');
 }
 
