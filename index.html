@@ -395,11 +395,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="color:var(--gray);font-size:13px;margin-bottom:20px;">Type any diecast model. Get price estimates, true landed cost, and real margin after ALL fees.</div>
     <div class="search-row" style="display:flex;gap:12px;flex-wrap:wrap;">
       <div style="position:relative;flex:1;min-width:200px;">
-        <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red... — or paste an image with Ctrl+V" style="width:100%;box-sizing:border-box;font-size:15px;padding:14px 44px 14px 20px;border:2px solid var(--gold);box-shadow:0 0 8px rgba(201,168,76,0.3);background:#1E2330;" oninput="togglePsClear()"/>
+        <input class="text-input" id="psSearchInput" placeholder="e.g. MiniGT Porsche 911 GT3 RS, Kaido House NSX Red... — or paste an image with Ctrl+V" style="width:100%;box-sizing:border-box;font-size:15px;padding:14px 44px 14px 20px;border:2px solid var(--gold);box-shadow:0 0 8px rgba(201,168,76,0.3);background:#1E2330;" oninput="onPsInput()"/>
         <button id="psClearBtn" onclick="clearPsSearch(); resetIdImages();" title="Clear search" aria-label="Clear search" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;padding:2px 8px;">&times;</button>
       </div>
       <button class="btn-red" id="psScanBtn" onclick="runPriceScan()" style="padding:14px 28px;font-size:14px;">SCAN + CALCULATE</button>
       <button id="psQuickToggle" class="qsearch-btn" onclick="toggleQuickPrice()" title="Quick Price — prices only, skips margin analysis for faster searches" style="border-color:var(--gold);color:var(--gold);font-weight:700;background:rgba(201,168,76,0.14);">⚡ Quick Price</button>
+    </div>
+    <div id="drillBackWrap" style="display:none;margin-top:6px;">
+      <button id="drillBackBtn" onclick="drillBack()" style="background:transparent;border:none;color:var(--gray);font-size:12px;cursor:pointer;padding:2px 0;">← Back to: <span id="drillBackTerm" style="font-weight:600;text-decoration:underline;"></span></button>
     </div>
     <input type="file" id="psImageInput" accept="image/*" multiple style="display:none" onchange="handlePsImageInput(event)"/>
     <div style="margin-top:12px;font-size:12px;color:var(--gray);">📷 Add multiple angles for better accuracy (base plate, front, rear, side) — up to 5. Paste with Ctrl+V or tap ＋ Add angle.</div>
@@ -2839,6 +2842,7 @@ function clearPsSearch() {
   if (!inp) return;
   inp.value = '';
   resetIdImages();   // clear the Image ID grid too
+  hideDrillBack();   // clearing the field also removes the drill "back" button
   togglePsClear();
   inp.focus();
 }
@@ -4065,7 +4069,10 @@ function renderCompetitorPrices() {
 let idImages = [];        // up to ID_MAX loaded images: {base64, mediaType, dataUrl}
 let _autoScanAfterId = false; // set by the SCAN button's smart flow so identification auto-runs a price scan
 let idFastMode = true;        // ⚡ Fast Mode: skip enrichment. Default ON (only OFF if explicitly turned off)
-try { idFastMode = localStorage.getItem('s64_fast_mode') !== 'false'; } catch (e) {}
+try {
+  const _fm = localStorage.getItem('s64_fast_mode');
+  idFastMode = (_fm === null || _fm === undefined) ? true : (_fm !== 'false');
+} catch (e) { idFastMode = true; }
 // Reflect the default/persisted state on the toggle as soon as the DOM button exists
 document.addEventListener('DOMContentLoaded', function () { updateFastModeUI(); updateQuickPriceUI(); });
 
@@ -4431,14 +4438,40 @@ function identifySearchAnyway(str) {
   runPriceScan();
 }
 
-// Drill into a specific active listing: copy its exact title into the search and re-scan
-function drillIntoListing(el) {
-  const title = (el && el.getAttribute('data-title')) || '';
-  if (!title.trim()) return;
+// Drill into a specific active listing: save the current search, copy this listing's exact title
+// into the search, re-scan, and show a "← Back to: …" button to restore the previous term.
+let _prevDrillSearch = null;
+function drillInto(encodedTitle) {
   const inp = document.getElementById('psSearchInput');
-  if (inp) { inp.value = title.trim(); togglePsClear(); }
+  const newTitle = decodeURIComponent(encodedTitle || '');
+  if (!inp || !newTitle.trim()) return;
+  _prevDrillSearch = inp.value;               // 1) save current term before overwriting
+  console.log('drill-in fired, title:', newTitle);
+  inp.value = newTitle;
+  togglePsClear();
+  showDrillBack(_prevDrillSearch);            // 2) show the back button
   runPriceScan();
 }
+function showDrillBack(prevTerm) {
+  const wrap = document.getElementById('drillBackWrap');
+  const termEl = document.getElementById('drillBackTerm');
+  if (!wrap || !termEl) return;
+  if (!prevTerm || !String(prevTerm).trim()) { wrap.style.display = 'none'; return; }
+  termEl.textContent = prevTerm;
+  wrap.style.display = 'block';
+}
+function hideDrillBack() {
+  const wrap = document.getElementById('drillBackWrap');
+  if (wrap) wrap.style.display = 'none';
+}
+function drillBack() {
+  const inp = document.getElementById('psSearchInput');
+  if (inp && _prevDrillSearch != null) { inp.value = _prevDrillSearch; togglePsClear(); } // 3) restore
+  hideDrillBack();
+  runPriceScan();
+}
+// Search-input typing: update the clear button AND hide the drill "back" button (4)
+function onPsInput() { togglePsClear(); hideDrillBack(); }
 
 // Build a specific eBay search term from an Image ID result — includes colorway + edition,
 // strips SKU/scale/parens/collab, caps at 8 words. (Keeps edition words, unlike simplifyEbaySearch.)
@@ -4558,7 +4591,7 @@ async function runPriceScan() {
       const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" data-price="${priceStr}" onclick="cardClick(this)" ondblclick="cardDblClick(this)" onmouseenter="cardHoverImg(this)" onmouseleave="cardHoverReset()"` : '';
       const pin = (interactive && safeImg) ? `<input type="checkbox" class="card-pin" title="Pin as reference photo" onclick="event.stopPropagation();togglePin(this)" ondblclick="event.stopPropagation()"/>` : '';
       // Active listings get a drill-in checkbox: search this exact listing title
-      const drill = !isSold ? `<input type="checkbox" class="drill-check" title="Search this exact listing title" onclick="event.stopPropagation();var _t=decodeURIComponent(this.dataset.title||'');console.log('drill-in fired, title:',_t);document.getElementById('psSearchInput').value=_t;runPriceScan()" ondblclick="event.stopPropagation()" data-title="${encodeURIComponent(i.title || '')}" style="cursor:pointer;flex-shrink:0;"/>` : '';
+      const drill = !isSold ? `<input type="checkbox" class="drill-check" title="Search this exact listing title" onclick="event.stopPropagation();drillInto(this.dataset.title)" ondblclick="event.stopPropagation()" data-title="${encodeURIComponent(i.title || '')}" style="cursor:pointer;flex-shrink:0;"/>` : '';
       return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}${drill}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div></div>`;
     }).join('');
     const renderColumn = (items, isSold, colId) => {
