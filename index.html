@@ -2760,6 +2760,7 @@ async function loadData() {
     // Migrate data saved under the old key, if any
     try { const legacy = await loadKey('s64_whatnot_intel'); if (Array.isArray(legacy) && legacy.length) { whatnotShows = legacy; saveWhatnotShows(); } } catch (e) {}
   }
+  if (dedupeWhatnotShows()) saveWhatnotShows(); // collapse any legacy duplicate title+date entries into one merged show
   initWhatnotDropzone();
   renderWhatnotAll();
   if (buyRep && typeof buyRep === 'object' && Array.isArray(buyRep.items)) buyReport = buyRep;
@@ -3565,6 +3566,49 @@ function showBuyersData(show) {
   return null;
 }
 
+// Unique key for a show — title + date only (seller may differ/be missing between Sales & Buyers CSVs)
+function whatnotShowKey(show) {
+  return String(show && show.streamTitle || '').trim().toLowerCase() + '|' + String(show && show.date || '');
+}
+
+// Collapse any stored duplicate show entries (same title+date) into one merged entry:
+// combine Sales/Buyers datasets and keep the strongest seller. Returns true if anything changed.
+function dedupeWhatnotShows() {
+  const SRC_RANK = { unknown: 0, filename: 1, sales: 2, user: 3 };
+  const byKey = {};
+  const order = [];
+  whatnotShows.forEach(show => {
+    const key = whatnotShowKey(show);
+    const sales = showSalesData(show);
+    const buyers = showBuyersData(show);
+    const incomingSrc = show.sellerSource || ((show.seller && show.seller !== 'Unknown') ? 'sales' : 'unknown');
+    if (!byKey[key]) {
+      byKey[key] = {
+        id: show.id || (Date.now() + '_' + Math.floor(Math.random() * 1000)),
+        streamTitle: show.streamTitle || '',
+        date: show.date || '',
+        seller: (show.seller && show.seller !== 'Unknown') ? show.seller : 'Unknown',
+        sellerSource: (show.seller && show.seller !== 'Unknown') ? incomingSrc : 'unknown',
+        sales: sales || null,
+        buyers: buyers || null
+      };
+      order.push(key);
+    } else {
+      const cur = byKey[key];
+      if (!cur.sales && sales) cur.sales = sales;
+      if (!cur.buyers && buyers) cur.buyers = buyers;
+      if (!cur.streamTitle && show.streamTitle) cur.streamTitle = show.streamTitle;
+      if (show.seller && show.seller !== 'Unknown' && SRC_RANK[incomingSrc] > SRC_RANK[cur.sellerSource || 'unknown']) {
+        cur.seller = show.seller; cur.sellerSource = incomingSrc;
+      }
+    }
+  });
+  const deduped = order.map(k => byKey[k]);
+  const changed = deduped.length !== whatnotShows.length;
+  whatnotShows = deduped;
+  return changed;
+}
+
 function wnBuyerRecordsForShow(show) {
   // Prefer the authoritative Buyers dataset (aggregated total_spent per buyer)…
   const bd = showBuyersData(show);
@@ -3605,7 +3649,7 @@ function buildBuyerLeaderboard(sellerFilter) {
       if (!agg[rec.buyer]) agg[rec.buyer] = { buyer: rec.buyer, spent: 0, purchases: 0, shows: new Set() };
       agg[rec.buyer].spent += rec.spent;
       agg[rec.buyer].purchases += rec.purchases;
-      agg[rec.buyer].shows.add(show.id);
+      agg[rec.buyer].shows.add(whatnotShowKey(show)); // count unique title+date, not stored entries
     });
   });
   return Object.values(agg).map(a => ({
@@ -3655,27 +3699,34 @@ function renderWhatnotLeaderboard() {
 // Build a per-buyer profile: total spend + a breakdown by show (with itemized purchases where available)
 function buildBuyerProfile(buyerName) {
   const target = String(buyerName || '').trim().toLowerCase();
-  const shows = [];
-  let grandTotal = 0;
+  // Group by title+date so a Buyers-only entry and a Sales entry for the same show become ONE card:
+  // seller from the Sales entry, itemized purchases combined, authoritative spend from the Buyers CSV.
+  const byKey = {};
+  const order = [];
   whatnotShows.forEach(show => {
     const rec = wnBuyerRecordsForShow(show).find(r => (r.buyer || '').trim().toLowerCase() === target);
     const items = wnSalesForShow(show)
       .filter(s => (s.buyer || '').trim().toLowerCase() === target)
       .map(s => ({ item: s.item, price: s.price }));
     if (!rec && !items.length) return; // buyer not present in this show
-    const spent = rec ? rec.spent : items.reduce((a, b) => a + (b.price || 0), 0);
-    const purchases = rec ? rec.purchases : items.length;
-    grandTotal += spent;
-    shows.push({
-      title: show.streamTitle || '(untitled show)',
-      seller: show.seller || 'Unknown',
-      date: show.date || '',
-      purchases: purchases,
-      spent: spent,
-      items: items
-    });
+    const key = whatnotShowKey(show);
+    if (!byKey[key]) { byKey[key] = { title: show.streamTitle || '(untitled show)', seller: 'Unknown', date: show.date || '', items: [], buyerSpend: null, buyerPurchases: null, salesSpent: 0, salesPurchases: 0 }; order.push(key); }
+    const card = byKey[key];
+    if ((card.seller === 'Unknown' || !card.seller) && show.seller && show.seller !== 'Unknown') card.seller = show.seller;
+    if (!card.title || card.title === '(untitled show)') card.title = show.streamTitle || card.title;
+    card.items = card.items.concat(items);
+    card.salesSpent += items.reduce((a, b) => a + (b.price || 0), 0);
+    card.salesPurchases += items.length;
+    if (rec && showBuyersData(show)) { card.buyerSpend = rec.spent; card.buyerPurchases = rec.purchases; } // authoritative from Buyers CSV
+  });
+  const shows = order.map(k => {
+    const c = byKey[k];
+    const spent = (c.buyerSpend != null) ? c.buyerSpend : c.salesSpent;
+    const purchases = (c.buyerPurchases != null) ? c.buyerPurchases : c.salesPurchases;
+    return { title: c.title, seller: c.seller || 'Unknown', date: c.date, purchases: purchases, spent: spent, items: c.items };
   });
   shows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const grandTotal = shows.reduce((a, b) => a + b.spent, 0);
   return { buyer: buyerName, grandTotal, shows };
 }
 
