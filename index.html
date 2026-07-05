@@ -2555,7 +2555,8 @@ function mergeScrapedItems(vendor, scraped) {
       if (s.scale && !existing.scale) existing.scale = s.scale;
       if (s.brand && !existing.brand) existing.brand = s.brand;
       if (s.image && !existing.image) existing.image = s.image;
-      if (s.currency) existing.currency = s.currency;   // refresh detected currency
+      if (vendor === 'Horizon Diecast') existing.currency = '';   // Horizon is always USD — clear any stale CAD/CAD? value
+      else if (s.currency) existing.currency = s.currency;         // refresh detected currency (CarBromc = CAD)
       existing.dateAdded = catToday();
       updated++;
     } else {
@@ -2567,7 +2568,7 @@ function mergeScrapedItems(vendor, scraped) {
         price: s.price != null ? s.price : null,
         status: s.status || 'Unknown',
         image: s.image || '',
-        currency: s.currency || '',
+        currency: (vendor === 'Horizon Diecast') ? '' : (s.currency || ''),
         dateAdded: catToday()
       };
       arr.push(entry);
@@ -4158,7 +4159,7 @@ function compVendorUrl(site, name) {
   return base ? base + encodeURIComponent(name || '') : '';
 }
 
-// ---- CAD → USD conversion for CarBromc & Horizon Diecast (priced in CAD) ----
+// ---- CAD → USD conversion for CarBromc only (priced in CAD; Horizon Diecast is USD) ----
 let _cadRowSeq = 0;      // unique id counter for CAD price rows
 let _cadUsdRate = null;  // cached once per session
 
@@ -4231,10 +4232,10 @@ function renderCompetitorPrices() {
     const safeTitle = escAttr(it.name || '');
     const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" onclick="cardClick(this)" ondblclick="cardDblClick(this)"` : '';
     const arrow = interactive ? `<span title="Single click: preview image · Double click: open vendor page" style="color:var(--gray);font-size:13px;margin-left:8px;">↗</span>` : '';
-    // Currency: only CarBromc prices in CAD (their products.json feed returns CAD).
-    // Horizon Diecast prices are USD — no label, no convert button.
+    // Currency: ONLY CarBromc ever shows a label / convert button (their feed returns CAD).
+    // Horizon Diecast is always USD and everything else is USD — never show a label or button.
     let currencyLabel = '', showCadBtn = false;
-    if (priceNum != null && it.site === 'CarBromc') { currencyLabel = 'CAD'; showCadBtn = true; }
+    if (priceNum != null && it.site === 'CarBromc' && it.site !== 'Horizon Diecast') { currencyLabel = 'CAD'; showCadBtn = true; }
     const rid = 'cad' + (_cadRowSeq++);
     const priceSpan = `<span id="price_${rid}" style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:var(--blue);">${price}</span>`;
     const curFlag = currencyLabel ? `<span class="cad-flag" style="font-size:9px;color:var(--gray);font-weight:700;">${currencyLabel}</span>` : '';
