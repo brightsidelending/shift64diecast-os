@@ -4066,6 +4066,8 @@ let idImages = [];        // up to ID_MAX loaded images: {base64, mediaType, dat
 let _autoScanAfterId = false; // set by the SCAN button's smart flow so identification auto-runs a price scan
 let idFastMode = true;        // ⚡ Fast Mode: skip enrichment. Default ON (only OFF if explicitly turned off)
 try { idFastMode = localStorage.getItem('s64_fast_mode') !== 'false'; } catch (e) {}
+// Reflect the default/persisted state on the toggle as soon as the DOM button exists
+document.addEventListener('DOMContentLoaded', function () { updateFastModeUI(); updateQuickPriceUI(); });
 
 function toggleFastMode() {
   idFastMode = !idFastMode;
@@ -4556,7 +4558,7 @@ async function runPriceScan() {
       const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" data-price="${priceStr}" onclick="cardClick(this)" ondblclick="cardDblClick(this)" onmouseenter="cardHoverImg(this)" onmouseleave="cardHoverReset()"` : '';
       const pin = (interactive && safeImg) ? `<input type="checkbox" class="card-pin" title="Pin as reference photo" onclick="event.stopPropagation();togglePin(this)" ondblclick="event.stopPropagation()"/>` : '';
       // Active listings get a drill-in checkbox: search this exact listing title
-      const drill = !isSold ? `<input type="checkbox" class="drill-check" title="Search this exact listing title" onclick="event.stopPropagation();document.getElementById('psSearchInput').value=this.dataset.title;runPriceScan()" ondblclick="event.stopPropagation()" data-title="${safeTitle}" style="cursor:pointer;flex-shrink:0;"/>` : '';
+      const drill = !isSold ? `<input type="checkbox" class="drill-check" title="Search this exact listing title" onclick="event.stopPropagation();var _t=decodeURIComponent(this.dataset.title||'');console.log('drill-in fired, title:',_t);document.getElementById('psSearchInput').value=_t;runPriceScan()" ondblclick="event.stopPropagation()" data-title="${encodeURIComponent(i.title || '')}" style="cursor:pointer;flex-shrink:0;"/>` : '';
       return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}${drill}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div></div>`;
     }).join('');
     const renderColumn = (items, isSold, colId) => {
