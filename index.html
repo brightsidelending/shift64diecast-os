@@ -2904,26 +2904,15 @@ function toggleShowMore(colId) {
   btn.textContent = opening ? 'Show Less' : ('Show More (' + more.children.length + ')');
 }
 
-// Smoothly collapse/expand the SOLD LISTINGS body (max-height transition, no page jump)
+// Collapse/expand the SOLD LISTINGS body (toggles #soldBody display)
 function toggleSoldListings(headerEl) {
   const card = headerEl.parentElement;
-  const body = card ? card.querySelector('.sold-body') : null;
+  const body = card ? (card.querySelector('#soldBody') || card.querySelector('.sold-body')) : null;
   const chev = headerEl.querySelector('.sold-chevron');
   if (!body) return;
-  const opening = !body.classList.contains('open');
-  if (opening) {
-    body.classList.add('open');
-    body.style.maxHeight = body.scrollHeight + 'px';
-    // After the transition, drop the cap so nested "Show More" can expand freely
-    setTimeout(() => { if (body.classList.contains('open')) body.style.maxHeight = 'none'; }, 320);
-    if (chev) chev.textContent = '▼ Hide';
-  } else {
-    body.style.maxHeight = body.scrollHeight + 'px'; // set explicit height, then animate to 0
-    void body.offsetHeight;                          // force reflow
-    body.style.maxHeight = '0px';
-    body.classList.remove('open');
-    if (chev) chev.textContent = '▶ Show';
-  }
+  const opening = body.style.display === 'none';
+  body.style.display = opening ? 'block' : 'none';
+  if (chev) chev.textContent = opening ? '▼ Hide' : '▶ Show';
 }
 function showImagePreview(img, title) {
   if (!img) return;
@@ -4092,11 +4081,11 @@ function updateFastModeUI() {
 }
 
 // ⚡ Quick Price: prices only, skips the sold-listings fetch + margin breakdown
-let psQuickPrice = true;      // Default ON (only OFF if explicitly saved '0')
-try { psQuickPrice = localStorage.getItem('s64_quick_price') !== '0'; } catch (e) {}
+let psQuickPrice = true;      // Default ON (only OFF if explicitly turned off)
+try { psQuickPrice = localStorage.getItem('s64_quick_price') !== 'false'; } catch (e) {}
 function toggleQuickPrice() {
   psQuickPrice = !psQuickPrice;
-  try { localStorage.setItem('s64_quick_price', psQuickPrice ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem('s64_quick_price', psQuickPrice ? 'true' : 'false'); } catch (e) {}
   updateQuickPriceUI();
 }
 function updateQuickPriceUI() {
@@ -4557,7 +4546,7 @@ async function runPriceScan() {
       const attrs = interactive ? `class="listing-clickable" data-url="${safeUrl}" data-img="${safeImg}" data-title="${safeTitle}" data-price="${priceStr}" onclick="cardClick(this)" ondblclick="cardDblClick(this)" onmouseenter="cardHoverImg(this)" onmouseleave="cardHoverReset()"` : '';
       const pin = (interactive && safeImg) ? `<input type="checkbox" class="card-pin" title="Pin as reference photo" onclick="event.stopPropagation();togglePin(this)" ondblclick="event.stopPropagation()"/>` : '';
       // Active listings get a drill-in checkbox: search this exact listing title
-      const drill = !isSold ? `<input type="checkbox" class="drill-check" title="Search this exact listing title" onclick="event.stopPropagation();drillIntoListing(this)" ondblclick="event.stopPropagation()" data-title="${safeTitle}" style="cursor:pointer;flex-shrink:0;"/>` : '';
+      const drill = !isSold ? `<input type="checkbox" class="drill-check" title="Search this exact listing title" onclick="event.stopPropagation();document.getElementById('psSearchInput').value=this.dataset.title;runPriceScan()" ondblclick="event.stopPropagation()" data-title="${safeTitle}" style="cursor:pointer;flex-shrink:0;"/>` : '';
       return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}${drill}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div></div>`;
     }).join('');
     const renderColumn = (items, isSold, colId) => {
@@ -4577,7 +4566,7 @@ async function runPriceScan() {
         <div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟢 SOLD LISTINGS · <span style="color:var(--green);font-size:12px;font-weight:600;">${soldCountLabel} sold/30 days</span></div>
         <span class="sold-chevron" style="font-size:12px;color:var(--blue);font-weight:700;white-space:nowrap;">▶ Show</span>
       </div>
-      <div class="sold-body" style="max-height:0;overflow:hidden;transition:max-height 0.28s ease;">${rowsHtml}</div>
+      <div id="soldBody" class="sold-body" style="display:none;">${rowsHtml}</div>
       <a href="https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Complete=1&LH_Sold=1" target="_blank" rel="noopener noreferrer" style="display:block;background:var(--gold);color:#000;padding:10px;text-align:center;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px;margin:10px;">🔗 View Sold on eBay →</a>
     </div>`;
     const compMatches = findCompetitorMatches(query);
