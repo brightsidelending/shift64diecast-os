@@ -3467,16 +3467,32 @@ function addWhatnotShow(fileName, text) {
   }
   if (!seller) seller = 'Unknown';
   const date = ((document.getElementById('whatnotDate') || {}).value || '').trim() || new Date().toISOString().slice(0, 10);
-  const show = {
-    id: Date.now() + '_' + Math.floor(Math.random() * 1000),
-    seller, date, type, fileName, headers, streamTitle, rowCount: objects.length, rows: objects
-  };
-  whatnotShows.push(show); // append to history rather than overwrite
+  const dataset = { headers, rows: objects, fileName, rowCount: objects.length };
+
+  // Match an existing show by title + date + seller (case-insensitive on title/seller)
+  const norm = v => String(v || '').trim().toLowerCase();
+  const thisKey = norm(streamTitle) + '|' + String(date) + '|' + norm(seller);
+  const showKey = s => norm(s.streamTitle) + '|' + String(s.date) + '|' + norm(s.seller);
+  const existing = whatnotShows.find(s => showKey(s) === thisKey);
+
+  let merged = false;
+  if (existing) {
+    existing[type] = dataset;                 // add/replace the Sales or Buyers slot on the same show
+    if (!existing.streamTitle && streamTitle) existing.streamTitle = streamTitle;
+    merged = true;
+    console.log('🔀 MERGE: added ' + type.toUpperCase() + ' data into existing show →', seller, '·', date, '·', streamTitle || '(no title)');
+  } else {
+    const show = { id: Date.now() + '_' + Math.floor(Math.random() * 1000), seller, date, streamTitle };
+    show[type] = dataset;                      // new entry with one dataset slot
+    whatnotShows.push(show);
+    console.log('➕ NEW SHOW: created entry →', seller, '·', date, '·', (streamTitle || '(no title)'), '(' + type + ')');
+  }
+
   const status = document.getElementById('whatnotUploadStatus');
-  if (status) status.innerHTML = `✅ <strong>${escHtmlA(fileName)}</strong> — detected <strong>${type === 'sales' ? 'Sales' : 'Buyers'} CSV</strong>, ${objects.length} rows${streamTitle ? ' · ' + escHtmlA(streamTitle) : ''} (${escHtmlA(seller)}, ${escHtmlA(date)})`;
+  if (status) status.innerHTML = `✅ <strong>${escHtmlA(fileName)}</strong> — ${merged ? 'merged into existing show' : 'new show'} · <strong>${type === 'sales' ? 'Sales' : 'Buyers'}</strong>, ${objects.length} rows${streamTitle ? ' · ' + escHtmlA(streamTitle) : ''} (${escHtmlA(seller)}, ${escHtmlA(date)})`;
   renderWhatnotAll();
   saveWhatnotShows();
-  toast('📺 Show added: ' + seller + ' (' + type + ', ' + objects.length + ' rows)', 'green');
+  toast((merged ? '🔀 Merged ' + type + ' into ' : '📺 Show added: ') + seller + ' (' + objects.length + ' rows)', 'green');
 }
 
 function deleteWhatnotShow(id) {
@@ -3493,37 +3509,57 @@ function renderWhatnotShows() {
   if (!div) return;
   if (!whatnotShows.length) { div.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:6px 0;">No shows uploaded yet.</div>'; return; }
   div.innerHTML = '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">' + whatnotShows.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(s => {
-    const badge = s.type === 'sales'
-      ? '<span style="background:#0D2B0D;color:var(--green);border:1px solid var(--green);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">SALES</span>'
-      : '<span style="background:#0D1520;color:var(--blue);border:1px solid var(--blue);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">BUYERS</span>';
+    const sd = showSalesData(s), bd = showBuyersData(s);
+    const salesBadge = sd ? '<span style="background:#0D2B0D;color:var(--green);border:1px solid var(--green);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">SALES</span>' : '';
+    const buyersBadge = bd ? '<span style="background:#0D1520;color:var(--blue);border:1px solid var(--blue);border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;">BUYERS</span>' : '';
+    const badge = [salesBadge, buyersBadge].filter(Boolean).join(' ');
+    const totalRows = (sd ? sd.rows.length : 0) + (bd ? bd.rows.length : 0);
+    const files = [sd && sd.fileName, bd && bd.fileName].filter(Boolean).join(', ') || (s.fileName || '');
     return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">
-      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${escHtmlA(s.date)} ${badge}</div>${s.streamTitle ? `<div style="font-size:12px;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📺 ${escHtmlA(s.streamTitle)}</div>` : ''}<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(s.fileName)} · ${s.rowCount} rows</div></div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${escHtmlA(s.date)} ${badge}</div>${s.streamTitle ? `<div style="font-size:12px;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📺 ${escHtmlA(s.streamTitle)}</div>` : ''}<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(files)} · ${totalRows} rows</div></div>
       <button onclick="deleteWhatnotShow('${s.id}')" class="row-action row-del" title="Delete show">🗑️</button>
     </div>`;
   }).join('') + '</div>';
 }
 
 // --- Aggregation helpers ---
+// A show may hold a Sales dataset, a Buyers dataset, or BOTH (merged). These accessors also
+// understand the legacy flat shape ({ type, headers, rows }).
+function showSalesData(show) {
+  if (show.sales && Array.isArray(show.sales.rows)) return show.sales;
+  if (show.type === 'sales' && Array.isArray(show.rows)) return { headers: show.headers, rows: show.rows, fileName: show.fileName };
+  return null;
+}
+function showBuyersData(show) {
+  if (show.buyers && Array.isArray(show.buyers.rows)) return show.buyers;
+  if (show.type === 'buyers' && Array.isArray(show.rows)) return { headers: show.headers, rows: show.rows, fileName: show.fileName };
+  return null;
+}
+
 function wnBuyerRecordsForShow(show) {
-  // Returns [{buyer, spent, purchases}] for one show
-  const h = show.headers;
-  if (show.type === 'buyers') {
+  // Prefer the authoritative Buyers dataset (aggregated total_spent per buyer)…
+  const bd = showBuyersData(show);
+  if (bd) {
+    const h = bd.headers;
     const buyerCol = exactCol(h, 'display_name') || exactCol(h, 'username') || findCol(h, ['buyer', 'username', 'user', 'handle', 'customer']);
     if (!buyerCol) return [];
     const spentCol = exactCol(h, 'total_spent') || findCol(h, ['spent', 'total', 'amount', 'revenue']);
     const purCol = exactCol(h, 'item_count') || findCol(h, ['purchase', 'orders', 'items', 'qty', 'count']);
-    return show.rows.map(r => ({
+    return bd.rows.map(r => ({
       buyer: (r[buyerCol] || '').trim(),
       spent: parseMoney(spentCol ? r[spentCol] : 0),
       purchases: purCol ? (parseInt(parseMoney(r[purCol]), 10) || 1) : 1
     })).filter(x => x.buyer);
   }
-  // sales CSV: group individual sales by buyer (buyer_display)
+  // …otherwise derive buyer spend by grouping the Sales dataset (buyer_display)
+  const sd = showSalesData(show);
+  if (!sd) return [];
+  const h = sd.headers;
   const buyerCol = exactCol(h, 'buyer_display') || exactCol(h, 'buyer_username') || findCol(h, ['buyer', 'user', 'handle', 'customer']);
   if (!buyerCol) return [];
   const priceCol = exactCol(h, 'price') || findCol(h, ['amount', 'sold', 'total']);
   const map = {};
-  show.rows.forEach(r => {
+  sd.rows.forEach(r => {
     const b = (r[buyerCol] || '').trim(); if (!b) return;
     if (!map[b]) map[b] = { buyer: b, spent: 0, purchases: 0 };
     map[b].spent += parseMoney(priceCol ? r[priceCol] : 0);
@@ -3584,8 +3620,9 @@ function renderWhatnotLeaderboard() {
 
 // --- Sales analysis ---
 function wnSalesForShow(show) {
-  if (show.type !== 'sales') return [];
-  const h = show.headers;
+  const sd = showSalesData(show);
+  if (!sd) return [];
+  const h = sd.headers;
   const itemCol = exactCol(h, 'title') || findCol(h, ['item', 'product', 'listing', 'name']);
   const priceCol = exactCol(h, 'price') || findCol(h, ['amount', 'sold', 'total']);        // dollars, NOT price_cents
   const timeCol = exactCol(h, 'updated_at_iso') || findCol(h, ['time', 'date', 'sold at', 'timestamp']);
@@ -3593,7 +3630,7 @@ function wnSalesForShow(show) {
   const givCol = exactCol(h, 'is_giveaway');
   const durCol = findCol(h, ['second', 'duration', 'elapsed', 'time to sell', 'sold in']);
   const showLabel = (show.streamTitle ? show.streamTitle + ' · ' : '') + show.seller + ' · ' + show.date;
-  return show.rows.map(r => {
+  return sd.rows.map(r => {
     const dur = durCol ? parseMoney(r[durCol]) : null;
     let saleType = typeCol ? (r[typeCol] || '') : '';
     if (givCol && /^(true|1|yes)$/i.test((r[givCol] || '').trim())) saleType = 'Giveaway';
@@ -3669,7 +3706,7 @@ function refreshWhatnotFilters() {
   const ss = document.getElementById('wnSalesShow');
   if (ss) {
     const prev = ss.value;
-    const showOpts = whatnotShows.filter(s => s.type === 'sales').map(s => `<option value="${escAttr(s.id)}">${escHtmlA(s.seller + ' · ' + s.date)}</option>`).join('');
+    const showOpts = whatnotShows.filter(s => showSalesData(s)).map(s => `<option value="${escAttr(s.id)}">${escHtmlA(s.seller + ' · ' + s.date)}</option>`).join('');
     ss.innerHTML = '<option value="">All shows</option>' + showOpts;
     ss.value = prev;
   }
