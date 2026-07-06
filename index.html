@@ -5217,12 +5217,12 @@ function renderEversenChips() {
   ).join('');
 }
 
-// Search angles tried in order. If one pass doesn't nail a maker + contact, the next widens the net.
+// Research angles tried in order. If one pass doesn't nail a maker + contact, the next widens the net.
 function evBuildQueries(brand) {
   return [
-    { q: brand + ' diecast manufacturer', label: 'manufacturer' },
-    { q: brand + ' 1:64 wholesale China', label: 'wholesale / China' },
-    { q: brand + ' diecast factory contact', label: 'factory contact' }
+    { q: 'identifying the actual manufacturer / factory and their official website', label: 'manufacturer' },
+    { q: 'wholesale / OEM contact routes and Chinese B2B platforms (Alibaba, Made-in-China, 1688.com)', label: 'wholesale / China' },
+    { q: 'community leads — diecast forums, Reddit (r/diecast, r/HotWheels), Facebook groups, Instagram, YouTube', label: 'community leads' }
   ];
 }
 function evConfRank(c) { return c === 'High' ? 3 : c === 'Medium' ? 2 : c === 'Low' ? 1 : 0; }
@@ -5251,41 +5251,40 @@ function evMerge(a, b) {
   return out;
 }
 
-// One research pass focused on a given query angle. Returns { parsed, errorMsg }. Never throws.
-async function evResearchOnce(brand, focusQuery) {
+// One research pass focused on a given angle. Returns { parsed, errorMsg }. Never throws.
+// Knowledge-based: a plain Anthropic call with NO tools (no web_search), so it can't hit
+// the serverless timeout that caused "Failed to fetch". Uses Claude's training knowledge of
+// diecast makers (Inno64, Demon King, Veloce, Suhu, BPC, Kaido House, etc.).
+async function evResearchOnce(brand, focusHint) {
   try {
     const res = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1800,
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }],
+        max_tokens: 1500,
+        system: `You are Eversen, a sourcing research assistant for Shift64 Diecast, a US-based diecast reseller. Using your existing knowledge of the diecast industry — you know brands like Inno64, Demon King, Veloce, Suhu, BPC, and Kaido House and who makes/distributes them — provide the best available manufacturer and wholesaler contact intelligence for a given brand. Never refuse and never claim you cannot browse the web; simply give your best-known information from training and mark the confidence accordingly. Respond with ONLY minified JSON — no prose, no markdown, no code fences.`,
         messages: [{ role: 'user', content:
-`You are Eversen, a sourcing researcher for Shift64 Diecast (a US diecast reseller). Find the REAL manufacturer, factory, or wholesaler behind the diecast brand "${brand}".
+`Brand: "${brand}".
+Focus this pass on: ${focusHint}.
+Give what you know about who manufactures or distributes this diecast brand and how a reseller could realistically reach them.
 
-PRIORITY THIS PASS: run web searches for "${focusQuery}" and closely related queries first.
+Return ONLY minified JSON with these fields:
+{"brand":"${brand}","manufacturer":"company/factory name or Unknown","website":"official url or ''","contactEmail":"email or ''","contactPage":"wholesale/contact url or ''","country":"country or ''","language":"primary business language e.g. Chinese/Japanese/English","langCode":"zh/ja/ko/en/..","altNames":["alternate or Chinese names"],"leads":[{"note":"a forum/Reddit/Facebook/Instagram/YouTube/Alibaba/Made-in-China/1688 lead or what to search there","url":"url or ''"}],"confidence":"High|Medium|Low","summary":"1-2 sentence plain-English summary"}
 
-Dig into community and trade sources, not just official websites:
-- Diecast forums and hobby blogs
-- Reddit — r/diecast, r/HotWheels and related threads
-- Facebook diecast groups, Instagram posts/bios, YouTube video descriptions & comments
-- Chinese B2B platforms — Alibaba, Made-in-China, and 1688.com — look up the brand and its likely factory
-Try alternate spellings, romanizations, and the brand's Chinese name. Some diecast brands sell under a different Chinese name (for example a brand like "Demon King" may appear under a Chinese name) — search both the English and Chinese forms.
-
-Find: the actual manufacturer/factory/wholesaler, official website, contact email, any wholesale/OEM inquiry page, community leads (with links), the company's country and primary business language.
-
-Return ONLY minified JSON, no prose:
-{"brand":"${brand}","manufacturer":"company name or Unknown","website":"url or ''","contactEmail":"email or ''","contactPage":"wholesale/contact url or ''","country":"country or ''","language":"primary language e.g. Chinese/Japanese/English","langCode":"zh/ja/ko/en/..","altNames":["alternate or Chinese names found"],"sources":[{"title":"","url":""}],"communityLeads":[{"note":"what it says","url":""}],"confidence":"High|Medium|Low","summary":"1-2 sentence plain-English summary of what you found"}
-Confidence: High = official contact found; Medium = manufacturer identified but no direct email; Low = only guesses/community leads. If you truly cannot identify the maker, still return your best partial info with manufacturer "Unknown", confidence "Low", and include any sources/leads you found.` }]
+Guidance: confidence High = you are confident of the maker and a real way to contact them; Medium = maker known but contact uncertain; Low = best guess. Include likely B2B search leads (Alibaba, Made-in-China, 1688.com) and community sources (r/diecast, diecast forums, Facebook groups) in "leads" even without exact URLs — put the platform and what to search in "note". If you don't know the maker, set manufacturer to "Unknown", confidence "Low", and still return any partial info and leads.` }]
       })
     });
     const data = await res.json();
     if (data && data.error) return { parsed: null, errorMsg: (data.error.message || JSON.stringify(data.error)) };
     const txt = evAnthropicText(data);
-    if (!txt) return { parsed: null, errorMsg: 'Search returned no readable text' };
-    try { return { parsed: evParseJson(txt), errorMsg: null }; }
-    catch (e) { return { parsed: null, errorMsg: 'Could not parse research response' }; }
+    if (!txt) return { parsed: null, errorMsg: 'No readable text returned' };
+    try {
+      const p = evParseJson(txt);
+      // Normalize the new "leads" field onto communityLeads so existing rendering/merging works.
+      if (p && Array.isArray(p.leads) && !Array.isArray(p.communityLeads)) p.communityLeads = p.leads;
+      return { parsed: p, errorMsg: null };
+    } catch (e) { return { parsed: null, errorMsg: 'Could not parse research response' }; }
   } catch (e) {
     return { parsed: null, errorMsg: String((e && e.message) || e) };
   }
