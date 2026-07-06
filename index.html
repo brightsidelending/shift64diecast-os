@@ -160,6 +160,16 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
 .btn-cancel{background:transparent;border:1px solid var(--border);color:var(--gray);border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer}
 .btn-confirm{background:var(--red);border:none;color:white;border-radius:6px;padding:9px 20px;font-size:13px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:1px}
+.ev-chip{background:var(--black);border:1px solid var(--border);color:var(--gold);padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;transition:all 0.15s;font-weight:600}
+.ev-chip:hover{border-color:var(--gold);background:rgba(201,168,76,0.12)}
+.ev-lang-btn{background:var(--black);border:1px solid var(--border);color:var(--gray);padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600}
+.ev-lang-btn.active{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,0.12)}
+.ev-badge{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700;letter-spacing:0.3px}
+.ev-conf-High{background:rgba(46,204,113,0.15);color:var(--green);border:1px solid rgba(46,204,113,0.4)}
+.ev-conf-Medium{background:rgba(241,196,15,0.15);color:var(--yellow);border:1px solid rgba(241,196,15,0.4)}
+.ev-conf-Low{background:rgba(224,43,43,0.15);color:var(--red);border:1px solid rgba(224,43,43,0.4)}
+.ev-lang-badge{background:rgba(74,144,217,0.15);color:var(--blue);border:1px solid rgba(74,144,217,0.4)}
+.ev-status-sel{background:var(--black);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;padding:5px 8px;font-family:'Inter',sans-serif;outline:none}
 .sell-divider{border-top:1px solid var(--border);margin:14px 0 12px;padding-top:12px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;color:var(--gold);letter-spacing:1px}
 /* COLORS */
 .green{color:var(--green)}.gold{color:var(--gold)}.red-c{color:var(--red)}.blue-c{color:var(--blue)}.gray{color:var(--gray)}
@@ -373,6 +383,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <button class="nav-tab" onclick="showTab('khai',this)">🏎️ Khai</button>
   <button class="nav-tab" onclick="showTab('wantlist',this)">🎯 Want List</button>
   <button class="nav-tab" onclick="showTab('intel',this)">💡 Intel</button>
+  <button class="nav-tab" onclick="showTab('eversen',this)">🤖 Eversen</button>
 </div>
 
 <div class="main">
@@ -971,7 +982,101 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
 </div>
 
+<!-- ===== EVERSEN — AI SOURCING AGENT ===== -->
+<div id="eversen" class="section">
+
+  <!-- HEADER -->
+  <div class="card" style="border-color:rgba(201,168,76,0.35);background:linear-gradient(135deg,#16191F 0%,#1A1710 100%);">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div style="font-size:38px;line-height:1;">🤖</div>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:800;color:var(--gold);">Eversen</div>
+        <div style="color:var(--gray);font-size:13px;margin-top:2px;">Your AI sourcing agent. Finds the real Chinese manufacturers &amp; wholesalers behind diecast brands and drafts bilingual outreach on behalf of Shift64 Diecast.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: BRAND INPUT -->
+  <div class="card">
+    <div class="card-title">🔍 Find A Manufacturer</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <input class="text-input" id="evBrandInput" placeholder="Type a brand name (e.g. Demon King, Veloce, Inno64)…" style="flex:1;min-width:220px;" onkeydown="if(event.key==='Enter')eversenFind()"/>
+      <button class="btn-red" onclick="eversenFind()" style="padding:12px 24px;font-size:14px;white-space:nowrap;">🔍 Find Manufacturer</button>
+    </div>
+    <div style="margin-top:12px;">
+      <div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Quick add</div>
+      <div id="evChips" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+    </div>
+    <div id="evFindStatus" style="font-size:12px;color:var(--gray);margin-top:10px;"></div>
+  </div>
+
+  <!-- SECTION 2: RESEARCH CARDS -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">🧠 Research Findings</div>
+      <span style="font-size:11px;color:var(--gray);">Powered by live web search</span>
+    </div>
+    <div id="evResearchCards"><div style="color:var(--gray);font-size:13px;">No research yet. Enter a brand above and Eversen will hunt down the manufacturer, contact info, and community leads.</div></div>
+  </div>
+
+  <!-- SECTION 3: OUTREACH QUEUE -->
+  <div class="card">
+    <div class="card-title">✉️ Outreach Queue</div>
+    <div id="evOutreachQueue"><div style="color:var(--gray);font-size:13px;">Brands with a found contact will appear here, ready to draft outreach.</div></div>
+  </div>
+
+  <!-- SECTION 4: OUTREACH TRACKER -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">📊 Outreach Tracker</div>
+      <button onclick="openModal('evReplyModal')" style="padding:8px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">📥 Log a Reply</button>
+    </div>
+    <div id="evTracker"><div style="color:var(--gray);font-size:13px;">No outreach yet.</div></div>
+  </div>
+
+</div>
+
 </div><!-- end main -->
+
+<!-- EVERSEN — EMAIL DRAFT MODAL -->
+<div class="modal-overlay" id="evEmailModal">
+  <div class="modal" style="width:640px;">
+    <h2 style="color:var(--gold);">✉️ Draft Outreach <span id="evEmailBrandTag" style="font-size:13px;color:var(--gray);font-weight:400;"></span></h2>
+    <div class="fg"><label>To</label><input class="fi" id="evEmailTo" placeholder="contact@manufacturer.com"/></div>
+    <div class="fg"><label>Subject</label><input class="fi" id="evEmailSubject" placeholder="Subject line"/></div>
+    <div class="fg">
+      <label>Language view</label>
+      <div id="evLangToggle" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="ev-lang-btn active" data-mode="both" onclick="evSetLangView('both')">🌐 Both</button>
+        <button type="button" class="ev-lang-btn" data-mode="native" onclick="evSetLangView('native')">🀄 Native only</button>
+        <button type="button" class="ev-lang-btn" data-mode="english" onclick="evSetLangView('english')">🇬🇧 English only</button>
+      </div>
+    </div>
+    <div class="fg"><label>Body <span id="evEmailLangBadge" style="color:var(--gold);"></span></label><textarea class="fi" id="evEmailBody" style="min-height:280px;resize:vertical;font-family:'Inter',sans-serif;line-height:1.5;"></textarea></div>
+    <div class="modal-actions" style="flex-wrap:wrap;">
+      <button class="btn-cancel" onclick="closeModal('evEmailModal')">Cancel</button>
+      <button class="btn-cancel" onclick="evSaveDraft()">💾 Save Draft</button>
+      <button class="btn-confirm" style="background:var(--gold);color:#000;" onclick="evSendGmail()">📤 Send via Gmail</button>
+    </div>
+  </div>
+</div>
+
+<!-- EVERSEN — LOG REPLY MODAL -->
+<div class="modal-overlay" id="evReplyModal">
+  <div class="modal">
+    <h2 style="color:var(--gold);">📥 Log &amp; Analyze a Reply</h2>
+    <div class="fg">
+      <label>Brand</label>
+      <select class="fi" id="evReplyBrand"></select>
+    </div>
+    <div class="fg"><label>Paste the vendor's reply (any language)</label><textarea class="fi" id="evReplyText" style="min-height:200px;resize:vertical;" placeholder="Paste the email reply here…"></textarea></div>
+    <div id="evReplyResult" style="display:none;background:var(--black);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:13px;font-size:13px;"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('evReplyModal')">Close</button>
+      <button class="btn-confirm" style="background:var(--gold);color:#000;" id="evReplyAnalyzeBtn" onclick="evAnalyzeReply()">🧠 Analyze Reply</button>
+    </div>
+  </div>
+</div>
 
 <!-- ERIC COLLECTION MODAL -->
 <div class="modal-overlay" id="ericModal">
@@ -2701,6 +2806,7 @@ async function saveData() {
     localStorage.setItem('s64_auction_settings', JSON.stringify(auctionSettings));
     localStorage.setItem('s64_whatnot_shows', JSON.stringify(whatnotShows));
     localStorage.setItem('s64_buy_report', JSON.stringify(buyReport));
+    localStorage.setItem('s64_eversen_brands', JSON.stringify(eversenBrands));
   } catch(e) {}
   showSaving('💾 Saving…');
   toast('⏳ Saving…', 'yellow');
@@ -2716,7 +2822,8 @@ async function saveData() {
       kvSet('s64_auction_watch', auctionWatchlist),
       kvSet('s64_auction_settings', auctionSettings),
       kvSet('s64_whatnot_shows', whatnotShows),
-      kvSet('s64_buy_report', buyReport)
+      kvSet('s64_buy_report', buyReport),
+      kvSet('s64_eversen_brands', eversenBrands)
     ]);
     hideSaving('✅ Saved to cloud');
     toast('✅ Saved to cloud', 'green');
@@ -2733,8 +2840,8 @@ async function loadKey(key) {
   return null;
 }
 async function loadData() {
-  const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta, auctWatch, auctSettings, whatnot, buyRep] = await Promise.all([
-    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings'), loadKey('s64_whatnot_shows'), loadKey('s64_buy_report')
+  const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta, auctWatch, auctSettings, whatnot, buyRep, eversen] = await Promise.all([
+    loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings'), loadKey('s64_whatnot_shows'), loadKey('s64_buy_report'), loadKey('s64_eversen_brands')
   ]);
   if (Array.isArray(items)) allItems = items;
   if (Array.isArray(eric)) ericColl = eric;
@@ -2765,6 +2872,8 @@ async function loadData() {
   renderWhatnotAll();
   if (buyRep && typeof buyRep === 'object' && Array.isArray(buyRep.items)) buyReport = buyRep;
   renderBuyReport();
+  if (Array.isArray(eversen)) eversenBrands = eversen;
+  renderEversenAll();
   renderIdImageGrid(); // show the empty "add angle" slot for the Image ID grid
   updateFastModeUI();  // reflect the persisted Fast Mode state on the toggle
   updateQuickPriceUI();// reflect the persisted Quick Price state on the toggle
@@ -5050,9 +5159,428 @@ function addTransaction() {
   closeModal('txModal');
 }
 
+// ============================================================
+// EVERSEN — AI SOURCING AGENT
+// ============================================================
+// Brand record shape:
+// { id, brand, manufacturer, website, contactEmail, contactPage, country, language, langCode,
+//   sources:[{title,url}], communityLeads:[{note,url}], confidence, summary,
+//   status, dateContacted, notes,
+//   draft:{ subjectNative, subjectEn, bodyNative, bodyEn, needsNative },
+//   reply:{ language, summary, translated, loggedAt } }
+let eversenBrands = [];
+const EVERSEN_QUICK = ['Inno64', 'Demon King', 'Veloce', 'Suhu', 'BPC', 'Kaido House'];
+const EV_STATUSES = ['Draft', 'Sent', 'Replied', 'Negotiating', 'Deal Closed'];
+const EV_LANG_MAP = {
+  'chinese':{name:'Chinese (Simplified)',code:'zh'}, 'mandarin':{name:'Chinese (Simplified)',code:'zh'},
+  'chinese (simplified)':{name:'Chinese (Simplified)',code:'zh'}, 'zh':{name:'Chinese (Simplified)',code:'zh'},
+  'japanese':{name:'Japanese',code:'ja'}, 'ja':{name:'Japanese',code:'ja'},
+  'korean':{name:'Korean',code:'ko'}, 'ko':{name:'Korean',code:'ko'},
+  'english':{name:'English',code:'en'}, 'en':{name:'English',code:'en'}
+};
+const EV_COUNTRY_LANG = {
+  'china':'zh','prc':'zh','taiwan':'zh','hong kong':'zh','hongkong':'zh','macau':'zh',
+  'japan':'ja','korea':'ko','south korea':'ko',
+  'united states':'en','usa':'en','us':'en','united kingdom':'en','uk':'en','canada':'en','australia':'en'
+};
+let evActiveBrandId = null;   // brand currently open in the email modal
+let evDraftParts = null;      // { subjectNative, subjectEn, bodyNative, bodyEn, needsNative }
+let evLangView = 'both';      // both | native | english
+
+function evAnthropicText(data) {
+  if (!data || !Array.isArray(data.content)) return '';
+  return data.content.filter(c => c.type === 'text').map(c => c.text || '').join('\n');
+}
+function evParseJson(text) {
+  let t = String(text || '').replace(/```json|```/g, '').trim();
+  const s = t.indexOf('{'), e = t.lastIndexOf('}');
+  if (s >= 0 && e > s) t = t.slice(s, e + 1);
+  return JSON.parse(t);
+}
+// Normalize the language a manufacturer speaks from the agent's language + country fields.
+function evLangInfo(b) {
+  const raw = String(b && b.language || '').trim().toLowerCase();
+  if (raw && EV_LANG_MAP[raw]) { const m = EV_LANG_MAP[raw]; return { name: m.name, code: m.code, needsNative: m.code !== 'en' }; }
+  const country = String(b && b.country || '').trim().toLowerCase();
+  const code = EV_COUNTRY_LANG[country];
+  if (code && EV_LANG_MAP[code]) { const m = EV_LANG_MAP[code]; return { name: m.name, code: m.code, needsNative: m.code !== 'en' }; }
+  // Unknown non-English language: keep the agent's label but still translate.
+  if (raw && raw !== 'english') return { name: (b.language || 'Native'), code: (b.langCode || 'xx'), needsNative: true };
+  return { name: 'English', code: 'en', needsNative: false };
+}
+
+function renderEversenChips() {
+  const wrap = document.getElementById('evChips');
+  if (!wrap) return;
+  wrap.innerHTML = EVERSEN_QUICK.map(b =>
+    `<button class="ev-chip" onclick="eversenFind('${escJs(b)}')">+ ${escHtmlA(b)}</button>`
+  ).join('');
+}
+
+async function eversenFind(preset) {
+  const input = document.getElementById('evBrandInput');
+  const brand = String(preset || (input ? input.value : '') || '').trim();
+  if (!brand) { toast('⚠️ Type a brand name first.', 'yellow'); return; }
+  const status = document.getElementById('evFindStatus');
+  if (status) status.innerHTML = `<span style="color:var(--gold);">🔎 Eversen is researching <b>${escHtmlA(brand)}</b> — searching the web, forums & trade pages…</span>`;
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1600,
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+        messages: [{ role: 'user', content:
+`You are Eversen, a sourcing researcher for Shift64 Diecast (a US diecast reseller). Use web search to find the real manufacturer or wholesaler behind the diecast brand "${brand}".
+
+Find:
+- The actual manufacturer / factory / wholesaler company behind the brand
+- Their official website, contact email, and any trade / wholesale / OEM inquiry page
+- Any forum posts, Facebook groups, Reddit or diecast community threads mentioning wholesale or factory-direct contacts for this brand
+- The company's country and primary business language
+
+Return ONLY minified JSON, no prose:
+{"brand":"${brand}","manufacturer":"company name or Unknown","website":"url or ''","contactEmail":"email or ''","contactPage":"wholesale/contact url or ''","country":"country or ''","language":"primary language e.g. Chinese/Japanese/English","langCode":"zh/ja/ko/en/..","sources":[{"title":"","url":""}],"communityLeads":[{"note":"what it says","url":""}],"confidence":"High|Medium|Low","summary":"1-2 sentence plain-English summary of what you found"}
+Confidence: High = official contact found; Medium = manufacturer identified but no direct email; Low = only guesses/community leads.` }]
+      })
+    });
+    const data = await res.json();
+    const parsed = evParseJson(evAnthropicText(data));
+    parsed.brand = parsed.brand || brand;
+    upsertEversenBrand(parsed);
+    if (input && !preset) input.value = '';
+    if (status) status.innerHTML = `<span style="color:var(--green);">✅ Research complete for <b>${escHtmlA(parsed.brand)}</b>.</span>`;
+    saveEversen();
+  } catch (e) {
+    console.log('Eversen research failed:', e);
+    if (status) status.innerHTML = `<span style="color:var(--red);">❌ Research failed for ${escHtmlA(brand)}. Try again.</span>`;
+    toast('⚠️ Research failed. Try again.', 'yellow');
+  }
+}
+
+function upsertEversenBrand(parsed) {
+  const key = String(parsed.brand || '').trim().toLowerCase();
+  let rec = eversenBrands.find(b => String(b.brand || '').trim().toLowerCase() === key);
+  const base = {
+    manufacturer: parsed.manufacturer || 'Unknown',
+    website: parsed.website || '', contactEmail: parsed.contactEmail || '',
+    contactPage: parsed.contactPage || '', country: parsed.country || '',
+    language: parsed.language || '', langCode: parsed.langCode || '',
+    sources: Array.isArray(parsed.sources) ? parsed.sources : [],
+    communityLeads: Array.isArray(parsed.communityLeads) ? parsed.communityLeads : [],
+    confidence: parsed.confidence || 'Low', summary: parsed.summary || ''
+  };
+  if (rec) { Object.assign(rec, base); }
+  else {
+    rec = Object.assign({
+      id: 'ev_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      brand: parsed.brand, status: '', dateContacted: '', notes: '', draft: null, reply: null
+    }, base);
+    eversenBrands.unshift(rec);
+  }
+  renderEversenAll();
+}
+
+function evContactLine(b) {
+  if (b.contactEmail) return `📧 <a href="mailto:${escHtmlA(b.contactEmail)}" style="color:var(--gold);">${escHtmlA(b.contactEmail)}</a>`;
+  if (b.contactPage) return `🔗 <a href="${escHtmlA(b.contactPage)}" target="_blank" style="color:var(--gold);">Wholesale / contact page</a>`;
+  return `<span style="color:var(--gray);">No direct contact found</span>`;
+}
+
+function renderEversenResearch() {
+  const div = document.getElementById('evResearchCards');
+  if (!div) return;
+  if (!eversenBrands.length) { div.innerHTML = '<div style="color:var(--gray);font-size:13px;">No research yet. Enter a brand above and Eversen will hunt down the manufacturer, contact info, and community leads.</div>'; return; }
+  div.innerHTML = eversenBrands.map(b => {
+    const li = evLangInfo(b);
+    const langBadge = `<span class="ev-badge ev-lang-badge" title="Outreach language">${li.needsNative ? '🌐 ' + escHtmlA(li.name) + ' + English' : '🇬🇧 English'}</span>`;
+    const conf = ['High','Medium','Low'].includes(b.confidence) ? b.confidence : 'Low';
+    const srcs = (b.sources || []).filter(s => s && s.url).map(s =>
+      `<a href="${escHtmlA(s.url)}" target="_blank" style="color:var(--blue);font-size:12px;display:block;margin-top:3px;">🔗 ${escHtmlA(s.title || s.url)}</a>`).join('');
+    const leads = (b.communityLeads || []).filter(s => s && (s.url || s.note)).map(s =>
+      `<div style="font-size:12px;color:var(--gray);margin-top:3px;">💬 ${escHtmlA(s.note || '')} ${s.url ? `<a href="${escHtmlA(s.url)}" target="_blank" style="color:var(--blue);">link</a>` : ''}</div>`).join('');
+    return `<div class="card" style="background:var(--black);margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;color:var(--white);">${escHtmlA(b.brand)}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <span class="ev-badge ev-conf-${conf}">${conf} confidence</span>${langBadge}
+        </div>
+      </div>
+      <div style="font-size:13px;margin-top:8px;"><span style="color:var(--gray);">Manufacturer:</span> <b>${escHtmlA(b.manufacturer || 'Unknown')}</b>${b.country ? ` <span style="color:var(--gray);">· ${escHtmlA(b.country)}</span>` : ''}</div>
+      ${b.website ? `<div style="font-size:13px;margin-top:4px;"><span style="color:var(--gray);">Website:</span> <a href="${escHtmlA(b.website)}" target="_blank" style="color:var(--gold);">${escHtmlA(b.website)}</a></div>` : ''}
+      <div style="font-size:13px;margin-top:4px;">${evContactLine(b)}</div>
+      ${b.summary ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;line-height:1.5;">${escHtmlA(b.summary)}</div>` : ''}
+      ${srcs ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;">Sources</div>${srcs}</div>` : ''}
+      ${leads ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;">Community leads</div>${leads}</div>` : ''}
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-blue" style="background:var(--gold);color:#000;" onclick="evDraftOutreach('${escJs(b.id)}')">✉️ Draft Outreach</button>
+        <button onclick="evRemoveBrand('${escJs(b.id)}')" style="padding:9px 14px;font-size:12px;background:var(--card);color:var(--gray);border:1px solid var(--border);border-radius:6px;cursor:pointer;">🗑️ Remove</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderEversenQueue() {
+  const div = document.getElementById('evOutreachQueue');
+  if (!div) return;
+  const q = eversenBrands.filter(b => b.contactEmail || b.contactPage);
+  if (!q.length) { div.innerHTML = '<div style="color:var(--gray);font-size:13px;">Brands with a found contact will appear here, ready to draft outreach.</div>'; return; }
+  div.innerHTML = q.map(b => {
+    const li = evLangInfo(b);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-weight:700;">${escHtmlA(b.brand)} <span style="color:var(--gray);font-weight:400;font-size:12px;">· ${escHtmlA(b.manufacturer || 'Unknown')}</span></div>
+        <div style="font-size:12px;color:var(--gray);margin-top:2px;">${evContactLine(b)} · ${li.needsNative ? '🌐 ' + escHtmlA(li.name) + ' + English' : '🇬🇧 English'}${b.draft ? ' · <span style="color:var(--gold);">draft ready</span>' : ''}</div>
+      </div>
+      <button class="btn-blue" style="background:var(--gold);color:#000;white-space:nowrap;" onclick="evDraftOutreach('${escJs(b.id)}')">✉️ ${b.draft ? 'Review Draft' : 'Draft Outreach'}</button>
+    </div>`;
+  }).join('');
+}
+
+async function evDraftOutreach(id) {
+  const b = eversenBrands.find(x => x.id === id);
+  if (!b) return;
+  const li = evLangInfo(b);
+  // If a draft already exists, just open it.
+  if (b.draft) { evOpenEmailModal(b); return; }
+  toast('✍️ Eversen is drafting outreach…', 'yellow');
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content:
+`Write a first-contact wholesale outreach email as "Eversen", sourcing manager on behalf of Shift64 Diecast (a growing US-based diecast car reseller). Recipient: ${b.manufacturer || 'the manufacturer'} behind the brand "${b.brand}".
+
+The email must: introduce Shift64 Diecast warmly, express genuine interest in becoming an authorized reseller / stocking their products, and politely request wholesale pricing and MOQ (minimum order quantity) information. Tone: friendly, respectful, professional. Keep it concise (about 130-180 words). Sign off as "Eversen — Sourcing, Shift64 Diecast".
+
+Recipient's primary language: ${li.name} (code ${li.code}).
+${li.needsNative
+  ? `Provide BOTH a native-language (${li.name}) version AND an English version. Translate naturally and respectfully, not literally.`
+  : `English only.`}
+
+Return ONLY minified JSON:
+{"subjectNative":"${li.needsNative ? 'subject in ' + li.name : ''}","subjectEn":"English subject","bodyNative":"${li.needsNative ? 'full email body in ' + li.name : ''}","bodyEn":"full English email body"}` }]
+      })
+    });
+    const data = await res.json();
+    const d = evParseJson(evAnthropicText(data));
+    b.draft = {
+      subjectNative: d.subjectNative || '', subjectEn: d.subjectEn || `Wholesale inquiry — Shift64 Diecast x ${b.brand}`,
+      bodyNative: d.bodyNative || '', bodyEn: d.bodyEn || '', needsNative: li.needsNative
+    };
+    if (!b.status) b.status = 'Draft';
+    saveEversen();
+    renderEversenAll();
+    evOpenEmailModal(b);
+    toast('✅ Draft ready.', 'green');
+  } catch (e) {
+    console.log('Eversen draft failed:', e);
+    toast('⚠️ Draft failed. Try again.', 'yellow');
+  }
+}
+
+function evOpenEmailModal(b) {
+  evActiveBrandId = b.id;
+  evDraftParts = Object.assign({ subjectNative:'', subjectEn:'', bodyNative:'', bodyEn:'', needsNative:false }, b.draft || {});
+  document.getElementById('evEmailBrandTag').textContent = '— ' + b.brand;
+  document.getElementById('evEmailTo').value = b.contactEmail || '';
+  // Show native view first when applicable (native leads as a sign of respect), else both/english.
+  evLangView = evDraftParts.needsNative ? 'both' : 'english';
+  // Hide the native toggle button when there is no native version.
+  document.querySelectorAll('#evLangToggle .ev-lang-btn').forEach(btn => {
+    const m = btn.getAttribute('data-mode');
+    btn.style.display = (!evDraftParts.needsNative && (m === 'native' || m === 'both')) ? 'none' : '';
+  });
+  evSetLangView(evLangView);
+  openModal('evEmailModal');
+}
+
+function evComposeBody(parts, mode) {
+  if (mode === 'native') return parts.bodyNative || parts.bodyEn || '';
+  if (mode === 'english') return parts.bodyEn || '';
+  // both — native first as a sign of respect, English below
+  if (parts.needsNative && parts.bodyNative) return parts.bodyNative + '\n\n———\n\n' + parts.bodyEn;
+  return parts.bodyEn || '';
+}
+function evComposeSubject(parts, mode) {
+  if (mode === 'native') return parts.subjectNative || parts.subjectEn || '';
+  if (mode === 'english') return parts.subjectEn || '';
+  if (parts.needsNative && parts.subjectNative) return parts.subjectNative + ' / ' + parts.subjectEn;
+  return parts.subjectEn || '';
+}
+function evSetLangView(mode) {
+  if (!evDraftParts) return;
+  evLangView = mode;
+  document.querySelectorAll('#evLangToggle .ev-lang-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === mode));
+  document.getElementById('evEmailSubject').value = evComposeSubject(evDraftParts, mode);
+  document.getElementById('evEmailBody').value = evComposeBody(evDraftParts, mode);
+  const badge = document.getElementById('evEmailLangBadge');
+  if (badge) badge.textContent = mode === 'both' && evDraftParts.needsNative ? '(native + English)' : (mode === 'native' ? '(native)' : '(English)');
+}
+
+function evSaveDraft() {
+  const b = eversenBrands.find(x => x.id === evActiveBrandId);
+  if (!b) return;
+  b.contactEmail = document.getElementById('evEmailTo').value.trim() || b.contactEmail;
+  // Persist edits back into whichever segment is showing.
+  const subj = document.getElementById('evEmailSubject').value;
+  const body = document.getElementById('evEmailBody').value;
+  b.draft = b.draft || { subjectNative:'', subjectEn:'', bodyNative:'', bodyEn:'', needsNative: evDraftParts.needsNative };
+  if (evLangView === 'english') { b.draft.subjectEn = subj; b.draft.bodyEn = body; }
+  else if (evLangView === 'native') { b.draft.subjectNative = subj; b.draft.bodyNative = body; }
+  // 'both' is a composite view — keep the underlying segments as-is.
+  if (!b.status || b.status === '') b.status = 'Draft';
+  saveEversen();
+  renderEversenAll();
+  toast('💾 Draft saved.', 'green');
+  closeModal('evEmailModal');
+}
+
+// Browser-feasible "send via Gmail": open a Gmail compose window pre-filled from shift64diecast@gmail.com.
+function evSendGmail() {
+  const b = eversenBrands.find(x => x.id === evActiveBrandId);
+  if (!b) return;
+  const to = document.getElementById('evEmailTo').value.trim();
+  const su = document.getElementById('evEmailSubject').value;
+  const body = document.getElementById('evEmailBody').value;
+  if (!to) { toast('⚠️ Add a recipient email first.', 'yellow'); return; }
+  const url = 'https://mail.google.com/mail/?view=cm&fs=1&authuser=shift64diecast@gmail.com'
+    + '&to=' + encodeURIComponent(to)
+    + '&su=' + encodeURIComponent(su)
+    + '&body=' + encodeURIComponent(body);
+  window.open(url, '_blank');
+  b.status = 'Sent';
+  b.dateContacted = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  b.draft = b.draft || {};
+  saveEversen();
+  renderEversenAll();
+  toast('📤 Opened Gmail compose — review & hit send.', 'green');
+  closeModal('evEmailModal');
+}
+
+function evRemoveBrand(id) {
+  eversenBrands = eversenBrands.filter(b => b.id !== id);
+  saveEversen();
+  renderEversenAll();
+}
+
+function renderEversenTracker() {
+  const div = document.getElementById('evTracker');
+  if (!div) return;
+  const rows = eversenBrands.filter(b => b.status || b.draft || b.reply);
+  if (!rows.length) { div.innerHTML = '<div style="color:var(--gray);font-size:13px;">No outreach yet.</div>'; return; }
+  const body = rows.map(b => {
+    const li = evLangInfo(b);
+    const statusOpts = EV_STATUSES.map(s => `<option${b.status === s ? ' selected' : ''}>${s}</option>`).join('');
+    const replyFlag = b.reply ? `<span class="ev-badge" style="background:rgba(224,43,43,0.15);color:var(--red);border:1px solid rgba(224,43,43,0.4);cursor:pointer;" title="${escHtmlA(b.reply.summary || 'Reply logged')}" onclick="evShowReply('${escJs(b.id)}')">🔴 Reply</span>` : '';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px;font-weight:700;">${escHtmlA(b.brand)} ${replyFlag}</td>
+      <td style="padding:8px;color:var(--gray);">${escHtmlA(b.manufacturer || 'Unknown')}</td>
+      <td style="padding:8px;white-space:nowrap;color:var(--gray);">${escHtmlA(b.dateContacted || '—')}</td>
+      <td style="padding:8px;white-space:nowrap;">${li.needsNative ? escHtmlA(li.name) + ' + EN' : 'English'}</td>
+      <td style="padding:8px;"><select class="ev-status-sel" onchange="evSetStatus('${escJs(b.id)}',this.value)">${statusOpts}</select></td>
+      <td style="padding:8px;"><input class="ev-status-sel" style="width:100%;min-width:120px;" value="${escHtmlA(b.notes || '')}" placeholder="notes…" onchange="evSetNote('${escJs(b.id)}',this.value)"/></td>
+    </tr>`;
+  }).join('');
+  div.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="text-align:left;color:var(--gray);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border);">
+      <th style="padding:8px;">Brand</th><th style="padding:8px;">Manufacturer</th><th style="padding:8px;">Contacted</th><th style="padding:8px;">Language</th><th style="padding:8px;">Status</th><th style="padding:8px;">Notes</th>
+    </tr></thead><tbody>${body}</tbody></table></div>`;
+}
+function evSetStatus(id, val) { const b = eversenBrands.find(x => x.id === id); if (b) { b.status = val; saveEversen(); } }
+function evSetNote(id, val) { const b = eversenBrands.find(x => x.id === id); if (b) { b.notes = val; saveEversen(); } }
+
+function evShowReply(id) {
+  const b = eversenBrands.find(x => x.id === id);
+  if (!b || !b.reply) return;
+  document.getElementById('evReplyBrand').value = b.id;
+  const box = document.getElementById('evReplyResult');
+  box.style.display = 'block';
+  box.innerHTML = evReplyResultHtml(b.reply);
+  document.getElementById('evReplyText').value = '';
+  openModal('evReplyModal');
+}
+function evReplyResultHtml(r) {
+  return `<div style="font-weight:700;color:var(--gold);margin-bottom:6px;">🧠 Reply Analysis</div>
+    <div style="margin-bottom:6px;"><span style="color:var(--gray);">Detected language:</span> <b>${escHtmlA(r.language || 'Unknown')}</b></div>
+    <div style="margin-bottom:6px;"><span style="color:var(--gray);">Summary:</span> ${escHtmlA(r.summary || '')}</div>
+    ${r.translated ? `<div style="margin-top:8px;"><div style="color:var(--gray);font-size:11px;text-transform:uppercase;">English translation</div><div style="white-space:pre-wrap;margin-top:4px;">${escHtmlA(r.translated)}</div></div>` : ''}`;
+}
+
+function renderEvReplyBrandOptions() {
+  const sel = document.getElementById('evReplyBrand');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = eversenBrands.map(b => `<option value="${escHtmlA(b.id)}">${escHtmlA(b.brand)} — ${escHtmlA(b.manufacturer || 'Unknown')}</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+async function evAnalyzeReply() {
+  const sel = document.getElementById('evReplyBrand');
+  const b = eversenBrands.find(x => x.id === (sel && sel.value));
+  const text = document.getElementById('evReplyText').value.trim();
+  if (!b) { toast('⚠️ Pick a brand.', 'yellow'); return; }
+  if (!text) { toast('⚠️ Paste the reply text.', 'yellow'); return; }
+  const btn = document.getElementById('evReplyAnalyzeBtn');
+  const orig = btn.textContent; btn.textContent = '⏳ Analyzing…'; btn.disabled = true;
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1200,
+        messages: [{ role: 'user', content:
+`A diecast manufacturer replied to Shift64 Diecast's wholesale outreach. Detect the language, translate it to English if it is not already English, and summarize the key business points (pricing, MOQ, terms, interest level, next steps).
+
+Reply text:
+"""${text}"""
+
+Return ONLY minified JSON:
+{"language":"detected language","translated":"full English translation (empty string if original is English)","summary":"2-4 sentence English summary of the key points and what they want / offer","suggestedStatus":"Replied|Negotiating|Deal Closed"}` }]
+      })
+    });
+    const data = await res.json();
+    const r = evParseJson(evAnthropicText(data));
+    b.reply = { language: r.language || 'Unknown', translated: r.translated || '', summary: r.summary || '', loggedAt: Date.now() };
+    if (r.suggestedStatus && EV_STATUSES.includes(r.suggestedStatus)) b.status = r.suggestedStatus;
+    else if (!b.status || b.status === 'Draft' || b.status === 'Sent') b.status = 'Replied';
+    saveEversen();
+    renderEversenAll();
+    const box = document.getElementById('evReplyResult');
+    box.style.display = 'block';
+    box.innerHTML = evReplyResultHtml(b.reply);
+    toast('✅ Reply analyzed & flagged in tracker.', 'green');
+  } catch (e) {
+    console.log('Eversen reply analysis failed:', e);
+    toast('⚠️ Analysis failed. Try again.', 'yellow');
+  } finally {
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+function renderEversenAll() {
+  renderEversenChips();
+  renderEversenResearch();
+  renderEversenQueue();
+  renderEversenTracker();
+  renderEvReplyBrandOptions();
+}
+
+async function saveEversen() {
+  try { localStorage.setItem('s64_eversen_brands', JSON.stringify(eversenBrands)); } catch (e) {}
+  try { await kvSet('s64_eversen_brands', eversenBrands); } catch (e) {}
+}
+
 // Init
 renderScreenshots();
 renderCatalogs();               // show default vendor catalogs immediately (independent of KV load)
+renderEversenChips();           // show quick-add chips immediately (independent of KV load)
 window.addEventListener('load', loadData);
 
 // Filter event listeners - guaranteed to fire
