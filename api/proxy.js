@@ -157,8 +157,18 @@ export default async function handler(req, res) {
   }
 
   // Anthropic AI
+  // The full request body is forwarded to Anthropic UNCHANGED — including any `tools`
+  // array (e.g. the web_search_20250305 server tool used by Eversen). There is no tool
+  // filtering or whitelist here, so web search passes straight through.
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
+    // Log the tools array so we can confirm web search is arriving from the client.
+    const incomingTools = (req.body && req.body.tools) || null;
+    if (incomingTools) {
+      console.log('[proxy] tools received:', JSON.stringify(incomingTools));
+    } else {
+      console.log('[proxy] no tools array in request body');
+    }
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -166,7 +176,7 @@ export default async function handler(req, res) {
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify(req.body)
+      body: JSON.stringify(req.body) // forwarded unchanged, tools included
     });
     const data = await response.json();
     return res.status(200).json(data);
