@@ -1,7 +1,8 @@
-// Allow larger request bodies (image ID payloads, long prompts) and give the function
-// room to run. Tools arrays (including web_search_20250305) are always forwarded as-is;
+// Allow large request bodies (image ID payloads, long prompts) and give the function the
+// maximum runtime, since web_search tool calls take longer than a standard completion.
+// Tools arrays (including web_search_20250305) are always forwarded to Anthropic as-is —
 // there is no tools validation, size rejection, or whitelist that could drop them.
-export const config = { api: { bodyParser: { sizeLimit: '4mb' } }, maxDuration: 60 };
+export const config = { api: { bodyParser: { sizeLimit: '10mb' } }, maxDuration: 60 };
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
