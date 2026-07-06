@@ -8,8 +8,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, anthropic-dangerous-direct-browser-access');
 
+  // CORS preflight: the headers above are already set, so return 200 with them.
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { type } = req.query;

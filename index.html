@@ -5259,7 +5259,7 @@ async function evResearchOnce(brand, focusHint) {
   try {
     const res = await fetch(PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'Content-Type': 'application/json' }, // proxy adds Anthropic's browser-access header server-side
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1800,
