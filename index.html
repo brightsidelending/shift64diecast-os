@@ -384,7 +384,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <button class="nav-tab" onclick="showTab('khai',this)">🏎️ Khai</button>
   <button class="nav-tab" onclick="showTab('wantlist',this)">🎯 Want List</button>
   <button class="nav-tab" onclick="showTab('intel',this)">💡 Intel</button>
-  <button class="nav-tab" onclick="showTab('eversen',this)">🤖 Eversen</button>
+  <button class="nav-tab" onclick="showTab('eversen',this)">🤖 Eversen <span id="evTabBadge" style="display:none;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:2px;">0</span></button>
 </div>
 
 <div class="main">
@@ -986,6 +986,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <!-- ===== EVERSEN — AI SOURCING AGENT ===== -->
 <div id="eversen" class="section">
 
+  <!-- 🎯 DECISION REQUIRED (only appears when a vendor offer is ready for Eric to act on) -->
+  <div id="evDecisionPanel" style="display:none;"></div>
+
   <!-- HEADER -->
   <div class="card" style="border-color:rgba(201,168,76,0.35);background:linear-gradient(135deg,#16191F 0%,#1A1710 100%);">
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
@@ -1030,7 +1033,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
       <div class="card-title" style="margin-bottom:0;">📊 Outreach Tracker</div>
-      <button onclick="openModal('evReplyModal')" style="padding:8px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">📥 Log a Reply</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="evMonitorInbox(true)" style="padding:8px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">🔄 Check Replies Now</button>
+        <button onclick="openModal('evReplyModal')" style="padding:8px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">📥 Log a Reply</button>
+      </div>
     </div>
     <div id="evTracker"><div style="color:var(--gray);font-size:13px;">No outreach yet.</div></div>
   </div>
@@ -1057,7 +1063,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="modal-actions" style="flex-wrap:wrap;">
       <button class="btn-cancel" onclick="closeModal('evEmailModal')">Cancel</button>
       <button class="btn-cancel" onclick="evSaveDraft()">💾 Save Draft</button>
-      <button class="btn-confirm" style="background:var(--gold);color:#000;" onclick="evSendGmail()">📤 Send via Gmail</button>
+      <button class="btn-confirm" id="evSendBtn" style="background:var(--gold);color:#000;" onclick="evSendGmail()">📤 Send via Gmail</button>
     </div>
   </div>
 </div>
@@ -2875,6 +2881,7 @@ async function loadData() {
   renderBuyReport();
   if (Array.isArray(eversen)) eversenBrands = eversen;
   renderEversenAll();
+  if (eversenBrands.some(b => b.threadId)) evStartMonitor(); // begin watching Gmail for replies to sent threads
   renderIdImageGrid(); // show the empty "add angle" slot for the Image ID grid
   updateFastModeUI();  // reflect the persisted Fast Mode state on the toggle
   updateQuickPriceUI();// reflect the persisted Quick Price state on the toggle
@@ -5628,25 +5635,225 @@ function evSaveDraft() {
 }
 
 // Browser-feasible "send via Gmail": open a Gmail compose window pre-filled from shift64diecast@gmail.com.
-function evSendGmail() {
+// Silent send via the Gmail API (proxy endpoint). No compose window; logs thread to the tracker.
+async function evSendGmail() {
   const b = eversenBrands.find(x => x.id === evActiveBrandId);
   if (!b) return;
   const to = document.getElementById('evEmailTo').value.trim();
   const su = document.getElementById('evEmailSubject').value;
   const body = document.getElementById('evEmailBody').value;
   if (!to) { toast('⚠️ Add a recipient email first.', 'yellow'); return; }
-  const url = 'https://mail.google.com/mail/?view=cm&fs=1&authuser=shift64diecast@gmail.com'
-    + '&to=' + encodeURIComponent(to)
-    + '&su=' + encodeURIComponent(su)
-    + '&body=' + encodeURIComponent(body);
-  window.open(url, '_blank');
-  b.status = 'Sent';
-  b.dateContacted = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-  b.draft = b.draft || {};
+  const btn = document.getElementById('evSendBtn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '⏳ Sending…'; btn.disabled = true; }
+  try {
+    const res = await fetch(PROXY_URL + '?type=gmail_send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: to, subject: su, body: body, threadId: b.threadId || undefined })
+    });
+    const d = await res.json();
+    if (!d || !d.ok) throw new Error((d && d.error) || 'send failed');
+    b.status = 'Sent';
+    b.dateContacted = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+    b.contactEmail = to;
+    b.threadId = d.threadId || b.threadId || '';
+    b.lastSentMsgId = d.messageId || '';
+    b.sentAt = Date.now();
+    b.draft = b.draft || {};
+    saveEversen();
+    renderEversenAll();
+    evStartMonitor(); // ensure the inbox watcher is running now that we have a thread
+    toast('✅ Sent to ' + to, 'green');
+    closeModal('evEmailModal');
+  } catch (e) {
+    console.log('Gmail send failed:', e);
+    toast('⚠️ Send failed: ' + ((e && e.message) || 'error') + '. Check GMAIL_* env vars in Vercel.', 'yellow');
+  } finally {
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
+
+// ── Gmail automation: reply monitor, analysis, auto-negotiation, decision offers ──
+const EV_TARGET_MARGIN = 40; // below this estimated % margin, Eversen auto-counter-offers
+let evMonitorTimer = null;
+
+function evNum(v) {
+  if (v == null) return null;
+  const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+  return isNaN(n) ? null : n;
+}
+
+// Analyze a reply body via Anthropic → { language, translated, summary, price, currency, moq, terms, marginPct, hasOffer, suggestedStatus }
+async function evAnalyzeReplyCore(brand, text) {
+  const res = await fetch(PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1200,
+      messages: [{ role: 'user', content:
+`A diecast manufacturer replied to Shift64 Diecast's wholesale outreach for the brand "${brand}". Detect the language, translate to English if it is not already English, summarize the key business points, and extract any pricing / MOQ / terms. Also estimate gross margin: estimate a typical US resale price per unit for this brand's 1:64 diecast and compute a rough margin percent = (resale - offeredUnitPrice) / resale * 100 using the offered wholesale unit price if one is given.
+
+Reply text:
+"""${text}"""
+
+Return ONLY minified JSON:
+{"language":"detected language","translated":"full English translation or '' if already English","summary":"2-4 sentence English summary of what they offer/want","price":"offered unit price as a number only, or null","currency":"USD/CNY/etc or ''","moq":"minimum order quantity as a number only, or null","terms":"payment/shipping terms or ''","marginPct":"estimated gross margin percent as a number, or null","hasOffer":true,"suggestedStatus":"Replied|Negotiating|Deal Closed"}` }]
+    })
+  });
+  const data = await res.json();
+  if (data && data.error) throw new Error(data.error.message || 'analysis error');
+  return evParseJson(evAnthropicText(data));
+}
+
+// Apply an analysis result to a brand record (sets reply + decision offer).
+function evApplyAnalysis(b, r, sourceText) {
+  const price = evNum(r.price), moq = evNum(r.moq), margin = evNum(r.marginPct);
+  b.reply = {
+    language: r.language || 'Unknown', translated: r.translated || '', summary: r.summary || '',
+    price: price, currency: r.currency || '', moq: moq, terms: r.terms || '', marginPct: margin,
+    loggedAt: Date.now(), raw: String(sourceText || '').slice(0, 4000)
+  };
+  if (r.suggestedStatus && EV_STATUSES.includes(r.suggestedStatus)) b.status = r.suggestedStatus;
+  else if (!b.status || b.status === 'Draft' || b.status === 'Sent') b.status = 'Replied';
+  if (price != null || moq != null || r.hasOffer === true) {
+    b.offer = { price: price, currency: r.currency || '', moq: moq, marginPct: margin, terms: r.terms || '' };
+    b.offerResolved = false; // a fresh offer re-opens the decision
+  }
+}
+
+// Auto-negotiation: if margin is under target, send a polite counter-offer on the same thread.
+async function evSendCounterOffer(b) {
+  if (!b.threadId || !b.contactEmail) return;
+  try {
+    const li = evLangInfo(b);
+    const o = b.offer || {};
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 900,
+        messages: [{ role: 'user', content:
+`As "Eversen", sourcing manager for Shift64 Diecast, write a brief, warm, professional reply that negotiates a better deal on the brand "${b.brand}". The manufacturer offered ${o.price != null ? ('a unit price of ' + o.price + ' ' + (o.currency || '')) : 'a price'}${o.moq != null ? (' with an MOQ of ' + o.moq) : ''}, giving us an estimated margin of ${o.marginPct != null ? (o.marginPct + '%') : 'below our target'}. Our target is at least ${EV_TARGET_MARGIN}% margin. Politely request better wholesale pricing (a volume discount) or a lower MOQ so we can commit to a first order, and keep the door open. Under 130 words. ${li.needsNative ? ('Write it in ' + li.name + ' first, then an English version below.') : ''} Return ONLY the email body text — no subject line, no JSON.` }]
+      })
+    });
+    const data = await res.json();
+    const bodyTxt = (evAnthropicText(data) || '').trim();
+    if (!bodyTxt) return;
+    const subject = (b.draft && b.draft.subjectEn) ? ('Re: ' + b.draft.subjectEn) : ('Re: Wholesale inquiry — Shift64 Diecast x ' + b.brand);
+    const send = await fetch(PROXY_URL + '?type=gmail_send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: b.contactEmail, subject: subject, body: bodyTxt, threadId: b.threadId })
+    });
+    const sd = await send.json();
+    if (sd && sd.ok) {
+      b.negotiationCount = (b.negotiationCount || 0) + 1;
+      b.status = 'Negotiating';
+      b.notes = (b.notes ? b.notes + ' | ' : '') + 'Auto counter-offer sent ' + new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    }
+  } catch (e) { console.log('Eversen counter-offer failed:', e); }
+}
+
+// Poll the inbox, match replies to tracked threads, analyze new ones, negotiate if needed.
+async function evMonitorInbox(manual) {
+  const tracked = eversenBrands.filter(b => b.threadId);
+  if (!tracked.length) { if (manual) toast('No sent threads to monitor yet.', 'yellow'); return; }
+  let data;
+  try {
+    const res = await fetch(PROXY_URL + '?type=gmail_inbox', { method: 'GET' });
+    data = await res.json();
+  } catch (e) { console.log('Eversen inbox fetch failed:', e); if (manual) toast('⚠️ Could not reach inbox.', 'yellow'); return; }
+  if (!data || !data.ok || !Array.isArray(data.messages)) {
+    if (manual) toast('⚠️ Inbox unavailable (check GMAIL_* env vars).', 'yellow');
+    return;
+  }
+  // Latest inbound (not from us) message per thread.
+  const byThread = {};
+  data.messages.forEach(m => {
+    if (String(m.from || '').toLowerCase().indexOf('shift64diecast') >= 0) return; // skip our own
+    const prev = byThread[m.threadId];
+    if (!prev || new Date(m.date).getTime() > new Date(prev.date).getTime()) byThread[m.threadId] = m;
+  });
+  let found = 0;
+  for (const b of tracked) {
+    const msg = byThread[b.threadId];
+    if (!msg || b.lastReplyMsgId === msg.messageId) continue;
+    b.lastReplyMsgId = msg.messageId;
+    found++;
+    try {
+      const r = await evAnalyzeReplyCore(b.brand, msg.body || '');
+      evApplyAnalysis(b, r, msg.body);
+      if (b.offer && b.offer.marginPct != null && b.offer.marginPct < EV_TARGET_MARGIN && (b.negotiationCount || 0) < 2) {
+        await evSendCounterOffer(b);
+      }
+    } catch (e) { console.log('Eversen reply analysis failed for', b.brand, e); }
+  }
+  if (found) { saveEversen(); renderEversenAll(); toast('📥 ' + found + ' new repl' + (found > 1 ? 'ies' : 'y') + ' processed.', 'green'); }
+  else if (manual) toast('No new replies.', 'yellow');
+}
+
+function evStartMonitor() {
+  if (evMonitorTimer) return;
+  evMonitorInbox(false);                                              // run once now
+  evMonitorTimer = setInterval(() => evMonitorInbox(false), 2 * 60 * 60 * 1000); // every 2 hours
+}
+
+// 🎯 Decision Required panel — the only thing Eric needs to act on.
+function renderEversenDecisions() {
+  const div = document.getElementById('evDecisionPanel');
+  if (!div) return;
+  const offers = eversenBrands.filter(b => b.offer && !b.offerResolved);
+  if (!offers.length) { div.style.display = 'none'; div.innerHTML = ''; return; }
+  div.style.display = 'block';
+  const cards = offers.map(b => {
+    const o = b.offer || {};
+    const priceStr = o.price != null ? (o.price + ' ' + (o.currency || '')) : '—';
+    const moqStr = o.moq != null ? String(o.moq) : '—';
+    const marginStr = o.marginPct != null ? (o.marginPct.toFixed(0) + '%') : '—';
+    const marginColor = o.marginPct == null ? 'var(--gray)' : (o.marginPct >= EV_TARGET_MARGIN ? 'var(--green)' : (o.marginPct >= 25 ? 'var(--yellow)' : 'var(--red)'));
+    return `<div style="background:var(--black);border:1px solid rgba(201,168,76,0.35);border-radius:10px;padding:14px;margin-bottom:10px;">
+      <div style="font-weight:800;font-size:15px;">${escHtmlA(b.brand)} <span style="color:var(--gray);font-weight:400;font-size:12px;">· ${escHtmlA(b.manufacturer || 'Unknown')}</span></div>
+      <div style="font-size:12px;color:var(--gray);margin-top:4px;">${escHtmlA((b.reply && b.reply.summary) || 'Offer received')}</div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:11px;font-size:13px;">
+        <div><div style="font-size:10px;color:var(--gray);text-transform:uppercase;">Price</div><b>${escHtmlA(priceStr)}</b></div>
+        <div><div style="font-size:10px;color:var(--gray);text-transform:uppercase;">MOQ</div><b>${escHtmlA(moqStr)}</b></div>
+        <div><div style="font-size:10px;color:var(--gray);text-transform:uppercase;">Est. margin</div><b style="color:${marginColor};">${marginStr}</b></div>
+        ${o.terms ? `<div><div style="font-size:10px;color:var(--gray);text-transform:uppercase;">Terms</div><b>${escHtmlA(o.terms)}</b></div>` : ''}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button onclick="evDecideOffer('${escJs(b.id)}','approve')" style="padding:9px 16px;font-weight:800;background:var(--green);color:#05341b;border:none;border-radius:8px;cursor:pointer;">✅ Approve Purchase</button>
+        <button onclick="evDecideOffer('${escJs(b.id)}','pass')" style="padding:9px 16px;font-weight:700;background:var(--card);color:var(--gray);border:1px solid var(--border);border-radius:8px;cursor:pointer;">❌ Pass</button>
+        ${b.reply ? `<button onclick="evShowReply('${escJs(b.id)}')" style="padding:9px 14px;font-size:12px;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">📄 View reply</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  div.innerHTML = `<div class="card" style="border-color:rgba(224,43,43,0.45);background:linear-gradient(135deg,#16191F 0%,#1A1214 100%);">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <span style="font-size:20px;">🎯</span>
+      <span style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:800;color:var(--white);">Decision Required</span>
+      <span class="ev-badge" style="background:var(--red);color:#fff;">${offers.length}</span>
+    </div>${cards}</div>`;
+}
+
+function evDecideOffer(id, action) {
+  const b = eversenBrands.find(x => x.id === id);
+  if (!b) return;
+  b.offerResolved = true;
+  if (action === 'approve') { b.status = 'Deal Closed'; b.offerDecision = 'approved'; toast('✅ Purchase approved for ' + b.brand + '.', 'green'); }
+  else { b.offerDecision = 'passed'; b.status = 'Passed'; toast('❌ Passed on ' + b.brand + '.', 'yellow'); }
   saveEversen();
   renderEversenAll();
-  toast('📤 Opened Gmail compose — review & hit send.', 'green');
-  closeModal('evEmailModal');
+}
+
+// 🔴 badge on the Eversen nav tab = number of unreviewed offers.
+function renderEversenBadge() {
+  const el = document.getElementById('evTabBadge');
+  if (!el) return;
+  const n = eversenBrands.filter(b => b.offer && !b.offerResolved).length;
+  if (n > 0) { el.textContent = String(n); el.style.display = 'inline-block'; }
+  else { el.style.display = 'none'; }
 }
 
 function evRemoveBrand(id) {
@@ -5692,9 +5899,15 @@ function evShowReply(id) {
   openModal('evReplyModal');
 }
 function evReplyResultHtml(r) {
+  const chips = [];
+  if (r.price != null) chips.push('Price: <b>' + escHtmlA(String(r.price)) + ' ' + escHtmlA(r.currency || '') + '</b>');
+  if (r.moq != null) chips.push('MOQ: <b>' + escHtmlA(String(r.moq)) + '</b>');
+  if (r.marginPct != null) chips.push('Est. margin: <b>' + escHtmlA(String(r.marginPct)) + '%</b>');
+  if (r.terms) chips.push('Terms: <b>' + escHtmlA(r.terms) + '</b>');
   return `<div style="font-weight:700;color:var(--gold);margin-bottom:6px;">🧠 Reply Analysis</div>
     <div style="margin-bottom:6px;"><span style="color:var(--gray);">Detected language:</span> <b>${escHtmlA(r.language || 'Unknown')}</b></div>
     <div style="margin-bottom:6px;"><span style="color:var(--gray);">Summary:</span> ${escHtmlA(r.summary || '')}</div>
+    ${chips.length ? `<div style="margin:8px 0;display:flex;gap:14px;flex-wrap:wrap;font-size:13px;">${chips.join('')}</div>` : ''}
     ${r.translated ? `<div style="margin-top:8px;"><div style="color:var(--gray);font-size:11px;text-transform:uppercase;">English translation</div><div style="white-space:pre-wrap;margin-top:4px;">${escHtmlA(r.translated)}</div></div>` : ''}`;
 }
 
@@ -5715,27 +5928,8 @@ async function evAnalyzeReply() {
   const btn = document.getElementById('evReplyAnalyzeBtn');
   const orig = btn.textContent; btn.textContent = '⏳ Analyzing…'; btn.disabled = true;
   try {
-    const res = await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1200,
-        messages: [{ role: 'user', content:
-`A diecast manufacturer replied to Shift64 Diecast's wholesale outreach. Detect the language, translate it to English if it is not already English, and summarize the key business points (pricing, MOQ, terms, interest level, next steps).
-
-Reply text:
-"""${text}"""
-
-Return ONLY minified JSON:
-{"language":"detected language","translated":"full English translation (empty string if original is English)","summary":"2-4 sentence English summary of the key points and what they want / offer","suggestedStatus":"Replied|Negotiating|Deal Closed"}` }]
-      })
-    });
-    const data = await res.json();
-    const r = evParseJson(evAnthropicText(data));
-    b.reply = { language: r.language || 'Unknown', translated: r.translated || '', summary: r.summary || '', loggedAt: Date.now() };
-    if (r.suggestedStatus && EV_STATUSES.includes(r.suggestedStatus)) b.status = r.suggestedStatus;
-    else if (!b.status || b.status === 'Draft' || b.status === 'Sent') b.status = 'Replied';
+    const r = await evAnalyzeReplyCore(b.brand, text);
+    evApplyAnalysis(b, r, text);
     saveEversen();
     renderEversenAll();
     const box = document.getElementById('evReplyResult');
@@ -5756,6 +5950,8 @@ function renderEversenAll() {
   renderEversenQueue();
   renderEversenTracker();
   renderEvReplyBrandOptions();
+  renderEversenDecisions();
+  renderEversenBadge();
 }
 
 async function saveEversen() {
