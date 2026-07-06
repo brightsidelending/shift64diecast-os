@@ -5217,46 +5217,123 @@ function renderEversenChips() {
   ).join('');
 }
 
-async function eversenFind(preset) {
-  const input = document.getElementById('evBrandInput');
-  const brand = String(preset || (input ? input.value : '') || '').trim();
-  if (!brand) { toast('⚠️ Type a brand name first.', 'yellow'); return; }
-  const status = document.getElementById('evFindStatus');
-  if (status) status.innerHTML = `<span style="color:var(--gold);">🔎 Eversen is researching <b>${escHtmlA(brand)}</b> — searching the web, forums & trade pages…</span>`;
+// Search angles tried in order. If one pass doesn't nail a maker + contact, the next widens the net.
+function evBuildQueries(brand) {
+  return [
+    { q: brand + ' diecast manufacturer', label: 'manufacturer' },
+    { q: brand + ' 1:64 wholesale China', label: 'wholesale / China' },
+    { q: brand + ' diecast factory contact', label: 'factory contact' }
+  ];
+}
+function evConfRank(c) { return c === 'High' ? 3 : c === 'Medium' ? 2 : c === 'Low' ? 1 : 0; }
+function evDedupeLinks(arr) {
+  const seen = {}, out = [];
+  (arr || []).forEach(x => {
+    if (!x) return;
+    const k = (x.url || '') + '|' + (x.note || x.title || '');
+    if (seen[k]) return; seen[k] = 1; out.push(x);
+  });
+  return out;
+}
+// Merge a new pass's findings into the running best, filling gaps and keeping the strongest confidence.
+function evMerge(a, b) {
+  if (!a) return Object.assign({}, b);
+  if (!b) return a;
+  const out = Object.assign({}, a);
+  ['manufacturer', 'website', 'contactEmail', 'contactPage', 'country', 'language', 'langCode', 'summary'].forEach(k => {
+    const av = out[k], bv = b[k];
+    if ((!av || av === '' || av === 'Unknown') && bv && bv !== 'Unknown') out[k] = bv;
+  });
+  out.altNames = evDedupeLinks([].concat((a.altNames || []).map(n => ({ note: n })), (b.altNames || []).map(n => ({ note: n })))).map(x => x.note);
+  out.sources = evDedupeLinks([].concat(a.sources || [], b.sources || []));
+  out.communityLeads = evDedupeLinks([].concat(a.communityLeads || [], b.communityLeads || []));
+  if (evConfRank(b.confidence) > evConfRank(out.confidence)) out.confidence = b.confidence;
+  return out;
+}
+
+// One research pass focused on a given query angle. Returns { parsed, errorMsg }. Never throws.
+async function evResearchOnce(brand, focusQuery) {
   try {
     const res = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1600,
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+        max_tokens: 1800,
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }],
         messages: [{ role: 'user', content:
-`You are Eversen, a sourcing researcher for Shift64 Diecast (a US diecast reseller). Use web search to find the real manufacturer or wholesaler behind the diecast brand "${brand}".
+`You are Eversen, a sourcing researcher for Shift64 Diecast (a US diecast reseller). Find the REAL manufacturer, factory, or wholesaler behind the diecast brand "${brand}".
 
-Find:
-- The actual manufacturer / factory / wholesaler company behind the brand
-- Their official website, contact email, and any trade / wholesale / OEM inquiry page
-- Any forum posts, Facebook groups, Reddit or diecast community threads mentioning wholesale or factory-direct contacts for this brand
-- The company's country and primary business language
+PRIORITY THIS PASS: run web searches for "${focusQuery}" and closely related queries first.
+
+Dig into community and trade sources, not just official websites:
+- Diecast forums and hobby blogs
+- Reddit — r/diecast, r/HotWheels and related threads
+- Facebook diecast groups, Instagram posts/bios, YouTube video descriptions & comments
+- Chinese B2B platforms — Alibaba, Made-in-China, and 1688.com — look up the brand and its likely factory
+Try alternate spellings, romanizations, and the brand's Chinese name. Some diecast brands sell under a different Chinese name (for example a brand like "Demon King" may appear under a Chinese name) — search both the English and Chinese forms.
+
+Find: the actual manufacturer/factory/wholesaler, official website, contact email, any wholesale/OEM inquiry page, community leads (with links), the company's country and primary business language.
 
 Return ONLY minified JSON, no prose:
-{"brand":"${brand}","manufacturer":"company name or Unknown","website":"url or ''","contactEmail":"email or ''","contactPage":"wholesale/contact url or ''","country":"country or ''","language":"primary language e.g. Chinese/Japanese/English","langCode":"zh/ja/ko/en/..","sources":[{"title":"","url":""}],"communityLeads":[{"note":"what it says","url":""}],"confidence":"High|Medium|Low","summary":"1-2 sentence plain-English summary of what you found"}
-Confidence: High = official contact found; Medium = manufacturer identified but no direct email; Low = only guesses/community leads.` }]
+{"brand":"${brand}","manufacturer":"company name or Unknown","website":"url or ''","contactEmail":"email or ''","contactPage":"wholesale/contact url or ''","country":"country or ''","language":"primary language e.g. Chinese/Japanese/English","langCode":"zh/ja/ko/en/..","altNames":["alternate or Chinese names found"],"sources":[{"title":"","url":""}],"communityLeads":[{"note":"what it says","url":""}],"confidence":"High|Medium|Low","summary":"1-2 sentence plain-English summary of what you found"}
+Confidence: High = official contact found; Medium = manufacturer identified but no direct email; Low = only guesses/community leads. If you truly cannot identify the maker, still return your best partial info with manufacturer "Unknown", confidence "Low", and include any sources/leads you found.` }]
       })
     });
     const data = await res.json();
-    const parsed = evParseJson(evAnthropicText(data));
-    parsed.brand = parsed.brand || brand;
-    upsertEversenBrand(parsed);
-    if (input && !preset) input.value = '';
-    if (status) status.innerHTML = `<span style="color:var(--green);">✅ Research complete for <b>${escHtmlA(parsed.brand)}</b>.</span>`;
-    saveEversen();
+    if (data && data.error) return { parsed: null, errorMsg: (data.error.message || JSON.stringify(data.error)) };
+    const txt = evAnthropicText(data);
+    if (!txt) return { parsed: null, errorMsg: 'Search returned no readable text' };
+    try { return { parsed: evParseJson(txt), errorMsg: null }; }
+    catch (e) { return { parsed: null, errorMsg: 'Could not parse research response' }; }
   } catch (e) {
-    console.log('Eversen research failed:', e);
-    if (status) status.innerHTML = `<span style="color:var(--red);">❌ Research failed for ${escHtmlA(brand)}. Try again.</span>`;
-    toast('⚠️ Research failed. Try again.', 'yellow');
+    return { parsed: null, errorMsg: String((e && e.message) || e) };
   }
+}
+
+async function eversenFind(preset) {
+  const input = document.getElementById('evBrandInput');
+  const brand = String(preset || (input ? input.value : '') || '').trim();
+  if (!brand) { toast('⚠️ Type a brand name first.', 'yellow'); return; }
+  const statusEl = document.getElementById('evFindStatus');
+  const setStatus = (html) => { if (statusEl) statusEl.innerHTML = html; };
+  const queries = evBuildQueries(brand);
+  const tried = [];
+  let best = null, lastError = '';
+  // Try each angle in turn; stop early once we have a maker AND a way to reach them.
+  for (let i = 0; i < queries.length; i++) {
+    setStatus(`<span style="color:var(--gold);">🔎 Researching <b>${escHtmlA(brand)}</b> — pass ${i + 1}/${queries.length}: ${escHtmlA(queries[i].label)}…</span>`);
+    tried.push(queries[i].q);
+    const r = await evResearchOnce(brand, queries[i].q);
+    if (r.errorMsg) { lastError = r.errorMsg; console.log('Eversen pass failed:', queries[i].q, r.errorMsg); }
+    if (r.parsed) {
+      best = evMerge(best, r.parsed);
+      if (best.manufacturer && best.manufacturer !== 'Unknown' && (best.contactEmail || best.contactPage)) break;
+    }
+  }
+  const hasSomething = best && (
+    (best.manufacturer && best.manufacturer !== 'Unknown') ||
+    best.contactEmail || best.contactPage || best.website ||
+    (best.sources && best.sources.length) || (best.communityLeads && best.communityLeads.length)
+  );
+  if (input && !preset) input.value = '';
+  if (hasSomething) {
+    best.brand = best.brand || brand;
+    best.tried = tried;
+    best.notFound = false;
+    upsertEversenBrand(best);
+    const partial = !(best.manufacturer && best.manufacturer !== 'Unknown' && (best.contactEmail || best.contactPage));
+    setStatus(`<span style="color:var(--green);">✅ ${partial ? 'Partial info found' : 'Research complete'} for <b>${escHtmlA(best.brand)}</b>.</span>`);
+  } else {
+    // Never a bare error — leave a helpful card that shows what was tried and suggests a fix.
+    upsertEversenBrand({
+      brand: brand, manufacturer: 'Unknown', confidence: 'Low', notFound: true, tried: tried,
+      sources: [], communityLeads: [],
+      summary: 'No manufacturer confirmed after ' + tried.length + ' searches.' + (lastError ? ' Last issue: ' + lastError : '')
+    });
+    setStatus(`<span style="color:var(--yellow);">⚠️ Couldn't confirm a maker for <b>${escHtmlA(brand)}</b>. See the card below — try an alternate spelling or the brand's Chinese name.</span>`);
+  }
+  saveEversen();
 }
 
 function upsertEversenBrand(parsed) {
@@ -5267,9 +5344,12 @@ function upsertEversenBrand(parsed) {
     website: parsed.website || '', contactEmail: parsed.contactEmail || '',
     contactPage: parsed.contactPage || '', country: parsed.country || '',
     language: parsed.language || '', langCode: parsed.langCode || '',
+    altNames: Array.isArray(parsed.altNames) ? parsed.altNames : [],
     sources: Array.isArray(parsed.sources) ? parsed.sources : [],
     communityLeads: Array.isArray(parsed.communityLeads) ? parsed.communityLeads : [],
-    confidence: parsed.confidence || 'Low', summary: parsed.summary || ''
+    confidence: parsed.confidence || 'Low', summary: parsed.summary || '',
+    tried: Array.isArray(parsed.tried) ? parsed.tried : [],
+    notFound: !!parsed.notFound
   };
   if (rec) { Object.assign(rec, base); }
   else {
@@ -5293,6 +5373,27 @@ function renderEversenResearch() {
   if (!div) return;
   if (!eversenBrands.length) { div.innerHTML = '<div style="color:var(--gray);font-size:13px;">No research yet. Enter a brand above and Eversen will hunt down the manufacturer, contact info, and community leads.</div>'; return; }
   div.innerHTML = eversenBrands.map(b => {
+    const leadLinks = (arr) => (arr || []).filter(s => s && (s.url || s.note || s.title)).map(s =>
+      `<div style="font-size:12px;color:var(--gray);margin-top:3px;">🔗 ${escHtmlA(s.note || s.title || '')} ${s.url ? `<a href="${escHtmlA(s.url)}" target="_blank" style="color:var(--blue);">link</a>` : ''}</div>`).join('');
+    // Helpful "not found yet" card — never a bare error. Shows what was tried + a nudge to retry.
+    if (b.notFound) {
+      const triedHtml = (b.tried || []).map(t => `<span style="background:var(--card);border:1px solid var(--border);color:var(--gray);padding:3px 10px;border-radius:12px;font-size:11px;">${escHtmlA(t)}</span>`).join(' ');
+      const partial = (b.sources && b.sources.length) || (b.communityLeads && b.communityLeads.length);
+      return `<div class="card" style="background:var(--black);border-color:rgba(241,196,15,0.35);margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+          <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;color:var(--white);">${escHtmlA(b.brand)}</div>
+          <span class="ev-badge ev-conf-Low">⚠️ Not found yet</span>
+        </div>
+        ${b.summary ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;line-height:1.5;">${escHtmlA(b.summary)}</div>` : ''}
+        <div style="margin-top:10px;"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;">Searches tried</div><div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;">${triedHtml || '<span style="color:var(--gray);font-size:12px;">—</span>'}</div></div>
+        ${partial ? `<div style="margin-top:10px;"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;">Partial leads found</div>${leadLinks(b.sources)}${leadLinks(b.communityLeads)}</div>` : ''}
+        <div style="font-size:12px;color:var(--yellow);margin-top:10px;">💡 Try an alternate spelling or the brand's Chinese name in the box above, then Find again.</div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-blue" style="background:var(--gold);color:#000;" onclick="eversenFind('${escJs(b.brand)}')">🔁 Retry</button>
+          <button onclick="evRemoveBrand('${escJs(b.id)}')" style="padding:9px 14px;font-size:12px;background:var(--card);color:var(--gray);border:1px solid var(--border);border-radius:6px;cursor:pointer;">🗑️ Remove</button>
+        </div>
+      </div>`;
+    }
     const li = evLangInfo(b);
     const langBadge = `<span class="ev-badge ev-lang-badge" title="Outreach language">${li.needsNative ? '🌐 ' + escHtmlA(li.name) + ' + English' : '🇬🇧 English'}</span>`;
     const conf = ['High','Medium','Low'].includes(b.confidence) ? b.confidence : 'Low';
@@ -5308,6 +5409,7 @@ function renderEversenResearch() {
         </div>
       </div>
       <div style="font-size:13px;margin-top:8px;"><span style="color:var(--gray);">Manufacturer:</span> <b>${escHtmlA(b.manufacturer || 'Unknown')}</b>${b.country ? ` <span style="color:var(--gray);">· ${escHtmlA(b.country)}</span>` : ''}</div>
+      ${(b.altNames && b.altNames.length) ? `<div style="font-size:12px;margin-top:4px;"><span style="color:var(--gray);">Also known as:</span> ${escHtmlA(b.altNames.join(', '))}</div>` : ''}
       ${b.website ? `<div style="font-size:13px;margin-top:4px;"><span style="color:var(--gray);">Website:</span> <a href="${escHtmlA(b.website)}" target="_blank" style="color:var(--gold);">${escHtmlA(b.website)}</a></div>` : ''}
       <div style="font-size:13px;margin-top:4px;">${evContactLine(b)}</div>
       ${b.summary ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;line-height:1.5;">${escHtmlA(b.summary)}</div>` : ''}
