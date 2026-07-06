@@ -5321,6 +5321,47 @@ Guidance: confidence High = official contact found via search; Medium = manufact
   }
 }
 
+// Auto-generated strategic briefing ("Eversen's Plan") for a researched brand. No tools; plain prose.
+async function evGenerateBriefing(b) {
+  if (!b || b.notFound) return;
+  b.briefingLoading = true;
+  renderEversenResearch();
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 500,
+        system: `You are Eversen, a sourcing strategist for Shift64 Diecast, a US-based diecast reseller. Given research findings about a diecast brand's manufacturer/wholesaler, write a concise 3-5 sentence strategic briefing in plain prose (no bullet points, no markdown, no JSON, no headers). Cover, in flowing sentences: what was found and what it means; who to contact first and why; the goal for that first contact (e.g. get a factory referral, negotiate bulk pricing, confirm a distributor relationship); and the realistic path from this contact to buying factory-direct. Write like you're thinking out loud about the next move.`,
+        messages: [{ role: 'user', content:
+`Research findings for brand "${b.brand}":
+Manufacturer: ${b.manufacturer || 'Unknown'}
+Country: ${b.country || 'unknown'}
+Website: ${b.website || 'none'}
+Contact email: ${b.contactEmail || 'none'}
+Contact / wholesale page: ${b.contactPage || 'none'}
+Confidence: ${b.confidence || 'Low'}
+Alternate names: ${(b.altNames || []).join(', ') || 'none'}
+Leads: ${(b.communityLeads || []).map(l => l && l.note).filter(Boolean).join(' | ') || 'none'}
+Summary: ${b.summary || ''}
+
+Write the 3-5 sentence plan now.` }]
+      })
+    });
+    const data = await res.json();
+    if (data && data.error) { b.briefing = ''; }
+    else { b.briefing = (evAnthropicText(data) || '').trim(); }
+  } catch (e) {
+    console.log('Eversen briefing failed:', e);
+    b.briefing = '';
+  } finally {
+    b.briefingLoading = false;
+    saveEversen();
+    renderEversenResearch();
+  }
+}
+
 async function eversenFind(preset) {
   const input = document.getElementById('evBrandInput');
   const brand = String(preset || (input ? input.value : '') || '').trim();
@@ -5354,6 +5395,10 @@ async function eversenFind(preset) {
     upsertEversenBrand(best);
     const partial = !(best.manufacturer && best.manufacturer !== 'Unknown' && (best.contactEmail || best.contactPage));
     setStatus(`<span style="color:var(--green);">✅ ${partial ? 'Partial info found' : 'Research complete'} for <b>${escHtmlA(best.brand)}</b>.</span>`);
+    // Auto-generate Eversen's strategic plan for this card (fire-and-forget; streams into the card).
+    const bkey = String(best.brand || '').trim().toLowerCase();
+    const recRef = eversenBrands.find(x => String(x.brand || '').trim().toLowerCase() === bkey);
+    if (recRef) evGenerateBriefing(recRef);
   } else {
     // Never a bare error — leave a helpful card that shows what was tried and suggests a fix.
     upsertEversenBrand({
@@ -5445,6 +5490,12 @@ function renderEversenResearch() {
       ${b.summary ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;line-height:1.5;">${escHtmlA(b.summary)}</div>` : ''}
       ${srcs ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;">Sources</div>${srcs}</div>` : ''}
       ${leads ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;">Community leads</div>${leads}</div>` : ''}
+      ${(b.briefingLoading || b.briefing) ? `<div style="margin-top:12px;padding:12px 14px;background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.28);border-radius:10px;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:0.5px;margin-bottom:6px;">🧭 EVERSEN'S PLAN</div>
+        ${b.briefingLoading
+          ? `<div style="display:flex;align-items:center;gap:9px;color:var(--gray);font-size:13px;"><div style="width:15px;height:15px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;"></div>Eversen is thinking through the next move…</div>`
+          : `<div style="font-size:13px;line-height:1.6;color:#C9C9C9;white-space:pre-wrap;">${escHtmlA(b.briefing)}</div>`}
+      </div>` : ''}
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn-blue" style="background:var(--gold);color:#000;" onclick="evDraftOutreach('${escJs(b.id)}')">✉️ Draft Outreach</button>
         <button onclick="evRemoveBrand('${escJs(b.id)}')" style="padding:9px 14px;font-size:12px;background:var(--card);color:var(--gray);border:1px solid var(--border);border-radius:6px;cursor:pointer;">🗑️ Remove</button>
@@ -5486,7 +5537,10 @@ async function evDraftOutreach(id) {
         max_tokens: 2000,
         messages: [{ role: 'user', content:
 `Write a first-contact wholesale outreach email as "Eversen", sourcing manager on behalf of Shift64 Diecast (a growing US-based diecast car reseller). Recipient: ${b.manufacturer || 'the manufacturer'} behind the brand "${b.brand}".
-
+${b.briefing ? `
+Eversen's strategy for this outreach: ${b.briefing}
+Follow this strategy: address the FIRST contact Eversen recommends above, and make the email's specific goal match it (e.g. request a factory referral, negotiate bulk pricing, or confirm a distributor relationship) rather than sending a generic introduction.
+` : ''}
 The email must: introduce Shift64 Diecast warmly, express genuine interest in becoming an authorized reseller / stocking their products, and politely request wholesale pricing and MOQ (minimum order quantity) information. Tone: friendly, respectful, professional. Keep it concise (about 130-180 words). Sign off as "Eversen — Sourcing, Shift64 Diecast".
 
 Recipient's primary language: ${li.name} (code ${li.code}).
