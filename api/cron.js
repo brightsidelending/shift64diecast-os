@@ -14,6 +14,8 @@
 //   ANTHROPIC_API_KEY
 //   KV_REST_API_URL / KV_REST_API_TOKEN  (or UPSTASH_REDIS_REST_URL / _TOKEN)
 
+import nodemailer from 'nodemailer';
+
 const OUR_ADDRESS = 'shift64diecast@gmail.com';
 const SIGNATURE = 'Eversen Chan';
 const TRACKER_KEY = 'outreach_tracker'; // Redis key: JSON array of card objects
@@ -67,8 +69,12 @@ export default async function handler(req, res) {
   const summary = { processed: 0, autoSent: 0, needsReview: 0, skipped: 0, errors: 0, actions: [] };
 
   try {
+    // nodemailer OAuth2 transport handles token refresh automatically for SENDING.
+    const transporter = createTransporter();
+    // Reading the inbox (list/get/modify) needs a REST access token — nodemailer
+    // only sends, so we obtain a token for those read-only Gmail API calls.
     const accessToken = await getGmailAccessToken();
-    console.log('[cron] Gmail access token acquired');
+    console.log('[cron] Gmail transporter + read token ready');
 
     // Unread messages in the inbox. We filter to Eversen threads below.
     const listUrl = gmailUrl('/messages') + '?q=' + encodeURIComponent('is:unread in:inbox') + '&maxResults=50';
@@ -126,20 +132,15 @@ export default async function handler(req, res) {
           continue; // do not mark read, so a human still sees it
         }
 
-        // ---- Draft + send the reply as Eversen ------------------------------
+        // ---- Draft + send the reply as Eversen (via nodemailer OAuth2) ------
         const draft = await draftReply(classification.type, bodyText);
-        const rawMime = buildReplyMime({
-          to: supplierEmail,
+        await transporter.sendMail({
           from: `${SIGNATURE} <${GMAIL_USER()}>`,
+          to: supplierEmail,
           subject: subject.toLowerCase().startsWith('re:') ? subject : 'Re: ' + subject,
-          inReplyTo: replyHeaders['message-id'],
+          inReplyTo: replyHeaders['message-id'],       // keeps Gmail threading intact
           references: replyHeaders['references'] || replyHeaders['message-id'],
-          body: draft,
-        });
-
-        await gapi(gmailUrl('/messages/send'), accessToken, {
-          method: 'POST',
-          body: JSON.stringify({ raw: rawMime, threadId }),
+          text: draft,
         });
         console.log(`[cron] thread ${threadId}: auto-sent ${classification.type} reply to ${supplierEmail}`);
 
@@ -242,7 +243,7 @@ async function callClaude(messages, maxTokens) {
 }
 
 // ---------------------------------------------------------------------------
-// Gmail helpers (REST API)
+// Gmail helpers
 // ---------------------------------------------------------------------------
 function GMAIL_USER() {
   return process.env.GMAIL_USER || OUR_ADDRESS;
@@ -251,6 +252,23 @@ function gmailUrl(path) {
   return `https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(GMAIL_USER())}${path}`;
 }
 
+// SENDING: nodemailer Gmail OAuth2 transport. Nodemailer refreshes the access
+// token itself from the refresh token on each send — no manual token handling.
+function createTransporter() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      type: 'OAuth2',
+      user: process.env.GMAIL_USER,
+      clientId: process.env.GMAIL_CLIENT_ID,
+      clientSecret: process.env.GMAIL_CLIENT_SECRET,
+      refreshToken: process.env.GMAIL_REFRESH_TOKEN,
+    },
+  });
+}
+
+// READING: nodemailer cannot list/read/modify messages, so we still need a REST
+// access token for those calls. This is the standard OAuth2 refresh-token grant.
 async function getGmailAccessToken() {
   const params = new URLSearchParams({
     client_id: process.env.GMAIL_CLIENT_ID,
@@ -316,19 +334,6 @@ function extractPlainText(payload) {
   return htmlFallback;
 }
 
-function buildReplyMime({ to, from, subject, inReplyTo, references, body }) {
-  const lines = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-  ];
-  if (inReplyTo) lines.push(`In-Reply-To: ${inReplyTo}`);
-  if (references) lines.push(`References: ${references}`);
-  lines.push('MIME-Version: 1.0', 'Content-Type: text/plain; charset="UTF-8"', '', body);
-  const mime = lines.join('\r\n');
-  return Buffer.from(mime, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
 // ---------------------------------------------------------------------------
 // Redis (Upstash REST) — Outreach Tracker
 // ---------------------------------------------------------------------------
@@ -386,3 +391,4 @@ function safeJson(text) {
   if (m) { try { return JSON.parse(m[0]); } catch (_) {} }
   return null;
 }
+// end of api/cron.js
