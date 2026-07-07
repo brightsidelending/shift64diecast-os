@@ -6058,6 +6058,43 @@ async function evSendGmail() {
     saveEversen();
     renderEversenAll();
     evStartMonitor(); // ensure the inbox watcher is running now that we have a thread
+
+    // Add or update this vendor in the Outreach Tracker (Redis "outreach_tracker").
+    try {
+      if (typeof orTracker !== 'undefined' && Array.isArray(orTracker)) {
+        const toMatch = to.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+        const email = (toMatch ? toMatch[2] : to).trim();
+        const name = toMatch ? toMatch[1].trim().replace(/^["']|["']$/g, '') : '';
+        const msgId = d.messageId || d.threadId || '';
+        const rec = orTracker.find(x =>
+          (x.contactEmail && email && x.contactEmail.toLowerCase() === email.toLowerCase()) ||
+          (x.brand && b.brand && x.brand.toLowerCase() === String(b.brand).toLowerCase()));
+        const nowIso = new Date().toISOString().slice(0, 10);
+        if (rec) {
+          rec.brand = b.brand || rec.brand;
+          rec.contactName = name || rec.contactName || '';
+          rec.contactEmail = email;
+          rec.status = 'Sent';
+          rec.lastActivity = nowIso;
+          rec.notes = 'Initial outreach sent via Eversen';
+          rec.threadId = msgId;
+        } else {
+          orTracker.unshift({
+            id: 'or_' + String(Date.now()) + Math.random().toString(36).slice(2, 8),
+            brand: b.brand || '',
+            contactName: name || '',
+            contactEmail: email,
+            status: 'Sent',
+            lastActivity: nowIso,
+            notes: 'Initial outreach sent via Eversen',
+            threadId: msgId
+          });
+        }
+        if (typeof saveOutreachTracker === 'function') await saveOutreachTracker();
+        if (typeof renderOutreach === 'function') renderOutreach(); // refresh the Outreach tab immediately
+      }
+    } catch (trackErr) { console.log('Outreach tracker update failed:', trackErr); }
+
     toast('✅ Sent to ' + to, 'green');
     closeModal('evEmailModal');
   } catch (e) {
