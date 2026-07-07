@@ -167,6 +167,22 @@ export default async function handler(req, res) {
     }
 
     console.log(`[cron] done — processed=${summary.processed} autoSent=${summary.autoSent} needsReview=${summary.needsReview} skipped=${summary.skipped} errors=${summary.errors}`);
+
+    // Morning digest email (Resend)
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'Shift64Diecast OS <onboarding@resend.dev>',
+        to: ['Shift64Diecast@gmail.com', 'erictran925@gmail.com'],
+        subject: `☀️ Shift64 Morning Digest — ${new Date().toLocaleDateString('en-US', {month:'short', day:'numeric'})}`,
+        html: '<p>Good morning Eric! Open your <a href="https://brightsidelending.github.io/shift64diecast-os/">Shift64 OS dashboard</a> for today\'s buy opportunities and auctions.</p>'
+      })
+    });
+
     return res.status(200).json({ ok: true, startedAt, summary });
   } catch (err) {
     console.error(`[cron] fatal: ${err.message}`);
