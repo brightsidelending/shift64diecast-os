@@ -1017,6 +1017,20 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
   </div>
 
+  <!-- SOURCING QUEUE (batch outreach) -->
+  <div class="card" style="border-color:rgba(201,168,76,0.35);">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">🗂️ Sourcing Queue <span id="sqCount" style="color:var(--gray);font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
+      <button id="sqRunBtn" onclick="sqRun()" style="padding:8px 16px;font-size:12px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;">▶ Run Queue</button>
+    </div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:10px;line-height:1.5;">Add multiple brands, then Run Queue — Eversen researches each, drafts the outreach, and drops it into Pending Approvals for you to review and send.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <input class="text-input" id="sqInput" placeholder="Add a brand to the queue…" style="flex:1;min-width:200px;" onkeydown="if(event.key==='Enter')sqAdd()"/>
+      <button onclick="sqAdd()" style="padding:10px 18px;font-size:13px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;white-space:nowrap;">+ Add</button>
+    </div>
+    <div id="sqList"></div>
+  </div>
+
   <!-- EVERSEN PLAYBOOK (collapsible, above the directive) -->
   <div class="card" style="border-color:rgba(201,168,76,0.35);">
     <button onclick="evTogglePlaybook()" id="evPlaybookToggle" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0;color:var(--gold);font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;">
@@ -5876,11 +5890,37 @@ function renderEversenResearch() {
         ${bestLeads.map(s => `<div style="font-size:13px;line-height:1.5;color:#E4E4E4;">• ${escHtmlA(s.note || s.title || s.url || '')}${s.url ? ` <a href="${escHtmlA(s.url)}" target="_blank" style="color:var(--blue);font-size:12px;">link</a>` : ''}</div>`).join('')}
       </div>` : '';
     const nLeads = leadArr.length;
+    // Plain-English summary shown at the top of the expanded list (quick read before detail).
+    const leadsSummaryText = nLeads
+      ? (nLeads + ' lead' + (nLeads === 1 ? '' : 's') + ' found.'
+        + (b.country ? ' Strongest signals point to ' + escHtmlA(b.country) + '-based sellers.' : '')
+        + (bestLeads[0] ? ' Best immediate action: ' + escHtmlA(bestLeads[0].note || bestLeads[0].title || bestLeads[0].url || '') + '.' : ''))
+      : '';
+    const leadsSummaryHtml = leadsSummaryText ? `<div style="font-size:13px;color:#D8D8D8;line-height:1.6;padding:10px 12px;background:rgba(74,144,217,0.08);border:1px solid rgba(74,144,217,0.3);border-radius:8px;margin-bottom:10px;">📊 ${leadsSummaryText}</div>` : '';
     // Community leads — collapsed by default behind a toggle.
     const communityCollapsible = (leads && nLeads) ? `<div style="margin-top:12px;">
         <button id="evLeadsBtn-${b.id}" onclick="evToggleLeads('${escJs(b.id)}', ${nLeads})" style="background:var(--card);border:1px solid var(--border);color:var(--blue);padding:8px 14px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;">📋 Show ${nLeads} community lead${nLeads === 1 ? '' : 's'} →</button>
-        <div id="evLeads-${b.id}" style="display:none;margin-top:8px;">${leads}</div>
+        <div id="evLeads-${b.id}" style="display:none;margin-top:8px;">${leadsSummaryHtml}${leads}</div>
       </div>` : '';
+
+    // Outreach status from the Outreach Tracker (Redis "outreach_tracker") matched by brand/email.
+    const trk = evTrackerFor(b);
+    const trkStatus = trk ? String(trk.status || '').toLowerCase() : '';
+    const isFollowup = trkStatus.indexOf('follow-up') >= 0;
+    const isContacted = ['sent', 'replied', 'follow-up pending', 'follow-up sent', 'closed'].indexOf(trkStatus) >= 0 || isFollowup;
+    let draftBtn;
+    if (b.drafting) {
+      draftBtn = `<button disabled style="padding:9px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--gold);border:1px solid var(--border);border-radius:6px;display:inline-flex;align-items:center;gap:7px;cursor:wait;"><span style="width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;"></span>✍️ Drafting…</button>`;
+    } else if (isFollowup) {
+      draftBtn = `<button disabled style="padding:9px 14px;font-size:12px;font-weight:700;background:#0D2233;color:var(--blue);border:1px solid rgba(74,144,217,0.4);border-radius:6px;cursor:default;">📧 Follow-up Sent</button>`;
+    } else if (isContacted) {
+      draftBtn = `<button disabled style="padding:9px 14px;font-size:12px;font-weight:700;background:#0D2B1A;color:var(--green);border:1px solid rgba(46,204,113,0.4);border-radius:6px;cursor:default;">✅ Outreach Sent</button>`;
+    } else {
+      draftBtn = `<button class="btn-blue" style="background:var(--gold);color:#000;" onclick="evDraftOutreach('${escJs(b.id)}')">✉️ ${b.draft ? 'Review Draft' : 'Draft Outreach'}</button>`;
+    }
+    const catCached = (typeof evCatalogData !== 'undefined' && Array.isArray(evCatalogData[evCatalogKey(b.brand)]) && evCatalogData[evCatalogKey(b.brand)].length);
+    const catalogBtn = `<button onclick="evViewCatalog('${escJs(b.id)}')" style="padding:9px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--gold);border:1px solid rgba(201,168,76,0.5);border-radius:6px;cursor:pointer;">📦 View Catalog${catCached ? ` <span style="background:#1A1710;color:var(--gold);border-radius:4px;padding:1px 5px;font-size:9px;margin-left:2px;">📦 Cached</span>` : ''}</button>`;
+    const statusLine = trk ? `<div style="font-size:11px;color:var(--gray);margin-top:8px;">Status: <b style="color:var(--gold);">${escHtmlA(trk.status || '—')}</b>${trk.lastActivity ? ' · Last contacted ' + escHtmlA(trk.lastActivity) : ''}</div>` : '';
     return `<div class="card" style="background:var(--black);margin-bottom:12px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
         <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;color:var(--white);">${escHtmlA(b.brand)}</div>
@@ -5903,13 +5943,24 @@ function renderEversenResearch() {
           : `<div style="font-size:13px;line-height:1.6;color:#C9C9C9;white-space:pre-wrap;">${escHtmlA(b.briefing)}</div>`}
       </div>` : ''}
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn-blue" style="background:var(--gold);color:#000;" onclick="evDraftOutreach('${escJs(b.id)}')">✉️ Draft Outreach</button>
-        <button onclick="evViewCatalog('${escJs(b.id)}')" style="padding:9px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--gold);border:1px solid rgba(201,168,76,0.5);border-radius:6px;cursor:pointer;">📦 View Catalog</button>
+        ${draftBtn}
+        ${catalogBtn}
         <button onclick="evRemoveBrand('${escJs(b.id)}')" style="padding:9px 14px;font-size:12px;background:var(--card);color:var(--gray);border:1px solid var(--border);border-radius:6px;cursor:pointer;">🗑️ Remove</button>
       </div>
+      ${statusLine}
       ${communityCollapsible}
     </div>`;
   }).join('');
+}
+
+// Find this brand's record in the Outreach Tracker (Redis "outreach_tracker"), matched by brand or email.
+function evTrackerFor(b) {
+  if (typeof orTracker === 'undefined' || !Array.isArray(orTracker)) return null;
+  const brand = String(b.brand || '').toLowerCase().trim();
+  const email = String(b.contactEmail || '').toLowerCase().trim();
+  return orTracker.find(r =>
+    (brand && String(r.brand || '').toLowerCase().trim() === brand) ||
+    (email && String(r.contactEmail || '').toLowerCase().trim() === email)) || null;
 }
 
 // Toggle a research card's collapsible community-leads list.
@@ -5922,6 +5973,117 @@ function evToggleLeads(id, count) {
   if (btn) btn.textContent = open
     ? ('📋 Show ' + count + ' community lead' + (count === 1 ? '' : 's') + ' →')
     : ('📋 Hide community leads ↑');
+}
+
+// ============================================================
+// SOURCING QUEUE — batch research → draft → Pending Approvals (Redis "sourcing_queue")
+// ============================================================
+let sourceQueue = [];
+const SQ_KEY = 'sourcing_queue';
+let sqRunning = false;
+
+async function sqLoad() {
+  try { const v = await kvGet(SQ_KEY); sourceQueue = Array.isArray(v) ? v : []; } catch (e) { console.log('queue load failed', e); }
+  sqRender();
+}
+async function sqSave() { try { await kvSet(SQ_KEY, sourceQueue); } catch (e) { console.error('[queue] save failed', e); } }
+function sqUid() { return 'sq_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+
+async function sqAdd() {
+  const input = document.getElementById('sqInput');
+  const brand = (input.value || '').trim();
+  if (!brand) return;
+  if (sourceQueue.some(q => q.brand.toLowerCase() === brand.toLowerCase())) { toast('Already in the queue.', 'yellow'); input.value = ''; return; }
+  sourceQueue.push({ id: sqUid(), brand, status: 'Pending' });
+  input.value = '';
+  sqRender();
+  await sqSave();
+}
+async function sqRemove(id) {
+  sourceQueue = sourceQueue.filter(q => q.id !== id);
+  sqRender();
+  await sqSave();
+}
+function sqStatusBadge(status) {
+  const map = {
+    'Pending': 'background:#1A1D24;color:var(--gray);',
+    'Researching': 'background:#0D2233;color:var(--blue);',
+    'Drafting': 'background:#2B2200;color:var(--yellow);',
+    'Draft Ready': 'background:#1A1710;color:var(--gold);',
+    'Sent': 'background:#0D2B1A;color:var(--green);',
+    'Failed': 'background:#2B0D0D;color:var(--red);'
+  };
+  return `<span class="badge" style="${map[status] || map['Pending']}">${escHtmlA(status)}</span>`;
+}
+function sqRender() {
+  const wrap = document.getElementById('sqList');
+  const count = document.getElementById('sqCount');
+  if (count) count.textContent = sourceQueue.length ? `(${sourceQueue.length})` : '';
+  if (!wrap) return;
+  if (!sourceQueue.length) { wrap.innerHTML = '<div style="color:var(--gray);font-size:13px;">Queue is empty. Add a brand above.</div>'; return; }
+  wrap.innerHTML = sourceQueue.map(q => {
+    // Show "Sent" if this brand already shows contacted in the Outreach Tracker.
+    const trk = evTrackerFor({ brand: q.brand });
+    const shown = (trk && ['sent', 'replied', 'follow-up sent', 'follow-up pending', 'closed'].indexOf(String(trk.status || '').toLowerCase()) >= 0) ? 'Sent' : q.status;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);">
+      <div style="font-weight:600;font-size:13px;">${escHtmlA(q.brand)}</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        ${sqStatusBadge(shown)}
+        <button onclick="sqRemove('${q.id}')" title="Remove" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:14px;">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function sqRun() {
+  if (sqRunning) return;
+  const pending = sourceQueue.filter(q => q.status === 'Pending' || q.status === 'Failed');
+  if (!pending.length) { toast('Nothing pending in the queue.', 'yellow'); return; }
+  sqRunning = true;
+  const btn = document.getElementById('sqRunBtn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '⏳ Running…'; btn.disabled = true; }
+  try {
+    for (const q of pending) {
+      q.status = 'Researching'; sqRender(); await sqSave();
+      try { await eversenFind(q.brand); } catch (e) { console.log('[queue] research error', e); }
+      const rec = eversenBrands.find(x => String(x.brand || '').toLowerCase().trim() === q.brand.toLowerCase().trim());
+      if (!rec || rec.notFound) { q.status = 'Failed'; sqRender(); await sqSave(); continue; }
+      q.status = 'Drafting'; sqRender(); await sqSave();
+      const ok = await evBuildDraft(rec);
+      saveEversen();
+      if (!ok || !rec.draft) { q.status = 'Failed'; sqRender(); await sqSave(); continue; }
+      sqAddToPending(rec);
+      q.status = 'Draft Ready'; sqRender(); await sqSave();
+    }
+    renderEversenAll();
+    toast('✅ Queue complete — drafts are waiting in Pending Approvals.', 'green');
+  } catch (e) {
+    console.error('[queue] run failed', e);
+    toast('⚠️ Queue run hit an error.', 'yellow');
+  } finally {
+    sqRunning = false;
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
+
+// Drop a drafted outreach into the Outreach tab's Pending Approvals queue.
+function sqAddToPending(rec) {
+  if (typeof orPending === 'undefined' || !Array.isArray(orPending)) return;
+  const brand = String(rec.brand || '').toLowerCase().trim();
+  if (orPending.some(p => String(p.brand || '').toLowerCase().trim() === brand && String(p.replySummary || '').indexOf('New outreach') >= 0)) return;
+  const draft = rec.draft || {};
+  orPending.unshift({
+    id: 'or_sq_' + (rec.id || Date.now().toString(36)),
+    from: rec.contactEmail || '',
+    brand: rec.brand || '',
+    replySummary: 'New outreach draft (no reply yet) — review and send.',
+    draftedReply: draft.bodyEn || '',
+    threadId: '',
+    subject: draft.subjectEn || ('Wholesale inquiry — Shift64 Diecast x ' + (rec.brand || ''))
+  });
+  if (typeof saveOutreachPending === 'function') saveOutreachPending();
+  if (typeof renderOutreach === 'function') renderOutreach();
 }
 
 function renderEversenQueue() {
@@ -6070,12 +6232,30 @@ async function evAddLead(source, i, btnEl) {
 async function evDraftOutreach(id) {
   const b = eversenBrands.find(x => x.id === id);
   if (!b) return;
+  if (b.draft) { evOpenEmailModal(b); return; } // already drafted → just open
+  if (b.drafting) return;                         // already in progress
+  b.drafting = true;
+  renderEversenAll();                             // show the "✍️ Drafting…" spinner on the button
+  toast('✍️ Eversen is researching & drafting outreach…', 'yellow');
+  const ok = await evBuildDraft(b);
+  b.drafting = false;
+  if (ok) {
+    saveEversen();
+    renderEversenAll();
+    evOpenEmailModal(b);
+    toast('✅ Draft ready.', 'green');
+  } else {
+    renderEversenAll();
+    toast('⚠️ Draft failed. Try again.', 'yellow');
+  }
+}
+
+// Builds b.draft from a fresh Claude call. Returns true on success, false only if a draft
+// genuinely couldn't be produced. Never opens a modal (so batch/queue can reuse it).
+async function evBuildDraft(b) {
   const li = evLangInfo(b);
   const directive = evGetDirective();
   const playbook = evPlaybookText();
-  // If a draft already exists, just open it.
-  if (b.draft) { evOpenEmailModal(b); return; }
-  toast('✍️ Eversen is researching & drafting outreach…', 'yellow');
   try {
     const res = await fetch(PROXY_URL, {
       method: 'POST',
@@ -6108,19 +6288,25 @@ Return ONLY minified JSON (no prose, no markdown, no code fences):
       })
     });
     const data = await res.json();
-    const d = evParseJson(evAnthropicText(data));
+    if (data && data.error) throw new Error(data.error.message || 'API error');
+    const txt = evAnthropicText(data);
+    let d = {};
+    try { d = evParseJson(txt) || {}; } catch (pe) { d = {}; }
+    // If JSON parsing didn't yield a body, fall back to the raw text so a real draft still shows.
+    const bodyEn = d.bodyEn || (txt && !d.subjectEn ? String(txt).trim() : '');
+    if (!d.subjectEn && !bodyEn) return false; // genuinely nothing to draft
     b.draft = {
-      subjectNative: d.subjectNative || '', subjectEn: d.subjectEn || `Wholesale inquiry — Shift64 Diecast x ${b.brand}`,
-      bodyNative: d.bodyNative || '', bodyEn: d.bodyEn || '', needsNative: li.needsNative
+      subjectNative: d.subjectNative || '',
+      subjectEn: d.subjectEn || `Wholesale inquiry — Shift64 Diecast x ${b.brand}`,
+      bodyNative: d.bodyNative || '',
+      bodyEn: bodyEn,
+      needsNative: li.needsNative
     };
     if (!b.status) b.status = 'Draft';
-    saveEversen();
-    renderEversenAll();
-    evOpenEmailModal(b);
-    toast('✅ Draft ready.', 'green');
+    return true;
   } catch (e) {
     console.log('Eversen draft failed:', e);
-    toast('⚠️ Draft failed. Try again.', 'yellow');
+    return false;
   }
 }
 
@@ -7372,6 +7558,7 @@ renderEversenChips();           // show quick-add chips immediately (independent
 window.addEventListener('load', loadData);
 window.addEventListener('load', function () { loadOutreach(false); });
 window.addEventListener('load', function () { loadPlaybook(); });
+window.addEventListener('load', function () { sqLoad(); });
 window.addEventListener('load', function () { loadAlerts(); });
 
 // Filter event listeners - guaranteed to fire
