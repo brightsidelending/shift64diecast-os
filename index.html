@@ -1374,10 +1374,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div class="fg"><label>Brand</label><input class="fi" id="ew_brand" placeholder="e.g. Kaido House"/></div>
       <div class="fg"><label>Scale</label><select class="fi" id="ew_scale"><option value="">Select</option><option selected>1/64</option><option>1/18</option><option>1/43</option></select></div>
     </div>
-    <div class="frow">
-      <div class="fg"><label>Max I Will Pay $</label><input class="fi" id="ew_max" type="number" placeholder="0.00"/></div>
-      <div class="fg"><label>Priority</label><select class="fi" id="ew_pri"><option>🔴 Must Have</option><option>🟡 Want</option><option>🟢 Nice to Have</option></select></div>
-    </div>
+    <div class="fg"><label>Priority</label><select class="fi" id="ew_pri"><option>🔴 Must Have</option><option>🟢 Nice to Have</option></select></div>
     <div class="fg"><label>Notes</label><input class="fi" id="ew_notes" placeholder="Chase only, Any color..."/></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('ericWantModal')">Cancel</button>
@@ -1396,8 +1393,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div class="fg"><label>Scale</label><select class="fi" id="kw_scale"><option value="">Select</option><option selected>1/64</option><option>1/18</option><option>1/43</option></select></div>
     </div>
     <div class="frow">
-      <div class="fg"><label>Max I Will Pay $</label><input class="fi" id="kw_max" type="number" placeholder="0.00"/></div>
-      <div class="fg"><label>Priority</label><select class="fi" id="kw_pri"><option>🔴 Must Have</option><option>🟡 Want</option><option>🟢 Nice to Have</option></select></div>
+      <div class="fg"><label>Priority</label><select class="fi" id="kw_pri"><option>🔴 Must Have</option><option>🟢 Nice to Have</option></select></div>
     </div>
     <div class="fg"><label>Notes</label><input class="fi" id="kw_notes" placeholder="Chase only, Any color..."/></div>
     <div class="modal-actions">
@@ -2298,10 +2294,8 @@ function addWant(who) {
   const item = {
     name, brand: document.getElementById(p+'brand').value.trim(),
     scale: document.getElementById(p+'scale').value,
-    max: parseFloat(document.getElementById(p+'max').value)||0,
     pri: document.getElementById(p+'pri').value,
-    notes: document.getElementById(p+'notes').value.trim(),
-    priceData: lookupPrice(name)
+    notes: document.getElementById(p+'notes').value.trim()
   };
   if (who === 'eric') ericWants.push(item);
   else khaiWants.push(item);
@@ -2310,64 +2304,29 @@ function addWant(who) {
   saveData();
 }
 
+// Simple want-list tracker: no prices, no eBay calls — just the model, brand/scale,
+// priority, notes, and a delete button. Pricing lives in the Bid Calculator.
 function renderWants(who) {
   const wants = who === 'eric' ? ericWants : khaiWants;
   const div = document.getElementById(who+'WantDiv');
   if (!wants.length) { div.innerHTML = '<div class="empty" style="padding:30px;"><div class="empty-icon" style="font-size:28px;">🎯</div><div class="empty-title" style="font-size:15px;">Empty</div></div>'; return; }
   div.innerHTML = wants.map((item,idx) => {
-    // Accurate market value from eBay SOLD listings only (no static fallback).
-    const stats = item.soldStats;                 // undefined until fetched
-    const loading = stats === undefined;
-    const enough = !!(stats && stats.avg != null); // at least 3 usable sold results
-    const avg = enough ? stats.avg : null;
-    const maxBid = enough ? Math.round(avg * 0.80) : null; // smart default: 80% of sold average
-    const avgDisplay = loading ? '⏳' : (enough ? '$' + avg : 'Not enough data');
-    const avgSmall = !enough; // shrink font for the text states
-    const hasSignal = item.max && enough;
-    const sigColor = !hasSignal ? 'var(--gray)' : item.max <= maxBid*0.85 ? 'var(--green)' : item.max <= maxBid ? 'var(--yellow)' : 'var(--red)';
-    const sigText = loading ? '⏳ Loading sold prices…' : !enough ? 'ℹ️ Not enough sold data for a signal' : !item.max ? 'Set a max price to see signal' : item.max <= maxBid*0.85 ? '✅ GREAT BUY at your max' : item.max <= maxBid ? '⚠️ FAIR — near max bid' : '🔴 TOO HIGH — over max bid';
-    const priColor = item.pri.includes('Must') ? 'var(--red)' : item.pri.includes('Want') ? 'var(--yellow)' : 'var(--green)';
+    const isMust = String(item.pri || '').includes('Must');
+    const priColor = isMust ? 'var(--red)' : 'var(--green)';
+    const priBg = isMust ? '#2B0D0D' : '#0D2B0D';
+    const meta = [item.brand, item.scale].filter(Boolean).map(escHtmlA).join(' · ');
     return `<div class="want-card">
-      <div style="display:flex;justify-content:space-between;align-items:start;">
-        <div>
-          <div class="want-name">${item.name}</div>
-          <div class="want-meta">${item.brand||''} ${item.scale||''} · <span style="color:${priColor}">${item.pri}</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:10px;">
+        <div style="flex:1;min-width:0;">
+          <div class="want-name">${escHtmlA(item.name)}</div>
+          ${meta ? `<div class="want-meta">${meta}</div>` : ''}
         </div>
-        <button onclick="removeWant('${who}',${idx})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:16px;">✕</button>
+        <button onclick="removeWant('${who}',${idx})" title="Delete" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:16px;">✕</button>
       </div>
-      <div class="want-prices">
-        <div class="want-price-box"><div class="want-price-val gold"${avgSmall?' style="font-size:12px;line-height:1.3;"':''}>${avgDisplay}</div><div class="want-price-lbl">Sold avg${enough?' ('+stats.count+')':''}</div></div>
-        <div class="want-price-box"><div class="want-price-val blue-c"${!enough?' style="font-size:14px;"':''}>${maxBid!=null?'$'+maxBid:(loading?'⏳':'—')}</div><div class="want-price-lbl">Max Bid (80%)</div></div>
-        <div class="want-price-box"><div class="want-price-val green"${enough?'':' style="font-size:14px;"'}>${enough?'$'+Math.round(avg*0.80)+'-$'+avg:'—'}</div><div class="want-price-lbl">Buy Range</div></div>
-      </div>
-      <div class="signal-bar" style="background:${sigColor==='var(--green)'?'#0D2B0D':sigColor==='var(--yellow)'?'#2B2200':'#2B0D0D'};color:${sigColor}">${sigText}${item.max?' · Your max $'+item.max:''}</div>
-      ${item.notes ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;">📝 ${item.notes}</div>` : ''}
-      <button onclick="loadBid('${item.name}')" style="margin-top:10px;width:100%;background:var(--gold);color:var(--black);border:none;border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Rajdhani,sans-serif;">⚡ OPEN IN BID CALCULATOR</button>
+      <div style="margin-top:8px;"><span class="badge" style="background:${priBg};color:${priColor};">${escHtmlA(item.pri || 'Nice to Have')}</span></div>
+      ${item.notes ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;">📝 ${escHtmlA(item.notes)}</div>` : ''}
     </div>`;
   }).join('');
-  queueWantPriceFetch(who); // pull live eBay averages for any items that don't have one yet
-}
-
-// Fetch the real eBay average for each want item once, then re-render so Max Bid updates automatically.
-const wantFetchRunning = {};
-async function queueWantPriceFetch(who) {
-  if (wantFetchRunning[who]) return;
-  const wants = who === 'eric' ? ericWants : khaiWants;
-  const todo = wants.filter(it => it.ebayAvg == null && !it.ebayAvgTried);
-  if (!todo.length) return;
-  wantFetchRunning[who] = true;
-  let changed = false;
-  for (const item of todo) {
-    item.ebayAvgTried = true; // mark so we don't re-fetch on every render (prevents loops)
-    try {
-      const stats = await fetchSoldStats(item.name); // full model name, outlier-filtered sold prices
-      item.soldStats = stats;                         // { count, avg } — avg is null when < 3 sold results
-      if (stats.avg != null) item.ebayAvg = stats.avg;
-      changed = true;
-    } catch (e) {}
-  }
-  wantFetchRunning[who] = false;
-  if (changed) { saveData(); renderWants(who); }
 }
 
 function removeWant(who, idx) {
@@ -3568,11 +3527,11 @@ async function addToWatchlist(idx) {
 }
 
 // Average of eBay sold prices for a query (via existing ebay_sold proxy)
-// Robust eBay SOLD-price stats using the FULL model name, with outlier filtering.
+// Sold-price stats for ONE search term, with outlier filtering.
 // Returns { count, avg } where avg is null when there aren't at least 3 usable sold results.
-async function fetchSoldStats(query) {
+async function soldStatsFor(query) {
   try {
-    const raw = await fetchEbayItems('ebay_sold', query); // sold/completed listings, full specific query
+    const raw = await fetchEbayItems('ebay_sold', query); // sold/completed listings
     let prices = mapSoldItems(raw || [], query).map(m => m.price).filter(p => p > 0);
     if (prices.length < 3) return { count: prices.length, avg: null }; // not enough data
     prices.sort((a, b) => a - b);
@@ -3584,6 +3543,37 @@ async function fetchSoldStats(query) {
     const avg = use.reduce((s, p) => s + p, 0) / use.length;
     return { count: use.length, avg: Math.round(avg * 100) / 100 };
   } catch (e) { return { count: 0, avg: null }; }
+}
+
+// Progressive search terms, broadest-last:
+//   1) full model name  2) brand + short model name  3) brand + scale (or brand alone)
+function buildSoldVariants(fullName, brand, scale) {
+  const clean = String(fullName || '').trim().replace(/\s+/g, ' ');
+  const variants = [clean];
+  const b = (brand && String(brand).trim()) ? String(brand).trim() : detectBrand(clean);
+  if (b) {
+    const bi = clean.toLowerCase().indexOf(b.toLowerCase());
+    // brand + up to 2 model words following the brand (e.g. "Kaido House NSX Evasive")
+    const modelWords = (bi >= 0 ? clean.slice(bi + b.length) : clean).trim().split(' ').filter(Boolean).slice(0, 2);
+    if (modelWords.length) variants.push((b + ' ' + modelWords.join(' ')).trim());
+    // brand + scale (e.g. "Kaido House 1/64"), or brand alone if no scale
+    variants.push((scale && String(scale).trim()) ? (b + ' ' + String(scale).trim()) : b);
+  }
+  const seen = new Set(), out = [];
+  for (const v of variants) { const k = (v || '').toLowerCase(); if (v && !seen.has(k)) { seen.add(k); out.push(v); } }
+  return out;
+}
+
+// Robust eBay SOLD-price lookup: tries progressively shorter terms and uses the FIRST
+// that returns >= 3 usable results. Returns { count, avg } (avg null = not enough data).
+async function fetchSoldStats(query, opts) {
+  opts = opts || {};
+  const variants = buildSoldVariants(query, opts.brand, opts.scale);
+  for (const v of variants) {
+    const stats = await soldStatsFor(v);
+    if (stats.avg != null) return { count: stats.count, avg: stats.avg, query: v };
+  }
+  return { count: 0, avg: null };
 }
 // Backwards-compatible helper (used by the Auction Watchlist): average sold price or null.
 async function fetchAvgSold(query) {
@@ -6509,21 +6499,14 @@ function evAddCatalogToWant(key, idx) {
   const products = evCatalogData[key] || [];
   const p = products[idx];
   if (!p) return;
-  const lo = (p.priceLow != null && !isNaN(p.priceLow)) ? Number(p.priceLow) : null;
-  const hi = (p.priceHigh != null && !isNaN(p.priceHigh)) ? Number(p.priceHigh) : null;
-  const priceData = (lo != null || hi != null)
-    ? { avg: Math.round(((lo != null ? lo : hi) + (hi != null ? hi : lo)) / 2), low: lo != null ? lo : hi, high: hi != null ? hi : lo }
-    : lookupPrice(p.model || '');
   const name = p.model || 'Unknown model';
   if (ericWants.some(w => (w.name || '').toLowerCase() === name.toLowerCase())) { toast('Already in Eric\'s Want List.', 'yellow'); return; }
   ericWants.push({
     name,
     brand: (evCatalogActiveId && (eversenBrands.find(x => x.id === evCatalogActiveId) || {}).brand) || '',
     scale: p.scale || '',
-    max: 0,
-    pri: '🟡 Want',
-    notes: 'From vendor catalog' + (p.releaseDate ? ' · ' + p.releaseDate : ''),
-    priceData
+    pri: '🟢 Nice to Have',
+    notes: 'From vendor catalog' + (p.releaseDate ? ' · ' + p.releaseDate : '')
   });
   saveData();
   renderWants('eric');
@@ -7262,7 +7245,7 @@ function wcAddToWant(i) {
   const name = p.name;
   if (ericWants.some(w => (w.name || '').toLowerCase() === name.toLowerCase())) { toast('Already in Eric\'s Want List.', 'yellow'); return; }
   const v = wcVendor();
-  ericWants.push({ name, brand: v.brand || '', scale: '', max: 0, pri: '🟡 Want', notes: 'Wholesale catalog' + (p.wholesalePrice != null ? ' · cost $' + p.wholesalePrice : '') + (p.moq != null ? ' · MOQ ' + p.moq : ''), priceData: lookupPrice(name) });
+  ericWants.push({ name, brand: v.brand || '', scale: '', pri: '🟢 Nice to Have', notes: 'Wholesale catalog' + (p.wholesalePrice != null ? ' · cost $' + p.wholesalePrice : '') + (p.moq != null ? ' · MOQ ' + p.moq : '') });
   saveData();
   renderWants('eric');
   toast('✅ Added “' + name + '” to Eric\'s Want List.', 'green');
