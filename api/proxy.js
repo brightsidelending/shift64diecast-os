@@ -259,6 +259,75 @@ export default async function handler(req, res) {
     }
   }
 
+  // Eversen — classify a supplier reply and auto-send Eversen Chan's response
+  if (type === 'eversen_reply') {
+    try {
+      const { from, subject, body, threadId } = req.body || {};
+      if (!from || !body) return res.status(400).json({ ok: false, error: 'Missing from or body' });
+
+      const persona = `You are Eversen Chan, procurement professional for Shift64 Diecast (a growing US-based diecast reseller selling on eBay, Shopify, and Whatnot). Warm, confident, specific, respectful — never robotic or generic. Always write in English as the primary language, and end the email with a single closing line offering to communicate in Mandarin or Cantonese if more comfortable for their team. Sign as "Eversen Chan / Shift64 Diecast / shift64diecast@gmail.com".`;
+
+      const rules = `Classify the supplier's reply as exactly one of:
+- "positive": receptive / wants to move forward -> draft a reply moving toward wholesale pricing and MOQ.
+- "needs_info": asks who we are / for business details -> draft a reply giving detail about Shift64's sales volume (eBay, Shopify, Whatnot) and growing marketplace presence.
+- "call_request": wants a phone/video call -> reply with exactly this sentiment: "Our sourcing team is currently attending trade shows across the US but we are happy to move quickly over email. Once we align on the basics I would love to set up a proper introduction call."`;
+
+      const prompt = `${persona}
+
+${rules}
+
+Supplier reply (from ${from}${subject ? `, subject "${subject}"` : ''}):
+"""
+${String(body).slice(0, 4000)}
+"""
+
+Return ONLY minified JSON: {"type":"positive|needs_info|call_request","reply":"the full email body Eversen should send, plain text, ending with the Mandarin/Cantonese offer line and the signature"}`;
+
+      const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5-20250929',
+          max_tokens: 900,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const aiData = await aiResp.json();
+      const text = (aiData && aiData.content && aiData.content[0] && aiData.content[0].text) || '';
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch (e) {
+        const m = text.match(/\{[\s\S]*\}/);
+        if (m) { try { parsed = JSON.parse(m[0]); } catch (e2) {} }
+      }
+      if (!parsed || !parsed.type || !parsed.reply) {
+        return res.status(200).json({ ok: false, error: 'Could not classify reply', raw: text.slice(0, 300) });
+      }
+
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.default.createTransport({
+        service: 'gmail',
+        auth: { user: 'Shift64Diecast@gmail.com', pass: process.env.GMAIL_APP_PASSWORD }
+      });
+      const mailOptions = {
+        from: 'Eversen Chan <Shift64Diecast@gmail.com>',
+        to: from,
+        subject: subject ? (String(subject).toLowerCase().startsWith('re:') ? subject : 'Re: ' + subject) : 'Re: Wholesale inquiry — Shift64 Diecast',
+        text: parsed.reply
+      };
+      if (threadId) { mailOptions.references = threadId; mailOptions.inReplyTo = threadId; }
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[proxy] eversen_reply: classified ${parsed.type}, sent to ${from} (${info.messageId})`);
+
+      return res.status(200).json({ ok: true, type: parsed.type, messageId: info.messageId });
+    } catch (err) {
+      return res.status(200).json({ ok: false, error: err.message });
+    }
+  }
+
   // Anthropic AI
   // The full request body is forwarded to Anthropic UNCHANGED — including any `tools`
   // array (e.g. the web_search_20250305 server tool used by Eversen). There is no tool
