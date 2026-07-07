@@ -5284,10 +5284,34 @@ async function runPriceScan() {
         </div>
       </div>`;
     renderCompetitorPrices(); // populate the competitor list + highlight the active filter
+    // 🎯 Whatnot Max Bid — one clean line at the bottom of the results.
+    const ebayAvgForBid = (ebaySoldPrices.length > 0) ? sold : (ebayActivePrices.length > 0 ? active : null);
+    document.getElementById('psResults').insertAdjacentHTML('beforeend', whatnotMaxBidLine(_compMatches, ebayAvgForBid));
     stopScanTimer();
     document.getElementById('psLoading').style.display = 'none';
     document.getElementById('psScanBtn').disabled = false;
   }
+}
+
+// Whatnot Max Bid: 85% of the lowest Horizon/Carbros retail (in USD), else 80% of the eBay avg.
+function whatnotMaxBidLine(compMatches, ebayAvg) {
+  const rate = (typeof _cadUsdRate === 'number' && _cadUsdRate > 0) ? _cadUsdRate : 0.73;
+  const retail = [];
+  (compMatches || []).forEach(m => {
+    const site = String(m.site || '').toLowerCase();
+    if (!/horizon|carbro/.test(site)) return;
+    if (String(m.status || '').toLowerCase() === 'out of stock') return; // skip sold-out retail
+    const pr = parseFloat(m.price);
+    if (isNaN(pr) || pr <= 0) return;
+    retail.push(/carbro/.test(site) ? pr * rate : pr); // CarBromc is priced in CAD → convert to USD
+  });
+  let maxBid = null;
+  if (retail.length) maxBid = Math.round(Math.min(...retail) * 0.85);
+  else if (ebayAvg != null && ebayAvg > 0) maxBid = Math.round(ebayAvg * 0.80);
+  const val = maxBid != null ? ('$' + maxBid) : 'Not enough data';
+  return `<div style="margin-top:16px;padding:14px 18px;background:#1A1710;border:2px solid var(--gold);border-radius:10px;text-align:center;">
+    <span style="font-family:'Rajdhani',sans-serif;font-size:19px;font-weight:800;color:var(--gold);letter-spacing:1px;">🎯 Whatnot Max Bid: ${val}</span>
+  </div>`;
 }
 
 // ===== BUSINESS MODULE FUNCTIONS =====
