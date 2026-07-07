@@ -1065,12 +1065,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="margin-bottom:10px;">
       <label style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">🎯 Sourcing Directive <span style="color:var(--gray);text-transform:none;letter-spacing:0;">(optional — steers research &amp; outreach)</span></label>
       <input class="text-input" id="evDirective" placeholder="e.g. Focus on Shenzhen manufacturers, approach via WeChat first..." style="width:100%;box-sizing:border-box;border:2px solid var(--gold);box-shadow:0 0 8px rgba(201,168,76,0.3);background:#1E2330;"/>
+      <div style="font-size:11px;color:var(--gray);margin-top:5px;line-height:1.4;">Strategy instructions for Eversen — e.g. 'Focus on Shenzhen manufacturers, approach via WeChat first'. Injected into every search and outreach.</div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <input class="text-input" id="evBrandInput" placeholder="Type a brand name (e.g. Demon King, Veloce, Inno64)…" style="flex:1;min-width:220px;" onkeydown="if(event.key==='Enter')eversenFind()"/>
       <button class="btn-red" onclick="eversenFind()" style="padding:12px 24px;font-size:14px;white-space:nowrap;">🔍 Find Manufacturer</button>
       <button type="button" id="evAutoSourceBtn" style="padding:12px 24px;font-size:14px;white-space:nowrap;background:var(--gold);color:#000;border:none;border-radius:8px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer;">🛰️ Auto-Source</button>
     </div>
+    <div style="font-size:11px;color:var(--gray);margin-top:6px;line-height:1.4;">Enter the diecast brand name you want to source — e.g. Demon King, Inno64, Pop Race.</div>
     <div style="margin-top:12px;">
       <div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Quick add</div>
       <div id="evChips" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
@@ -6589,30 +6591,58 @@ const NEGO_STAGES = [
 let negoActiveVendorId = null;
 let negoActiveKey = null;
 let negoConvo = { stage: 1, messages: [], notes: '' };
+let negoVendors = []; // normalized, merged from BOTH the Outreach Tracker and the Eversen research list
+
+// Build one vendor list from every place a vendor can live:
+//  - orTracker   (Redis "outreach_tracker") — contacts/leads in the Outreach tab
+//  - eversenBrands (Redis "s64_eversen_brands") — brands researched/contacted in the Eversen tab
+// Deduped by brand+email so a vendor in both places shows once.
+function buildNegoVendors() {
+  const list = [];
+  const seen = new Set();
+  const add = (v) => {
+    if (!v.brand && !v.contactEmail) return;
+    const key = String(v.brand || '').toLowerCase().trim() + '|' + String(v.contactEmail || '').toLowerCase().trim();
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push(v);
+  };
+  (typeof orTracker !== 'undefined' && Array.isArray(orTracker) ? orTracker : []).forEach(r => add({
+    id: r.id, brand: r.brand || '', contactName: r.contactName || '', contactEmail: r.contactEmail || '',
+    threadId: r.threadId || '', negoStage: r.negoStage, source: 'tracker', ref: r
+  }));
+  (typeof eversenBrands !== 'undefined' && Array.isArray(eversenBrands) ? eversenBrands : []).forEach(b => add({
+    id: b.id, brand: b.brand || '', contactName: b.manufacturer || b.contactName || '', contactEmail: b.contactEmail || b.contactPage || '',
+    threadId: b.threadId || '', negoStage: b.negoStage, source: 'eversen', ref: b
+  }));
+  negoVendors = list;
+  return list;
+}
 
 function loadNegoVendors() {
   const sel = document.getElementById('negoVendor');
   if (!sel) return;
   const cur = sel.value;
+  buildNegoVendors();
   const opts = ['<option value="">Select a vendor…</option>'].concat(
-    (orTracker || []).map(r => {
-      const who = r.contactName || r.contactEmail || '';
-      return `<option value="${escHtmlA(r.id)}">${escHtmlA(r.brand || '(no brand)')}${who ? ' — ' + escHtmlA(who) : ''}</option>`;
+    negoVendors.map(v => {
+      const who = v.contactName || v.contactEmail || '';
+      return `<option value="${escHtmlA(v.id)}">${escHtmlA(v.brand || '(no brand)')}${who ? ' — ' + escHtmlA(who) : ''}</option>`;
     })
   );
   sel.innerHTML = opts.join('');
   if (cur) sel.value = cur;
 }
 
-function negoKeyFor(rec) { return 'negotiation_' + (rec.threadId || rec.id); }
+function negoKeyFor(v) { return 'negotiation_' + (v.threadId || v.id); }
 
 async function negoSelectVendor() {
   const id = document.getElementById('negoVendor').value;
-  const rec = (orTracker || []).find(x => x.id === id);
-  if (!rec) { negoActiveVendorId = null; negoActiveKey = null; renderNego(); return; }
+  const v = negoVendors.find(x => x.id === id);
+  if (!v) { negoActiveVendorId = null; negoActiveKey = null; renderNego(); return; }
   negoActiveVendorId = id;
-  negoActiveKey = negoKeyFor(rec);
-  await loadNegoConvo(rec);
+  negoActiveKey = negoKeyFor(v);
+  await loadNegoConvo(v);
   renderNego();
 }
 
@@ -6664,7 +6694,7 @@ async function negoAnalyze(mode) {
   const raw = (document.getElementById('negoInput').value || '').trim();
   if (mode !== 'suggest' && !raw) { toast('⚠️ Paste the vendor message first.', 'yellow'); return; }
 
-  const rec = (orTracker || []).find(x => x.id === negoActiveVendorId) || {};
+  const rec = negoVendors.find(x => x.id === negoActiveVendorId) || {};
   const vendorLabel = (rec.brand || '(brand unknown)') + (rec.contactName || rec.contactEmail ? ' — ' + (rec.contactName || rec.contactEmail) : '');
   const history = negoConvo.messages.map(m => (m.from === 'vendor' ? 'VENDOR: ' : 'EVERSEN: ') + m.text).join('\n');
   const stageList = NEGO_STAGES.map((s, i) => (i + 1) + '. ' + s).join('\n');
@@ -6736,18 +6766,24 @@ async function negoCopySuggestion() {
 }
 
 async function negoLogToTracker() {
-  const rec = (orTracker || []).find(x => x.id === negoActiveVendorId);
-  if (!rec) { toast('⚠️ No vendor selected.', 'yellow'); return; }
+  const v = negoVendors.find(x => x.id === negoActiveVendorId);
+  if (!v || !v.ref) { toast('⚠️ No vendor selected.', 'yellow'); return; }
+  const rec = v.ref; // the original record in orTracker or eversenBrands
   const stageName = NEGO_STAGES[negoConvo.stage - 1];
   rec.negoStage = negoConvo.stage;
   const baseNotes = (rec.notes || '').replace(/\s*\|\s*Negotiation:.*$/, '');
   rec.notes = (baseNotes ? baseNotes + ' ' : '') + `| Negotiation: Stage ${negoConvo.stage} — ${stageName}`;
-  rec.lastActivity = orToday();
+  if ('lastActivity' in rec || v.source === 'tracker') rec.lastActivity = orToday();
   try {
-    await saveOutreachTracker();
-    renderOutreach();
-    toast('📌 Logged Stage ' + negoConvo.stage + ' to tracker.', 'green');
-  } catch (e) { toast('⚠️ Could not update tracker.', 'yellow'); }
+    if (v.source === 'eversen') {
+      await saveEversen();
+      if (typeof renderEversenAll === 'function') renderEversenAll();
+    } else {
+      await saveOutreachTracker();
+      renderOutreach();
+    }
+    toast('📌 Logged Stage ' + negoConvo.stage + ' to ' + (v.source === 'eversen' ? 'Eversen' : 'tracker') + '.', 'green');
+  } catch (e) { toast('⚠️ Could not save stage.', 'yellow'); }
 }
 
 // ============================================================
