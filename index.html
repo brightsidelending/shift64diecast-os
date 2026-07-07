@@ -5186,7 +5186,8 @@ async function runPriceScan() {
       const pin = (interactive && safeImg) ? `<input type="checkbox" class="card-pin" title="Pin as reference photo" onclick="event.stopPropagation();togglePin(this)" ondblclick="event.stopPropagation()"/>` : '';
       // Active listings get a drill-in checkbox: search this exact listing title
       const drill = !isSold ? `<input type="checkbox" class="drill-check" title="Search this exact listing title" onclick="event.stopPropagation();drillInto(this.dataset.title)" ondblclick="event.stopPropagation()" data-title="${encodeURIComponent(i.title || '')}" style="cursor:pointer;flex-shrink:0;"/>` : '';
-      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}${drill}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div></div>`;
+      const wantBtn = `<button class="scan-want-btn" onclick="event.stopPropagation();addScanToWant(this)" ondblclick="event.stopPropagation()" title="Add to your Want List" style="padding:5px 9px;font-size:11px;font-weight:700;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ Want</button>`;
+      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}${drill}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div>${wantBtn}</div>`;
     }).join('');
     const renderColumn = (items, isSold, colId) => {
       const first = items.slice(0, 4);
@@ -5284,10 +5285,51 @@ async function runPriceScan() {
         </div>
       </div>`;
     renderCompetitorPrices(); // populate the competitor list + highlight the active filter
+    // Build the pricing summary the "+ Want" buttons attach as notes.
+    {
+      const _rate = (typeof _cadUsdRate === 'number' && _cadUsdRate > 0) ? _cadUsdRate : 0.73;
+      const _money = (v) => '$' + (Math.round(v * 100) / 100);
+      const _lowestRetail = (re, isCad) => {
+        let best = null;
+        (_compMatches || []).forEach(m => {
+          if (!re.test(String(m.site || '').toLowerCase())) return;
+          if (String(m.status || '').toLowerCase() === 'out of stock') return;
+          const pr = parseFloat(m.price);
+          if (isNaN(pr) || pr <= 0) return;
+          const usd = isCad ? pr * _rate : pr;
+          if (best == null || usd < best) best = usd;
+        });
+        return best;
+      };
+      const _hz = _lowestRetail(/horizon/, false);
+      const _cb = _lowestRetail(/carbro/, true); // CarBromc priced in CAD → USD
+      const _ebayW = (ebaySoldPrices.length > 0) ? sold : (ebayActivePrices.length > 0 ? active : null);
+      const notes = 'eBay avg: ' + (_ebayW != null ? _money(_ebayW) : 'Unavailable')
+        + ' | Horizon: ' + (_hz != null ? _money(_hz) : 'Unavailable')
+        + ' | Carbros: ' + (_cb != null ? _money(_cb) : 'Unavailable');
+      _scanWant = { name: query, brand: detectBrand(query) || '', scale: (query.match(/1\/(?:12|18|24|32|43|64)/) || [''])[0], notes };
+    }
     stopScanTimer();
     document.getElementById('psLoading').style.display = 'none';
     document.getElementById('psScanBtn').disabled = false;
   }
+}
+
+// Pricing summary for the current scan, attached to Want List items via the "+ Want" buttons.
+let _scanWant = null;
+function addScanToWant(btn) {
+  if (!_scanWant || !_scanWant.name) return;
+  const who = (currentUser === 'khai') ? 'khai' : 'eric'; // logged-in user (default Eric)
+  const wants = who === 'eric' ? ericWants : khaiWants;
+  const name = _scanWant.name;
+  if (wants.some(w => (w.name || '').toLowerCase() === name.toLowerCase())) {
+    if (btn) { btn.textContent = '✓ Already in list'; btn.disabled = true; btn.style.color = 'var(--gray)'; btn.style.borderColor = 'var(--border)'; }
+    return;
+  }
+  wants.push({ name, brand: _scanWant.brand || '', scale: _scanWant.scale || '', pri: '🟢 Nice to Have', notes: _scanWant.notes || '' });
+  saveData();
+  if (typeof renderWants === 'function') renderWants(who);
+  if (btn) { btn.textContent = '✓ Added to Want List'; btn.disabled = true; btn.style.color = 'var(--green)'; btn.style.borderColor = 'var(--green)'; }
 }
 
 // ===== BUSINESS MODULE FUNCTIONS =====
