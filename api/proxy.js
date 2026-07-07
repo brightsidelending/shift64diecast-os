@@ -413,6 +413,12 @@ async function orLoadArray(key) {
   if (!raw) return [];
   try { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; } catch (e) { return []; }
 }
+// Stable unique id for Outreach-tab records (so the row action buttons work).
+function orGenId() {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'or_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
 // Tracker record: { brand, contactName, contactEmail, status, lastActivity, notes, threadId }
 async function orUpsertTracker(record) {
   try {
@@ -420,8 +426,8 @@ async function orUpsertTracker(record) {
     const idx = items.findIndex(c =>
       (record.threadId && c.threadId === record.threadId) ||
       (record.contactEmail && c.contactEmail === record.contactEmail));
-    if (idx >= 0) items[idx] = { ...items[idx], ...record };
-    else items.push(record);
+    if (idx >= 0) items[idx] = { ...items[idx], ...record }; // preserve existing id
+    else items.push({ id: orGenId(), ...record });
     await orKvCmd(['SET', 'outreach_tracker', JSON.stringify(items)]);
   } catch (e) { console.error('[proxy] orUpsertTracker failed:', e.message); }
 }

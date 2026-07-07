@@ -394,6 +394,13 @@ function displayDate() {
   return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Stable unique id for Outreach-tab records (so View Thread / Follow-up / Mark Closed work).
+function genId() {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'or_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
 // Merge/insert a tracker record (Outreach-tab shape), keyed by threadId (or contactEmail).
 // Shape: { brand, contactName, contactEmail, status, lastActivity, notes, threadId }
 async function upsertTrackerCard(card) {
@@ -406,8 +413,8 @@ async function upsertTrackerCard(card) {
     const idx = cards.findIndex((c) =>
       (card.threadId && c.threadId === card.threadId) ||
       (card.contactEmail && c.contactEmail === card.contactEmail));
-    if (idx >= 0) cards[idx] = { ...cards[idx], ...card };
-    else cards.push(card);
+    if (idx >= 0) cards[idx] = { ...cards[idx], ...card }; // preserve existing id
+    else cards.push({ id: genId(), ...card });
 
     await kvCmd(['SET', TRACKER_KEY, JSON.stringify(cards)]);
     console.log(`[cron] tracker updated: ${card.threadId || card.contactEmail} -> ${card.status}`);

@@ -1004,9 +1004,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <!-- SECTION 1: BRAND INPUT -->
   <div class="card">
     <div class="card-title">🔍 Find A Manufacturer</div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">🎯 Sourcing Directive <span style="color:var(--gray);text-transform:none;letter-spacing:0;">(optional — steers research &amp; outreach)</span></label>
+      <input class="text-input" id="evDirective" placeholder="e.g. Focus on Shenzhen manufacturers, approach via WeChat first..." style="width:100%;box-sizing:border-box;border:2px solid var(--gold);box-shadow:0 0 8px rgba(201,168,76,0.3);background:#1E2330;"/>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <input class="text-input" id="evBrandInput" placeholder="Type a brand name (e.g. Demon King, Veloce, Inno64)…" style="flex:1;min-width:220px;" onkeydown="if(event.key==='Enter')eversenFind()"/>
       <button class="btn-red" onclick="eversenFind()" style="padding:12px 24px;font-size:14px;white-space:nowrap;">🔍 Find Manufacturer</button>
+      <button onclick="evAutoSource()" id="evAutoSourceBtn" style="padding:12px 24px;font-size:14px;white-space:nowrap;background:var(--gold);color:#000;border:none;border-radius:8px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer;">🛰️ Auto-Source</button>
     </div>
     <div style="margin-top:12px;">
       <div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Quick add</div>
@@ -1022,6 +1027,15 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <span style="font-size:11px;color:var(--gray);">Powered by live web search</span>
     </div>
     <div id="evResearchCards"><div style="color:var(--gray);font-size:13px;">No research yet. Enter a brand above and Eversen will hunt down the manufacturer, contact info, and community leads.</div></div>
+  </div>
+
+  <!-- SECTION 2b: AUTO-SOURCE LEADS (eBay / Alibaba / AliExpress) -->
+  <div class="card" id="evAutoSourceCard" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">🛰️ Auto-Sourced Leads <span id="evAutoSourceTag" style="color:var(--gray);font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
+      <span style="font-size:11px;color:var(--gray);">eBay · Alibaba · AliExpress — via live web search</span>
+    </div>
+    <div id="evAutoSourceResults"></div>
   </div>
 
   <!-- SECTION 3: OUTREACH QUEUE -->
@@ -5353,11 +5367,21 @@ function evMerge(a, b) {
 }
 
 // One research pass focused on a given angle. Returns { parsed, errorMsg }. Never throws.
+// Shared knowledge Eversen always factors in, even when not explicitly told.
+const EV_HUBS_KNOWLEDGE = `Factor in the key Chinese diecast/toy manufacturing and wholesale hubs even if not explicitly told: Shenzhen and Guangzhou and Dongguan (Guangdong — the heart of diecast/OEM toy production) and Yiwu (Zhejiang — the world's largest small-commodities wholesale market). When a brand's factory is likely in one of these hubs, prioritize suppliers, agents, and B2B listings there.`;
+
+// Reads the optional Sourcing Directive the operator typed above the search bar.
+function evGetDirective() {
+  const el = document.getElementById('evDirective');
+  return el ? (el.value || '').trim() : '';
+}
+
 // Live web search: uses the web_search_20250305 server tool so Eversen finds current
 // manufacturer/wholesaler info rather than relying on training knowledge. The proxy
 // forwards the tools array untouched and the Vercel function runs up to 60s for this.
 async function evResearchOnce(brand, focusHint) {
   try {
+    const directive = evGetDirective();
     const res = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }, // proxy adds Anthropic's browser-access header server-side
@@ -5365,10 +5389,10 @@ async function evResearchOnce(brand, focusHint) {
         model: 'claude-sonnet-4-6',
         max_tokens: 1800,
         tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }],
-        system: `You are Eversen, a sourcing researcher for Shift64 Diecast, a US-based diecast reseller. Use the web_search tool to find the REAL manufacturer, factory, or wholesaler behind a given diecast brand and how a reseller can contact them. Search widely — official sites, trade/OEM pages, and community sources. When done, respond with ONLY minified JSON — no prose, no markdown, no code fences.`,
+        system: `You are Eversen, a sourcing researcher for Shift64 Diecast, a US-based diecast reseller. Use the web_search tool to find the REAL manufacturer, factory, or wholesaler behind a given diecast brand and how a reseller can contact them. Search widely — official sites, trade/OEM pages, and community sources. ${EV_HUBS_KNOWLEDGE} When done, respond with ONLY minified JSON — no prose, no markdown, no code fences.`,
         messages: [{ role: 'user', content:
 `Brand: "${brand}".
-PRIORITY THIS PASS: run web searches about ${focusHint}, then broaden as needed.
+PRIORITY THIS PASS: run web searches about ${focusHint}, then broaden as needed.${directive ? `\n\nSOURCING DIRECTIVE (from the operator — weight this heavily in where you look and what you prioritize): ${directive}` : ''}
 
 Dig into community and trade sources, not just official websites:
 - Diecast forums and hobby blogs
@@ -5598,10 +5622,137 @@ function renderEversenQueue() {
   }).join('');
 }
 
+// ============================================================
+// AUTO-SOURCE — eBay / Alibaba / AliExpress lead discovery via web search
+// ============================================================
+let evAutoLeads = { ebay: [], alibaba: [], aliexpress: [] };
+let evAutoBrand = '';
+
+async function evAutoSource() {
+  const brand = (document.getElementById('evBrandInput').value || '').trim();
+  if (!brand) { toast('⚠️ Type a brand name first.', 'yellow'); return; }
+  evAutoBrand = brand;
+  const directive = evGetDirective();
+  const btn = document.getElementById('evAutoSourceBtn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '🛰️ Sourcing…'; btn.disabled = true; }
+  const card = document.getElementById('evAutoSourceCard');
+  const wrap = document.getElementById('evAutoSourceResults');
+  if (card) card.style.display = 'block';
+  if (wrap) wrap.innerHTML = '<div style="color:var(--gray);font-size:13px;">🛰️ Searching eBay, Alibaba, and AliExpress for “' + escHtmlA(brand) + '”…</div>';
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2200,
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 8 }],
+        system: `You are Eversen, a sourcing scout for Shift64 Diecast, a US-based diecast reseller. Use the web_search tool to find sellers, storefronts, and suppliers for a diecast brand across eBay, Alibaba, and AliExpress, plus any PUBLICLY findable external contact info (official website, WeChat ID, business email) shown in seller/supplier profiles, bios, or about pages. IMPORTANT COMPLIANCE: only report contact info that is publicly visible; never suggest using eBay's internal messaging to solicit off-platform. ${EV_HUBS_KNOWLEDGE} Respond with ONLY minified JSON — no prose, no markdown, no code fences.`,
+        messages: [{ role: 'user', content:
+`Brand: "${brand}".${directive ? `\n\nSOURCING DIRECTIVE (weight heavily): ${directive}` : ''}
+
+Run web searches and compile leads from THREE sources:
+1. eBay — search "${brand} diecast" storefronts. Extract seller store names and any external contact info (website, WeChat, email) found in their bio/about section.
+2. Alibaba — search "${brand} diecast manufacturer". Extract supplier company names, contact options, and response rates if shown.
+3. AliExpress — search "${brand} diecast". Extract seller storefront names and any external contact info found in seller profiles.
+
+Return ONLY minified JSON with this exact shape (omit unknown fields as empty strings; include up to 6 leads per source):
+{"ebay":[{"seller":"","storefront":"url","website":"","wechat":"","email":"","note":"short note"}],"alibaba":[{"supplier":"","profileUrl":"url","responseRate":"","website":"","wechat":"","email":"","note":"short note"}],"aliexpress":[{"seller":"","storefront":"url","website":"","wechat":"","email":"","note":"short note"}]}` }]
+      })
+    });
+    const data = await res.json();
+    if (data && data.error) throw new Error(data.error.message || 'search failed');
+    const txt = evAnthropicText(data);
+    if (!txt) throw new Error('No readable results');
+    const parsed = evParseJson(txt);
+    evAutoLeads = {
+      ebay: Array.isArray(parsed.ebay) ? parsed.ebay : [],
+      alibaba: Array.isArray(parsed.alibaba) ? parsed.alibaba : [],
+      aliexpress: Array.isArray(parsed.aliexpress) ? parsed.aliexpress : []
+    };
+    renderAutoSource();
+    const total = evAutoLeads.ebay.length + evAutoLeads.alibaba.length + evAutoLeads.aliexpress.length;
+    toast(total ? ('🛰️ Found ' + total + ' lead' + (total > 1 ? 's' : '') + '.') : 'No leads found — try a different spelling.', total ? 'green' : 'yellow');
+  } catch (e) {
+    if (wrap) wrap.innerHTML = '<div style="color:var(--yellow);font-size:13px;">⚠️ Auto-Source failed: ' + escHtmlA((e && e.message) || 'error') + '</div>';
+    toast('⚠️ Auto-Source failed.', 'yellow');
+  } finally {
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
+
+function evAutoGroupHtml(source, label, emoji, leads) {
+  const rows = (leads || []).map((l, i) => {
+    const name = l.seller || l.supplier || l.name || '(unnamed seller)';
+    const bits = [];
+    if (l.website) bits.push('🌐 ' + escHtmlA(l.website));
+    if (l.wechat) bits.push('💬 WeChat: ' + escHtmlA(l.wechat));
+    if (l.email) bits.push('✉️ ' + escHtmlA(l.email));
+    if (l.responseRate) bits.push('📈 ' + escHtmlA(l.responseRate));
+    const link = l.storefront || l.profileUrl || '';
+    const linkHtml = link ? `<a href="${escHtmlA(link)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:12px;">View storefront ↗</a>` : '';
+    return `<div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;">
+        <div style="flex:1;min-width:180px;">
+          <div style="font-weight:600;font-size:14px;">${escHtmlA(name)}</div>
+          ${bits.length ? `<div style="font-size:12px;color:var(--gray);margin-top:4px;line-height:1.5;">${bits.join(' &nbsp;·&nbsp; ')}</div>` : '<div style="font-size:12px;color:var(--gray);margin-top:4px;">No external contact info found</div>'}
+          ${l.note ? `<div style="font-size:12px;color:var(--gray);margin-top:4px;">${escHtmlA(l.note)}</div>` : ''}
+          ${linkHtml ? `<div style="margin-top:5px;">${linkHtml}</div>` : ''}
+        </div>
+        <button onclick="evAddLead('${source}', ${i}, this)" style="padding:7px 13px;font-size:12px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:7px;cursor:pointer;white-space:nowrap;">+ Add to Outreach</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="margin-bottom:16px;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;color:var(--gold);letter-spacing:1px;margin-bottom:8px;">${emoji} ${label} <span style="color:var(--gray);font-weight:400;font-size:12px;">(${(leads || []).length})</span></div>
+    ${rows || '<div style="color:var(--gray);font-size:12px;">No leads found on this source.</div>'}
+  </div>`;
+}
+
+function renderAutoSource() {
+  const wrap = document.getElementById('evAutoSourceResults');
+  const tag = document.getElementById('evAutoSourceTag');
+  if (tag) tag.textContent = evAutoBrand ? '— ' + evAutoBrand : '';
+  if (!wrap) return;
+  wrap.innerHTML =
+    evAutoGroupHtml('ebay', 'eBay', '🛒', evAutoLeads.ebay) +
+    evAutoGroupHtml('alibaba', 'Alibaba', '🏭', evAutoLeads.alibaba) +
+    evAutoGroupHtml('aliexpress', 'AliExpress', '📦', evAutoLeads.aliexpress);
+}
+
+// Adds a sourced lead to the Outreach Tracker (Redis key "outreach_tracker") with status "Queued".
+async function evAddLead(source, i, btnEl) {
+  const lead = (evAutoLeads[source] || [])[i];
+  if (!lead) return;
+  const name = lead.seller || lead.supplier || lead.name || '(unnamed seller)';
+  const brand = evAutoBrand || (document.getElementById('evBrandInput').value || '').trim();
+  const bits = [];
+  if (lead.website) bits.push('Web: ' + lead.website);
+  if (lead.wechat) bits.push('WeChat: ' + lead.wechat);
+  if (lead.responseRate) bits.push('Resp: ' + lead.responseRate);
+  const link = lead.storefront || lead.profileUrl || '';
+  if (link) bits.push(link);
+  if (lead.note) bits.push(lead.note);
+  const notes = '[' + source + '] ' + bits.join(' · ');
+  const exists = orTracker.some(c => c.contactName === name && c.brand === brand && (c.notes || '').indexOf('[' + source + ']') >= 0);
+  if (exists) { toast('Already queued.', 'yellow'); return; }
+  orTracker.unshift({ id: orUid(), brand, contactName: name, contactEmail: lead.email || '', status: 'Queued', lastActivity: orToday(), notes, threadId: '' });
+  try {
+    await saveOutreachTracker();
+    renderOutreach();
+    if (btnEl) { btnEl.textContent = '✓ Queued'; btnEl.disabled = true; btnEl.style.background = 'var(--card)'; btnEl.style.color = 'var(--gray)'; btnEl.style.cursor = 'default'; }
+    toast('✅ Added to Outreach (Queued).', 'green');
+  } catch (e) {
+    toast('⚠️ Could not save to Outreach.', 'yellow');
+  }
+}
+
 async function evDraftOutreach(id) {
   const b = eversenBrands.find(x => x.id === id);
   if (!b) return;
   const li = evLangInfo(b);
+  const directive = evGetDirective();
   // If a draft already exists, just open it.
   if (b.draft) { evOpenEmailModal(b); return; }
   toast('✍️ Eversen is drafting outreach…', 'yellow');
@@ -5617,7 +5768,10 @@ async function evDraftOutreach(id) {
 ${b.briefing ? `
 Eversen's strategy for this outreach: ${b.briefing}
 Follow this strategy: address the FIRST contact Eversen recommends above, and make the email's specific goal match it (e.g. request a factory referral, negotiate bulk pricing, or confirm a distributor relationship) rather than sending a generic introduction.
+` : ''}${directive ? `
+SOURCING DIRECTIVE (from the operator — let this shape the email's tone, angle, and channel/approach): ${directive}
 ` : ''}
+${EV_HUBS_KNOWLEDGE}
 The email must: introduce Shift64 Diecast warmly, express genuine interest in becoming an authorized reseller / stocking their products, and politely request wholesale pricing and MOQ (minimum order quantity) information. Tone: friendly, respectful, professional. Keep it concise (about 130-180 words). Sign off as "Eversen — Sourcing, Shift64 Diecast".
 
 Recipient's primary language: ${li.name} (code ${li.code}).
@@ -6034,6 +6188,7 @@ let orTracker = [];   // [{ id, brand, contactName, contactEmail, status, lastAc
 let orPending = [];   // [{ id, from, brand, summary, draft, threadId, subject }]
 
 const OR_STATUS_STYLES = {
+  'Queued':             'background:#1A1710;color:var(--gold);',
   'Sent':               'background:#0D2233;color:var(--blue);',
   'Replied':            'background:#0D2B1A;color:var(--green);',
   'Needs Review':       'background:#2B2200;color:var(--yellow);',
