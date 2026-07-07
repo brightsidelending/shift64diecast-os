@@ -5551,12 +5551,10 @@ Follow this strategy: address the FIRST contact Eversen recommends above, and ma
 The email must: introduce Shift64 Diecast warmly, express genuine interest in becoming an authorized reseller / stocking their products, and politely request wholesale pricing and MOQ (minimum order quantity) information. Tone: friendly, respectful, professional. Keep it concise (about 130-180 words). Sign off as "Eversen — Sourcing, Shift64 Diecast".
 
 Recipient's primary language: ${li.name} (code ${li.code}).
-${li.needsNative
-  ? `Provide BOTH a native-language (${li.name}) version AND an English version. Translate naturally and respectfully, not literally.`
-  : `English only.`}
+Always write the entire email in English as the primary language. Do NOT write it in ${li.name} first, and do NOT include a full ${li.name} translation. After the sign-off, add a single closing line offering to communicate in Mandarin or Cantonese if that is more comfortable for their team.
 
 Return ONLY minified JSON:
-{"subjectNative":"${li.needsNative ? 'subject in ' + li.name : ''}","subjectEn":"English subject","bodyNative":"${li.needsNative ? 'full email body in ' + li.name : ''}","bodyEn":"full English email body"}` }]
+{"subjectNative":"","subjectEn":"English subject","bodyNative":"","bodyEn":"full English email body, ending with the single Mandarin/Cantonese offer line"}` }]
       })
     });
     const data = await res.json();
