@@ -895,14 +895,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;">🏎️ Eric's Want List</div>
-        <button class="btn-sm" onclick="openModal('ericWantModal')">+ ADD</button>
+        <button class="btn-sm" onclick="openAddWant('eric')">+ ADD</button>
       </div>
       <div id="ericWantDiv"><div class="empty" style="padding:30px;"><div class="empty-icon" style="font-size:28px;">🎯</div><div class="empty-title" style="font-size:15px;">Empty</div></div></div>
     </div>
     <div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;">🏎️ Khai's Want List</div>
-        <button class="btn-sm" style="background:var(--blue);" onclick="openModal('khaiWantModal')">+ ADD</button>
+        <button class="btn-sm" style="background:var(--blue);" onclick="openAddWant('khai')">+ ADD</button>
       </div>
       <div id="khaiWantDiv"><div class="empty" style="padding:30px;"><div class="empty-icon" style="font-size:28px;">🎯</div><div class="empty-title" style="font-size:15px;">Empty</div></div></div>
     </div>
@@ -1364,7 +1364,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <!-- ERIC WANT MODAL -->
 <div class="modal-overlay" id="ericWantModal">
   <div class="modal">
-    <h2>🎯 Add to Eric's Want List</h2>
+    <h2 id="ericWantTitle">🎯 Add to Eric's Want List</h2>
     <div class="fg"><label>Model Name</label><input class="fi" id="ew_name" placeholder="e.g. Kaido House NSX Red 1/64"/></div>
     <div class="frow">
       <div class="fg"><label>Brand</label><input class="fi" id="ew_brand" placeholder="e.g. Kaido House"/></div>
@@ -1374,7 +1374,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="fg"><label>Notes</label><input class="fi" id="ew_notes" placeholder="Chase only, Any color..."/></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('ericWantModal')">Cancel</button>
-      <button class="btn-confirm" onclick="addWant('eric')">ADD TO WANT LIST</button>
+      <button class="btn-confirm" id="ericWantSave" onclick="addWant('eric')">ADD TO WANT LIST</button>
     </div>
   </div>
 </div>
@@ -1382,7 +1382,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <!-- KHAI WANT MODAL -->
 <div class="modal-overlay" id="khaiWantModal">
   <div class="modal">
-    <h2>🎯 Add to Khai's Want List</h2>
+    <h2 id="khaiWantTitle">🎯 Add to Khai's Want List</h2>
     <div class="fg"><label>Model Name</label><input class="fi" id="kw_name" placeholder="e.g. Kaido House NSX Red 1/64"/></div>
     <div class="frow">
       <div class="fg"><label>Brand</label><input class="fi" id="kw_brand" placeholder="e.g. Kaido House"/></div>
@@ -1394,7 +1394,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="fg"><label>Notes</label><input class="fi" id="kw_notes" placeholder="Chase only, Any color..."/></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('khaiWantModal')">Cancel</button>
-      <button class="btn-confirm" style="background:var(--blue);" onclick="addWant('khai')">ADD TO WANT LIST</button>
+      <button class="btn-confirm" id="khaiWantSave" style="background:var(--blue);" onclick="addWant('khai')">ADD TO WANT LIST</button>
     </div>
   </div>
 </div>
@@ -2283,18 +2283,63 @@ function lookupPrice(q) {
   return {avg:25,low:18,high:38};
 }
 
+let wantEditing = null; // { who, idx } while editing an existing item; null when adding
+
+// Open the modal for a NEW item — clear fields and reset any edit state.
+function openAddWant(who) {
+  const p = who === 'eric' ? 'ew_' : 'kw_';
+  wantEditing = null;
+  document.getElementById(p+'name').value = '';
+  document.getElementById(p+'brand').value = '';
+  document.getElementById(p+'scale').value = '1/64';
+  document.getElementById(p+'pri').value = '🔴 Must Have';
+  document.getElementById(p+'notes').value = '';
+  const title = document.getElementById(who+'WantTitle');
+  const save = document.getElementById(who+'WantSave');
+  if (title) title.textContent = '🎯 Add to ' + (who === 'eric' ? "Eric's" : "Khai's") + ' Want List';
+  if (save) save.textContent = 'ADD TO WANT LIST';
+  openModal(who+'WantModal');
+}
+
+// Open the modal pre-filled with an existing item's data for editing.
+function editWant(who, idx) {
+  const wants = who === 'eric' ? ericWants : khaiWants;
+  const item = wants[idx];
+  if (!item) return;
+  const p = who === 'eric' ? 'ew_' : 'kw_';
+  document.getElementById(p+'name').value = item.name || '';
+  document.getElementById(p+'brand').value = item.brand || '';
+  document.getElementById(p+'scale').value = item.scale || '';
+  document.getElementById(p+'pri').value = String(item.pri || '').includes('Must') ? '🔴 Must Have' : '🟢 Nice to Have';
+  document.getElementById(p+'notes').value = item.notes || '';
+  wantEditing = { who, idx };
+  const title = document.getElementById(who+'WantTitle');
+  const save = document.getElementById(who+'WantSave');
+  if (title) title.textContent = '✏️ Edit ' + (who === 'eric' ? "Eric's" : "Khai's") + ' Want Item';
+  if (save) save.textContent = 'SAVE CHANGES';
+  openModal(who+'WantModal');
+}
+
 function addWant(who) {
   const p = who === 'eric' ? 'ew_' : 'kw_';
   const name = document.getElementById(p+'name').value.trim();
   if (!name) { toast('⚠️ Enter a model name.','yellow'); return; }
-  const item = {
+  const fields = {
     name, brand: document.getElementById(p+'brand').value.trim(),
     scale: document.getElementById(p+'scale').value,
     pri: document.getElementById(p+'pri').value,
     notes: document.getElementById(p+'notes').value.trim()
   };
-  if (who === 'eric') ericWants.push(item);
-  else khaiWants.push(item);
+  if (wantEditing && wantEditing.who === who && wantEditing.idx != null) {
+    // Update the existing record in place (no duplicate).
+    const wants = who === 'eric' ? ericWants : khaiWants;
+    if (wants[wantEditing.idx]) wants[wantEditing.idx] = { ...wants[wantEditing.idx], ...fields };
+    toast('✅ Updated.', 'green');
+  } else {
+    if (who === 'eric') ericWants.push(fields);
+    else khaiWants.push(fields);
+  }
+  wantEditing = null;
   renderWants(who);
   closeModal(who+'WantModal');
   saveData();
@@ -2317,7 +2362,10 @@ function renderWants(who) {
           <div class="want-name">${escHtmlA(item.name)}</div>
           ${meta ? `<div class="want-meta">${meta}</div>` : ''}
         </div>
-        <button onclick="removeWant('${who}',${idx})" title="Delete" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:16px;">✕</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+          <button onclick="editWant('${who}',${idx})" title="Edit" style="background:none;border:none;color:var(--gold);cursor:pointer;font-size:14px;">✏️</button>
+          <button onclick="removeWant('${who}',${idx})" title="Delete" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:16px;">✕</button>
+        </div>
       </div>
       <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <span class="badge" style="background:${priBg};color:${priColor};">${escHtmlA(item.pri || 'Nice to Have')}</span>
