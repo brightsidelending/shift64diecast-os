@@ -83,7 +83,7 @@ export default async function handler(req, res) {
   const startedAt = new Date().toISOString();
   console.log(`[cron] Eversen outreach responder started ${startedAt}`);
 
-  const summary = { processed: 0, autoSent: 0, needsReview: 0, skipped: 0, errors: 0, followupsSent: 0, actions: [] };
+  const summary = { processed: 0, autoSent: 0, needsReview: 0, skipped: 0, errors: 0, followupsSent: 0, alertsEmailed: 0, actions: [] };
 
   try {
     // nodemailer OAuth2 transport handles token refresh automatically for SENDING.
@@ -198,6 +198,10 @@ export default async function handler(req, res) {
     // --- Daily follow-up automation: nudge stale "Sent" outreach with no reply ---
     await runFollowups(summary);
     console.log(`[cron] follow-ups sent=${summary.followupsSent}`);
+
+    // --- Daily price-alert scan: eBay + AliExpress target-price hits ---
+    await runPriceAlerts(summary);
+    console.log(`[cron] price alerts emailed=${summary.alertsEmailed}`);
 
     const hour = new Date().getUTCHours();
     if (hour === 13) {
@@ -352,6 +356,142 @@ Output ONLY the email body.`;
   const data = await callClaude([{ role: 'user', content: prompt }], 600);
   return (data?.content?.[0]?.text || '').trim();
 }
+
+// ---------------------------------------------------------------------------
+// Price alerts — daily scan of eBay + AliExpress for target-price hits
+// ---------------------------------------------------------------------------
+const PROXY_BASE = 'https://shift64diecast-os.vercel.app';
+const ALERTS_KEY = 'price_alerts';
+const ALERTS_SENT_KEY = 'price_alerts_sent'; // { listingUrl: ISO timestamp } — for 24h dedupe
+const OS_URL = 'https://brightsidelending.github.io/shift64diecast-os/';
+
+async function runPriceAlerts(summary) {
+  try {
+    const rawA = await kvCmd(['GET', ALERTS_KEY]);
+    let alerts = [];
+    if (rawA) { try { alerts = JSON.parse(rawA); } catch (_) { alerts = []; } }
+    if (!Array.isArray(alerts) || !alerts.length) return;
+
+    const rawS = await kvCmd(['GET', ALERTS_SENT_KEY]);
+    let sent = {};
+    if (rawS) { try { sent = JSON.parse(rawS) || {}; } catch (_) { sent = {}; } }
+
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+    // Prune dedupe entries older than 7 days so the map doesn't grow forever.
+    for (const k of Object.keys(sent)) { if (now - Date.parse(sent[k]) > 7 * DAY) delete sent[k]; }
+
+    let transporter = null;
+
+    for (const alert of alerts) {
+      if (!alert || !alert.active) continue;
+      const target = parseFloat(alert.targetPrice);
+      if (!(target > 0)) { alert.lastChecked = displayDate(); continue; }
+
+      let matches = [];
+      if (alert.platform === 'ebay' || alert.platform === 'both') {
+        matches = matches.concat(await searchEbayForAlert(alert, target));
+      }
+      if (alert.platform === 'aliexpress' || alert.platform === 'both') {
+        matches = matches.concat(await searchAliExpressForAlert(alert, target));
+      }
+      alert.lastChecked = displayDate();
+
+      // Never send a duplicate for the same listing within 24h.
+      const fresh = matches.filter(m => m.url && !(sent[m.url] && (now - Date.parse(sent[m.url])) < DAY));
+      if (!fresh.length) continue;
+
+      if (!transporter) {
+        const nodemailer = await import('nodemailer');
+        transporter = nodemailer.default.createTransport({
+          service: 'gmail',
+          auth: { user: 'Shift64Diecast@gmail.com', pass: process.env.GMAIL_APP_PASSWORD },
+        });
+      }
+      await transporter.sendMail({
+        from: 'Shift64Diecast OS <Shift64Diecast@gmail.com>',
+        to: ['erictran925@gmail.com', 'Shift64Diecast@gmail.com'],
+        subject: `🔔 Price alert: "${alert.keyword}" at/below $${target.toFixed(2)}`,
+        html: priceAlertEmailHtml(alert, fresh, target),
+      });
+      fresh.forEach(m => { sent[m.url] = new Date().toISOString(); });
+      summary.alertsEmailed = (summary.alertsEmailed || 0) + fresh.length;
+      console.log(`[cron] price alert emailed: ${alert.keyword} — ${fresh.length} match(es)`);
+    }
+
+    await kvCmd(['SET', ALERTS_KEY, JSON.stringify(alerts)]);
+    await kvCmd(['SET', ALERTS_SENT_KEY, JSON.stringify(sent)]);
+  } catch (err) {
+    console.error(`[cron] price alerts failed: ${err.message}`);
+  }
+}
+
+// eBay via the existing Browse-API proxy (accurate prices + real listing links).
+async function searchEbayForAlert(alert, target) {
+  try {
+    const r = await fetch(PROXY_BASE + '/api/proxy?type=ebay_active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: alert.keyword }),
+    });
+    const d = await r.json();
+    const items = (d && d.itemSummaries) || [];
+    const out = [];
+    for (const it of items) {
+      const price = parseFloat(it.price && it.price.value);
+      if (!(price <= target)) continue;
+      if (alert.condition === 'new' && !/new/i.test(it.condition || '')) continue;
+      if (alert.condition === 'used' && !/used|pre-?owned/i.test(it.condition || '')) continue;
+      if (alert.listingType === 'bin' && !(Array.isArray(it.buyingOptions) && it.buyingOptions.includes('FIXED_PRICE'))) continue;
+      if (alert.usOnly && !(it.itemLocation && it.itemLocation.country === 'US')) continue;
+      out.push({ platform: 'eBay', title: it.title || alert.keyword, price, url: it.itemWebUrl || '' });
+    }
+    return out;
+  } catch (e) { console.error('[cron] eBay alert search failed:', e.message); return []; }
+}
+
+// AliExpress via the web_search tool through the proxy passthrough.
+async function searchAliExpressForAlert(alert, target) {
+  try {
+    const prompt = `Search AliExpress for "${alert.keyword}" diecast listings priced at or below $${target} USD. Return ONLY minified JSON: {"listings":[{"title":"","price":<number USD>,"url":"https://..."}]} — include only real AliExpress product URLs you actually find, up to 5, each priced <= ${target}. If none, return {"listings":[]}.`;
+    const r = await fetch(PROXY_BASE + '/api/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const d = await r.json();
+    const txt = (d && Array.isArray(d.content)) ? d.content.filter(c => c.type === 'text').map(c => c.text || '').join('\n') : '';
+    let parsed = null;
+    try { parsed = JSON.parse(txt); } catch (_) { const m = txt.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]); } catch (e) {} } }
+    const list = (parsed && Array.isArray(parsed.listings)) ? parsed.listings : [];
+    return list
+      .filter(x => x && x.url && parseFloat(x.price) <= target)
+      .slice(0, 5)
+      .map(x => ({ platform: 'AliExpress', title: x.title || alert.keyword, price: parseFloat(x.price), url: x.url }));
+  } catch (e) { console.error('[cron] AliExpress alert search failed:', e.message); return []; }
+}
+
+function priceAlertEmailHtml(alert, matches, target) {
+  const rows = matches.map(m => `
+    <div style="border:1px solid #333;border-radius:8px;padding:12px;margin-bottom:10px;">
+      <div style="font-weight:bold;color:#fff;">${escapeHtml(m.title)}</div>
+      <div style="color:#d4af37;font-size:18px;font-weight:bold;margin:4px 0;">$${Number(m.price).toFixed(2)} <span style="color:#999;font-size:12px;font-weight:normal;">on ${escapeHtml(m.platform)}</span></div>
+      <a href="${escapeHtml(m.url)}" style="color:#4A90D9;font-size:13px;">View listing →</a>
+    </div>`).join('');
+  return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#111;padding:20px;color:#eee;">
+    <h2 style="color:#d4af37;">🔔 Price Alert Hit</h2>
+    <p>Your alert for <b>${escapeHtml(alert.keyword)}</b> (target $${target.toFixed(2)}) matched ${matches.length} listing${matches.length > 1 ? 's' : ''}:</p>
+    ${rows}
+    <p style="margin-top:16px;"><a href="${OS_URL}" style="background:#d4af37;color:#000;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:bold;">View in OS →</a></p>
+  </div>`;
+}
+
+function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 async function callClaude(messages, maxTokens) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {

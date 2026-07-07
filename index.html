@@ -933,6 +933,26 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </div>
     </div>
   </div>
+
+  <!-- PRICE ALERTS -->
+  <div class="card" style="border:2px solid var(--gold);margin-top:20px;">
+    <div class="card-title">🔔 Price Alerts</div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:14px;line-height:1.5;">Get an email the moment a model drops to your target price on eBay or AliExpress. Checked automatically every day.</div>
+    <div class="mstack" style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:10px;">
+      <input class="text-input" id="palKeyword" placeholder="Item / keyword — e.g. Demon King Auto F40"/>
+      <input class="text-input" id="palTarget" type="number" step="0.01" placeholder="Target $"/>
+    </div>
+    <div class="mstack" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
+      <select class="fi" id="palPlatform"><option value="both">Both platforms</option><option value="ebay">eBay only</option><option value="aliexpress">AliExpress only</option></select>
+      <select class="fi" id="palCondition"><option value="any">Any condition</option><option value="new">New</option><option value="used">Used</option></select>
+      <select class="fi" id="palListing"><option value="any">Any listing</option><option value="bin">Buy It Now only</option></select>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gray);cursor:pointer;"><input type="checkbox" id="palUsOnly"/> US sellers only (eBay)</label>
+      <button onclick="palAdd()" style="padding:10px 20px;font-size:13px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;margin-left:auto;">+ Add Alert</button>
+    </div>
+    <div id="palList"></div>
+  </div>
 </div>
 
 <!-- ===== INTEL ===== -->
@@ -1049,7 +1069,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <input class="text-input" id="evBrandInput" placeholder="Type a brand name (e.g. Demon King, Veloce, Inno64)…" style="flex:1;min-width:220px;" onkeydown="if(event.key==='Enter')eversenFind()"/>
       <button class="btn-red" onclick="eversenFind()" style="padding:12px 24px;font-size:14px;white-space:nowrap;">🔍 Find Manufacturer</button>
-      <button onclick="evAutoSource()" id="evAutoSourceBtn" style="padding:12px 24px;font-size:14px;white-space:nowrap;background:var(--gold);color:#000;border:none;border-radius:8px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer;">🛰️ Auto-Source</button>
+      <button type="button" id="evAutoSourceBtn" style="padding:12px 24px;font-size:14px;white-space:nowrap;background:var(--gold);color:#000;border:none;border-radius:8px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer;">🛰️ Auto-Source</button>
     </div>
     <div style="margin-top:12px;">
       <div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Quick add</div>
@@ -1523,6 +1543,9 @@ function showTab(id, el) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   el.classList.add('active');
+  // Refresh per-tab data that depends on other tabs' state.
+  if (id === 'outreach' && typeof loadNegoVendors === 'function') loadNegoVendors();
+  if (id === 'wantlist' && typeof renderAlerts === 'function') renderAlerts();
 }
 
 // ============================================================
@@ -6727,6 +6750,73 @@ async function negoLogToTracker() {
   } catch (e) { toast('⚠️ Could not update tracker.', 'yellow'); }
 }
 
+// ============================================================
+// PRICE ALERTS — Want List tab (Redis key "price_alerts")
+// ============================================================
+let palAlerts = [];
+const PAL_KEY = 'price_alerts';
+
+function palUid() { return 'pal_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+async function loadAlerts() {
+  try { const v = await kvGet(PAL_KEY); palAlerts = Array.isArray(v) ? v : []; } catch (e) { console.log('Alerts load failed:', e); }
+  renderAlerts();
+}
+async function saveAlerts() { try { await kvSet(PAL_KEY, palAlerts); } catch (e) { toast('⚠️ Could not save alerts.', 'yellow'); } }
+
+async function palAdd() {
+  const keyword = (document.getElementById('palKeyword').value || '').trim();
+  const target = parseFloat(document.getElementById('palTarget').value);
+  if (!keyword) { toast('⚠️ Enter an item / keyword.', 'yellow'); return; }
+  if (!(target > 0)) { toast('⚠️ Enter a valid target price.', 'yellow'); return; }
+  palAlerts.unshift({
+    id: palUid(),
+    keyword,
+    targetPrice: target,
+    platform: document.getElementById('palPlatform').value,
+    condition: document.getElementById('palCondition').value,
+    listingType: document.getElementById('palListing').value,
+    usOnly: document.getElementById('palUsOnly').checked,
+    active: true,
+    lastChecked: ''
+  });
+  document.getElementById('palKeyword').value = '';
+  document.getElementById('palTarget').value = '';
+  document.getElementById('palUsOnly').checked = false;
+  renderAlerts();
+  await saveAlerts();
+  toast('🔔 Price alert added.', 'green');
+}
+async function palDelete(id) { palAlerts = palAlerts.filter(a => a.id !== id); renderAlerts(); await saveAlerts(); }
+async function palToggle(id) { const a = palAlerts.find(x => x.id === id); if (a) { a.active = !a.active; renderAlerts(); await saveAlerts(); } }
+
+function palPlatformBadges(p) {
+  const badge = (t, bg, c) => `<span class="badge" style="background:${bg};color:${c};">${t}</span>`;
+  if (p === 'ebay') return badge('eBay', '#0D2233', 'var(--blue)');
+  if (p === 'aliexpress') return badge('AliExpress', '#2A1A05', 'var(--orange)');
+  return badge('eBay', '#0D2233', 'var(--blue)') + ' ' + badge('AliExpress', '#2A1A05', 'var(--orange)');
+}
+function renderAlerts() {
+  const wrap = document.getElementById('palList');
+  if (!wrap) return;
+  if (!palAlerts.length) { wrap.innerHTML = '<div style="color:var(--gray);font-size:13px;">No price alerts yet. Add one above.</div>'; return; }
+  wrap.innerHTML = palAlerts.map(a => {
+    const bits = [a.condition !== 'any' ? a.condition : null, a.listingType === 'bin' ? 'BIN only' : null, a.usOnly ? 'US only' : null].filter(Boolean).map(escHtmlA).join(' · ');
+    return `<div style="background:var(--black);border:1px solid ${a.active ? 'var(--border)' : '#2a2a2a'};border-radius:10px;padding:12px 14px;margin-bottom:8px;opacity:${a.active ? '1' : '0.6'};">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;">
+        <div style="flex:1;min-width:180px;">
+          <div style="font-weight:600;font-size:14px;">${escHtmlA(a.keyword)}</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:4px;">Target <b style="color:var(--gold);">$${Number(a.targetPrice).toFixed(2)}</b> · ${palPlatformBadges(a.platform)}${bits ? ' · ' + bits : ''}</div>
+          <div style="font-size:11px;color:var(--gray);margin-top:4px;">Last checked: ${a.lastChecked ? escHtmlA(a.lastChecked) : 'never'}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button onclick="palToggle('${a.id}')" style="padding:5px 10px;font-size:11px;font-weight:700;background:var(--card);color:${a.active ? 'var(--green)' : 'var(--gray)'};border:1px solid var(--border);border-radius:6px;cursor:pointer;white-space:nowrap;">${a.active ? '● Active' : '❚❚ Paused'}</button>
+          <button onclick="palDelete('${a.id}')" title="Delete alert" style="background:var(--red);color:#fff;border:none;border-radius:6px;width:26px;height:26px;font-size:12px;font-weight:700;cursor:pointer;flex:none;">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 // Init
 renderScreenshots();
 renderCatalogs();               // show default vendor catalogs immediately (independent of KV load)
@@ -6734,6 +6824,7 @@ renderEversenChips();           // show quick-add chips immediately (independent
 window.addEventListener('load', loadData);
 window.addEventListener('load', function () { loadOutreach(false); });
 window.addEventListener('load', function () { loadPlaybook(); });
+window.addEventListener('load', function () { loadAlerts(); });
 
 // Filter event listeners - guaranteed to fire
 document.addEventListener('DOMContentLoaded', function() {
@@ -6854,9 +6945,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <button onclick="toggleHelpChat()" style="background:none;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;">×</button>
   </div>
   <div id="helpChatBody"></div>
-  <form id="helpChatForm" onsubmit="event.preventDefault();return false;">
-    <input id="helpChatInput" placeholder="Ask how anything works…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();helpChatSend(event);}"/>
-    <button id="helpChatSend" type="button" onclick="helpChatSend(event)">Send</button>
+  <form id="helpChatForm">
+    <input id="helpChatInput" placeholder="Ask how anything works…" autocomplete="off"/>
+    <button id="helpChatSend" type="button">Send</button>
   </form>
 </div>
 
@@ -7004,6 +7095,24 @@ initHelpTips();
   let t=null;
   const mo=new MutationObserver(function(){ clearTimeout(t); t=setTimeout(initHelpTips,350); });
   mo.observe(document.body,{ childList:true, subtree:true });
+})();
+
+// ---- Robust handler bindings (runs last; immune to inline-handler quirks) ----
+(function(){
+  // Help chat: Send button, Enter key, and prevent form submit/reload.
+  const sendBtn = document.getElementById('helpChatSend');
+  const chatInput = document.getElementById('helpChatInput');
+  const chatForm = document.getElementById('helpChatForm');
+  if (sendBtn) sendBtn.addEventListener('click', function(e){ e.preventDefault(); if (typeof helpChatSend === 'function') helpChatSend(e); });
+  if (chatInput) chatInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); if (typeof helpChatSend === 'function') helpChatSend(e); } });
+  if (chatForm) chatForm.addEventListener('submit', function(e){ e.preventDefault(); return false; });
+
+  // Auto-Source button (Eversen tab).
+  const autoBtn = document.getElementById('evAutoSourceBtn');
+  if (autoBtn) autoBtn.addEventListener('click', function(e){ e.preventDefault(); if (typeof evAutoSource === 'function') evAutoSource(); });
+
+  // Negotiate vendor dropdown: populate on first load and whenever the Outreach tab is opened.
+  if (typeof loadNegoVendors === 'function') loadNegoVendors();
 })();
 </script>
 
