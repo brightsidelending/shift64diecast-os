@@ -18,7 +18,8 @@ import nodemailer from 'nodemailer';
 
 const OUR_ADDRESS = 'shift64diecast@gmail.com';
 const SIGNATURE = 'Eversen Chan';
-const TRACKER_KEY = 'outreach_tracker'; // Redis key: JSON array of card objects
+const TRACKER_KEY = 'outreach_tracker'; // Redis key: JSON array of tracker records
+const PENDING_KEY = 'outreach_pending'; // Redis key: JSON array of pending-approval records
 const MODEL = 'claude-sonnet-4-5-20250929';
 
 // ---------------------------------------------------------------------------
@@ -41,9 +42,9 @@ RESPONSE RULES:
 - call_request -> respond: "Our sourcing team is currently attending trade shows
   across the US but we are happy to move quickly over email. Once we align on the
   basics I would love to set up a proper introduction call."
-- supplier_hint -> flag card with 🏭 in Redis and draft a warm, natural follow-up
-  to dig deeper without revealing intent.
-- unknown -> flag 🟡 Needs Review, do not auto-send.
+- referral -> supplier points us to another source; draft a warm, natural follow-up
+  to dig deeper without revealing intent, and route to Pending Approvals (no auto-send).
+- unknown -> route to Pending Approvals (no auto-send).
 
 Never ask for pricing or MOQ in the first exchange.
 Never reveal we are trying to find their supplier.
@@ -57,9 +58,13 @@ const SCENARIOS = {
     'Supplier asks who we are / for business details before quoting. Provide a short, credible intro to Shift64 Diecast (US reseller of premium 1:64 diecast), our interest in a wholesale account, and offer to share any docs they need.',
   call_request:
     'Supplier wants a phone/video call. Agree enthusiastically, propose that they suggest 2-3 time windows (with timezone), and ask for the best number / platform (WhatsApp, WeChat, Zoom).',
-  supplier_hint:
+  referral:
     'Supplier says they cannot supply directly but points us toward another source/distributor. Thank them warmly for the lead and ask for an introduction or the contact details of the source they mentioned.',
 };
+
+// Types that Eversen auto-sends and logs to the tracker. Everything else
+// (referral, unknown) is routed to Pending Approvals for a human to review.
+const AUTO_TYPES = ['positive', 'needs_info', 'call_request'];
 
 // ===========================================================================
 export default async function handler(req, res) {
@@ -118,22 +123,30 @@ export default async function handler(req, res) {
         const classification = await classifyReply(bodyText);
         console.log(`[cron] thread ${threadId}: classified as ${classification.type} (${classification.confidence})`);
 
-        if (classification.type === 'unknown' || !SCENARIOS[classification.type]) {
-          await upsertTrackerCard({
-            threadId, supplierEmail, subject,
-            status: '🟡 Needs Review',
-            classification: classification.type,
-            note: classification.reason || 'Did not match a known scenario',
-            lastReply: bodyText.slice(0, 500),
+        // Always draft a reply (used for auto-send OR for the approval queue).
+        const draft = await draftReply(
+          AUTO_TYPES.includes(classification.type) ? classification.type : 'referral',
+          bodyText
+        );
+
+        // ---- referral / unknown -> Pending Approvals (no auto-send) ---------
+        if (!AUTO_TYPES.includes(classification.type)) {
+          await pushPending({
+            id: 'or_' + threadId,
+            from: supplierEmail,
+            brand: '',
+            replySummary: (classification.reason ? classification.reason + ' — ' : '') + bodyText.slice(0, 400),
+            draftedReply: draft,
+            threadId,
+            subject: subject.toLowerCase().startsWith('re:') ? subject : 'Re: ' + subject,
           });
-          console.log(`[cron] thread ${threadId}: 🟡 Needs Review — NOT auto-sending`);
+          console.log(`[cron] thread ${threadId}: ${classification.type} -> Pending Approvals (no auto-send)`);
           summary.needsReview++;
-          summary.actions.push({ threadId, action: 'needs_review', type: classification.type });
+          summary.actions.push({ threadId, action: 'pending', type: classification.type });
           continue; // do not mark read, so a human still sees it
         }
 
-        // ---- Draft + send the reply as Eversen (via nodemailer OAuth2) ------
-        const draft = await draftReply(classification.type, bodyText);
+        // ---- positive / needs_info / call_request -> auto-send + tracker ----
         await transporter.sendMail({
           from: `${SIGNATURE} <${GMAIL_USER()}>`,
           to: supplierEmail,
@@ -151,11 +164,13 @@ export default async function handler(req, res) {
         });
 
         await upsertTrackerCard({
-          threadId, supplierEmail, subject,
-          status: statusForType(classification.type),
-          classification: classification.type,
-          note: 'Auto-replied by Eversen',
-          lastReply: bodyText.slice(0, 500),
+          brand: '',
+          contactName: '',
+          contactEmail: supplierEmail,
+          status: 'Replied',
+          lastActivity: displayDate(),
+          notes: `Auto-replied by Eversen (${classification.type})`,
+          threadId,
         });
 
         summary.autoSent++;
@@ -213,7 +228,7 @@ ${bodyText.slice(0, 4000)}
 """
 
 Respond with ONLY a JSON object, no prose:
-{"type":"positive|needs_info|call_request|supplier_hint|unknown","confidence":"high|medium|low","reason":"one short sentence"}`;
+{"type":"positive|needs_info|call_request|referral|unknown","confidence":"high|medium|low","reason":"one short sentence"}`;
 
   const data = await callClaude([{ role: 'user', content: prompt }], 300);
   const text = (data?.content?.[0]?.text || '').trim();
@@ -374,7 +389,13 @@ async function kvCmd(command) {
   return data.result;
 }
 
-// Merge/insert a card into the tracker array, keyed by threadId.
+// Display date matching the Outreach tab's format, e.g. "Jul 6, 2026".
+function displayDate() {
+  return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Merge/insert a tracker record (Outreach-tab shape), keyed by threadId (or contactEmail).
+// Shape: { brand, contactName, contactEmail, status, lastActivity, notes, threadId }
 async function upsertTrackerCard(card) {
   try {
     const raw = await kvCmd(['GET', TRACKER_KEY]);
@@ -382,25 +403,36 @@ async function upsertTrackerCard(card) {
     if (raw) { try { cards = JSON.parse(raw); } catch (_) { cards = []; } }
     if (!Array.isArray(cards)) cards = [];
 
-    const now = new Date().toISOString();
-    const idx = cards.findIndex((c) => c.threadId === card.threadId);
-    if (idx >= 0) cards[idx] = { ...cards[idx], ...card, updatedAt: now };
-    else cards.push({ ...card, createdAt: now, updatedAt: now });
+    const idx = cards.findIndex((c) =>
+      (card.threadId && c.threadId === card.threadId) ||
+      (card.contactEmail && c.contactEmail === card.contactEmail));
+    if (idx >= 0) cards[idx] = { ...cards[idx], ...card };
+    else cards.push(card);
 
     await kvCmd(['SET', TRACKER_KEY, JSON.stringify(cards)]);
-    console.log(`[cron] tracker updated: ${card.threadId} -> ${card.status}`);
+    console.log(`[cron] tracker updated: ${card.threadId || card.contactEmail} -> ${card.status}`);
   } catch (err) {
     console.error(`[cron] tracker update failed: ${err.message}`);
   }
 }
 
-function statusForType(type) {
-  switch (type) {
-    case 'positive': return '🟢 Positive';
-    case 'needs_info': return '🔵 Info Sent';
-    case 'call_request': return '📞 Call Requested';
-    case 'supplier_hint': return '🏭 Supplier Hint';
-    default: return '🟡 Needs Review';
+// Append/replace a pending-approval record (Outreach-tab shape), keyed by id.
+// Shape: { id, from, brand, replySummary, draftedReply, threadId, subject }
+async function pushPending(record) {
+  try {
+    const raw = await kvCmd(['GET', PENDING_KEY]);
+    let items = [];
+    if (raw) { try { items = JSON.parse(raw); } catch (_) { items = []; } }
+    if (!Array.isArray(items)) items = [];
+
+    const idx = items.findIndex((x) => x.id === record.id);
+    if (idx >= 0) items[idx] = { ...items[idx], ...record };
+    else items.push(record);
+
+    await kvCmd(['SET', PENDING_KEY, JSON.stringify(items)]);
+    console.log(`[cron] pending queued: ${record.id} from ${record.from}`);
+  } catch (err) {
+    console.error(`[cron] pending update failed: ${err.message}`);
   }
 }
 

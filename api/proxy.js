@@ -270,7 +270,9 @@ export default async function handler(req, res) {
       const rules = `Classify the supplier's reply as exactly one of:
 - "positive": receptive / wants to move forward -> draft a reply moving toward wholesale pricing and MOQ.
 - "needs_info": asks who we are / for business details -> draft a reply giving detail about Shift64's sales volume (eBay, Shopify, Whatnot) and growing marketplace presence.
-- "call_request": wants a phone/video call -> reply with exactly this sentiment: "Our sourcing team is currently attending trade shows across the US but we are happy to move quickly over email. Once we align on the basics I would love to set up a proper introduction call."`;
+- "call_request": wants a phone/video call -> reply with exactly this sentiment: "Our sourcing team is currently attending trade shows across the US but we are happy to move quickly over email. Once we align on the basics I would love to set up a proper introduction call."
+- "referral": supplier cannot supply directly but points us toward another source/distributor -> draft a warm, natural follow-up to dig deeper without revealing intent. (This will be queued for human approval, NOT auto-sent.)
+- "unknown": does not clearly match any of the above (off-topic, spam, hostile, ambiguous). (Queued for human review, NOT auto-sent.)`;
 
       const prompt = `${persona}
 
@@ -281,7 +283,7 @@ Supplier reply (from ${from}${subject ? `, subject "${subject}"` : ''}):
 ${String(body).slice(0, 4000)}
 """
 
-Return ONLY minified JSON: {"type":"positive|needs_info|call_request","reply":"the full email body Eversen should send, plain text, ending with the Mandarin/Cantonese offer line and the signature"}`;
+Return ONLY minified JSON: {"type":"positive|needs_info|call_request|referral|unknown","replySummary":"a one or two sentence English summary of what the supplier said","reply":"the full email body Eversen should send or queue, plain text, ending with the Mandarin/Cantonese offer line and the signature"}`;
 
       const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -307,6 +309,26 @@ Return ONLY minified JSON: {"type":"positive|needs_info|call_request","reply":"t
         return res.status(200).json({ ok: false, error: 'Could not classify reply', raw: text.slice(0, 300) });
       }
 
+      const AUTO_TYPES = ['positive', 'needs_info', 'call_request'];
+      const nowDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const reSubject = subject ? (String(subject).toLowerCase().startsWith('re:') ? subject : 'Re: ' + subject) : 'Re: Wholesale inquiry — Shift64 Diecast';
+
+      // referral / unknown -> Pending Approvals (no auto-send)
+      if (!AUTO_TYPES.includes(parsed.type)) {
+        await orPushPending({
+          id: 'or_' + (threadId || Date.now().toString(36)),
+          from,
+          brand: '',
+          replySummary: parsed.replySummary || String(body).slice(0, 400),
+          draftedReply: parsed.reply,
+          threadId: threadId || '',
+          subject: reSubject
+        });
+        console.log(`[proxy] eversen_reply: classified ${parsed.type} -> queued for approval (${from})`);
+        return res.status(200).json({ ok: true, type: parsed.type, queued: true });
+      }
+
+      // positive / needs_info / call_request -> auto-send + tracker (status "Replied")
       const nodemailer = await import('nodemailer');
       const transporter = nodemailer.default.createTransport({
         service: 'gmail',
@@ -315,11 +337,21 @@ Return ONLY minified JSON: {"type":"positive|needs_info|call_request","reply":"t
       const mailOptions = {
         from: 'Eversen Chan <Shift64Diecast@gmail.com>',
         to: from,
-        subject: subject ? (String(subject).toLowerCase().startsWith('re:') ? subject : 'Re: ' + subject) : 'Re: Wholesale inquiry — Shift64 Diecast',
+        subject: reSubject,
         text: parsed.reply
       };
       if (threadId) { mailOptions.references = threadId; mailOptions.inReplyTo = threadId; }
       const info = await transporter.sendMail(mailOptions);
+
+      await orUpsertTracker({
+        brand: '',
+        contactName: '',
+        contactEmail: from,
+        status: 'Replied',
+        lastActivity: nowDate,
+        notes: `Auto-replied by Eversen (${parsed.type})`,
+        threadId: threadId || ''
+      });
       console.log(`[proxy] eversen_reply: classified ${parsed.type}, sent to ${from} (${info.messageId})`);
 
       return res.status(200).json({ ok: true, type: parsed.type, messageId: info.messageId });
@@ -362,6 +394,46 @@ function kvConfig() {
   const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
   return { url, token };
+}
+
+// ── Outreach Redis helpers (Upstash REST) — shapes match the Outreach tab ──
+async function orKvCmd(command) {
+  const kv = kvConfig();
+  if (!kv) { console.warn('[proxy] Redis not configured — outreach write skipped'); return null; }
+  const r = await fetch(kv.url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${kv.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(command)
+  });
+  const data = await r.json();
+  return data.result;
+}
+async function orLoadArray(key) {
+  const raw = await orKvCmd(['GET', key]);
+  if (!raw) return [];
+  try { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+// Tracker record: { brand, contactName, contactEmail, status, lastActivity, notes, threadId }
+async function orUpsertTracker(record) {
+  try {
+    const items = await orLoadArray('outreach_tracker');
+    const idx = items.findIndex(c =>
+      (record.threadId && c.threadId === record.threadId) ||
+      (record.contactEmail && c.contactEmail === record.contactEmail));
+    if (idx >= 0) items[idx] = { ...items[idx], ...record };
+    else items.push(record);
+    await orKvCmd(['SET', 'outreach_tracker', JSON.stringify(items)]);
+  } catch (e) { console.error('[proxy] orUpsertTracker failed:', e.message); }
+}
+// Pending record: { id, from, brand, replySummary, draftedReply, threadId, subject }
+async function orPushPending(record) {
+  try {
+    const items = await orLoadArray('outreach_pending');
+    const idx = items.findIndex(x => x.id === record.id);
+    if (idx >= 0) items[idx] = { ...items[idx], ...record };
+    else items.push(record);
+    await orKvCmd(['SET', 'outreach_pending', JSON.stringify(items)]);
+  } catch (e) { console.error('[proxy] orPushPending failed:', e.message); }
 }
 
 // ── Gmail helpers (OAuth refresh-token flow → access token; REST calls; MIME parsing) ──

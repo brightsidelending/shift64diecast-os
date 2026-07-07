@@ -385,6 +385,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <button class="nav-tab" onclick="showTab('wantlist',this)">🎯 Want List</button>
   <button class="nav-tab" onclick="showTab('intel',this)">💡 Intel</button>
   <button class="nav-tab" onclick="showTab('eversen',this)">🤖 Eversen <span id="evTabBadge" style="display:none;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:2px;">0</span></button>
+  <button class="nav-tab" onclick="showTab('outreach',this)">📮 Outreach <span id="outreachTabBadge" style="display:none;background:var(--gold);color:#000;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:2px;">0</span></button>
 </div>
 
 <div class="main">
@@ -1043,6 +1044,50 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
 </div>
 
+<!-- ===== OUTREACH ===== -->
+<div id="outreach" class="section">
+
+  <!-- HEADER -->
+  <div class="card" style="border-color:rgba(201,168,76,0.35);background:linear-gradient(135deg,#16191F 0%,#1A1710 100%);">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div style="font-size:38px;line-height:1;">📮</div>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:800;color:var(--gold);">Outreach</div>
+        <div style="color:var(--gray);font-size:13px;margin-top:2px;">Track every supplier conversation and approve the replies Eversen flags for review. Synced to Redis.</div>
+      </div>
+      <button onclick="loadOutreach(true)" style="padding:9px 16px;font-size:12px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- SECTION 1: OUTREACH TRACKER -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">📊 Outreach Tracker</div>
+      <button onclick="orAddContactPrompt()" style="padding:8px 14px;font-size:12px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;">+ Add Contact</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>
+          <th style="background:#0E1015;padding:11px 14px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Brand</th>
+          <th style="background:#0E1015;padding:11px 14px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Contact</th>
+          <th style="background:#0E1015;padding:11px 14px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Status</th>
+          <th style="background:#0E1015;padding:11px 14px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Last Activity</th>
+          <th style="background:#0E1015;padding:11px 14px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Notes</th>
+          <th style="background:#0E1015;padding:11px 14px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Actions</th>
+        </tr></thead>
+        <tbody id="orTrackerBody"><tr><td colspan="6" style="text-align:center;color:var(--gray);padding:36px;">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SECTION 2: PENDING APPROVALS -->
+  <div class="card">
+    <div class="card-title">🟡 Pending Approvals <span id="orPendingCount" style="color:var(--gray);font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
+    <div id="orPendingCards"><div style="color:var(--gray);font-size:13px;">Nothing waiting for review. Replies Eversen flags as referrals or unknown will appear here.</div></div>
+  </div>
+
+</div>
+
 </div><!-- end main -->
 
 <!-- EVERSEN — EMAIL DRAFT MODAL -->
@@ -1193,6 +1238,31 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('khaiWantModal')">Cancel</button>
       <button class="btn-confirm" style="background:var(--blue);" onclick="addWant('khai')">ADD TO WANT LIST</button>
+    </div>
+  </div>
+</div>
+
+<!-- OUTREACH — SEND FOLLOW-UP MODAL -->
+<div class="modal-overlay" id="orFollowupModal">
+  <div class="modal" style="width:640px;">
+    <h2 style="color:var(--gold);">✉️ Send Follow-up <span id="orFuBrandTag" style="font-size:13px;color:var(--gray);font-weight:400;"></span></h2>
+    <div class="fg"><label>To</label><input class="fi" id="orFuTo" placeholder="contact@manufacturer.com"/></div>
+    <div class="fg"><label>Subject</label><input class="fi" id="orFuSubject" placeholder="Subject line"/></div>
+    <div class="fg"><label>Message</label><textarea class="fi" id="orFuBody" style="min-height:220px;resize:vertical;font-family:'Inter',sans-serif;line-height:1.5;"></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn-confirm" style="background:var(--card);border:1px solid var(--border);" onclick="closeModal('orFollowupModal')">Cancel</button>
+      <button class="btn-confirm" style="background:var(--gold);color:#000;" id="orFuSendBtn" onclick="orSendFollowup()">📤 Send Follow-up</button>
+    </div>
+  </div>
+</div>
+
+<!-- OUTREACH — VIEW THREAD MODAL -->
+<div class="modal-overlay" id="orThreadModal">
+  <div class="modal" style="width:620px;">
+    <h2 style="color:var(--gold);">🧵 Thread <span id="orThBrandTag" style="font-size:13px;color:var(--gray);font-weight:400;"></span></h2>
+    <div id="orThreadBody" style="font-size:13px;line-height:1.6;color:var(--white);"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn-confirm" style="background:var(--card);border:1px solid var(--border);" onclick="closeModal('orThreadModal')">Close</button>
     </div>
   </div>
 </div>
@@ -5955,11 +6025,233 @@ async function saveEversen() {
   try { await kvSet('s64_eversen_brands', eversenBrands); } catch (e) {}
 }
 
+// ============================================================
+// OUTREACH TAB — tracker + pending approvals (Redis-backed)
+// ============================================================
+const OR_TRACKER_KEY = 'outreach_tracker';
+const OR_PENDING_KEY = 'outreach_pending';
+let orTracker = [];   // [{ id, brand, contactName, contactEmail, status, lastActivity, notes, threadId }]
+let orPending = [];   // [{ id, from, brand, summary, draft, threadId, subject }]
+
+const OR_STATUS_STYLES = {
+  'Sent':               'background:#0D2233;color:var(--blue);',
+  'Replied':            'background:#0D2B1A;color:var(--green);',
+  'Needs Review':       'background:#2B2200;color:var(--yellow);',
+  'Follow-up Pending':  'background:#2A1A05;color:var(--orange);',
+  'Closed':             'background:#1A1D24;color:var(--gray);'
+};
+const OR_STATUSES = Object.keys(OR_STATUS_STYLES);
+
+function orEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function orToday() { return new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }); }
+function orUid() { return 'or_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+async function loadOutreach(showToast) {
+  try {
+    const [t, p] = await Promise.all([kvGet(OR_TRACKER_KEY), kvGet(OR_PENDING_KEY)]);
+    orTracker = Array.isArray(t) ? t : [];
+    orPending = Array.isArray(p) ? p : [];
+  } catch (e) {
+    console.log('Outreach load failed:', e);
+    if (showToast) toast('⚠️ Could not load outreach data.', 'yellow');
+  }
+  renderOutreach();
+  if (showToast) toast('🔄 Outreach refreshed.', 'green');
+}
+async function saveOutreachTracker() { try { await kvSet(OR_TRACKER_KEY, orTracker); } catch (e) { toast('⚠️ Save failed.', 'yellow'); } }
+async function saveOutreachPending() { try { await kvSet(OR_PENDING_KEY, orPending); } catch (e) { toast('⚠️ Save failed.', 'yellow'); } }
+
+function renderOutreach() {
+  renderOrTracker();
+  renderOrPending();
+  const badge = document.getElementById('outreachTabBadge');
+  if (badge) {
+    const n = orPending.length;
+    badge.textContent = n;
+    badge.style.display = n > 0 ? '' : 'none';
+  }
+}
+
+function orStatusBadge(status) {
+  const style = OR_STATUS_STYLES[status] || OR_STATUS_STYLES['Sent'];
+  return `<span class="badge" style="${style}">${orEsc(status || 'Sent')}</span>`;
+}
+
+function renderOrTracker() {
+  const body = document.getElementById('orTrackerBody');
+  if (!body) return;
+  if (!orTracker.length) {
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:36px;">No outreach contacts yet. Click “+ Add Contact” or let Eversen populate this.</td></tr>';
+    return;
+  }
+  body.innerHTML = orTracker.map(c => {
+    const contact = [c.contactName, c.contactEmail].filter(Boolean).map(orEsc).join('<br><span style="color:var(--gray);font-size:12px;">') + (c.contactEmail ? '</span>' : '');
+    const closed = c.status === 'Closed';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:12px 14px;font-weight:600;">${orEsc(c.brand || '—')}</td>
+      <td style="padding:12px 14px;font-size:13px;">${contact || '—'}</td>
+      <td style="padding:12px 14px;">${orStatusBadge(c.status)}</td>
+      <td style="padding:12px 14px;font-size:13px;color:var(--gray);">${orEsc(c.lastActivity || '—')}</td>
+      <td style="padding:12px 14px;font-size:13px;color:var(--gray);max-width:220px;">${orEsc(c.notes || '')}</td>
+      <td style="padding:12px 14px;white-space:nowrap;">
+        <button onclick="orViewThread('${c.id}')" style="padding:5px 9px;font-size:11px;font-weight:600;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:6px;cursor:pointer;margin-right:4px;">View Thread</button>
+        <button onclick="orOpenFollowup('${c.id}')" ${closed ? 'disabled' : ''} style="padding:5px 9px;font-size:11px;font-weight:600;background:${closed ? 'var(--card)' : 'var(--gold)'};color:${closed ? 'var(--gray)' : '#000'};border:${closed ? '1px solid var(--border)' : 'none'};border-radius:6px;cursor:${closed ? 'not-allowed' : 'pointer'};margin-right:4px;">Send Follow-up</button>
+        <button onclick="orMarkClosed('${c.id}')" ${closed ? 'disabled' : ''} style="padding:5px 9px;font-size:11px;font-weight:600;background:var(--card);color:${closed ? 'var(--gray)' : 'var(--white)'};border:1px solid var(--border);border-radius:6px;cursor:${closed ? 'not-allowed' : 'pointer'};">Mark Closed</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderOrPending() {
+  const wrap = document.getElementById('orPendingCards');
+  const count = document.getElementById('orPendingCount');
+  if (count) count.textContent = orPending.length ? `(${orPending.length})` : '';
+  if (!wrap) return;
+  if (!orPending.length) {
+    wrap.innerHTML = '<div style="color:var(--gray);font-size:13px;">Nothing waiting for review. Replies Eversen flags as referrals or unknown will appear here.</div>';
+    return;
+  }
+  wrap.innerHTML = orPending.map(p => `
+    <div class="card" style="background:var(--black);border-color:rgba(241,196,15,0.35);margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+        <div><span style="color:var(--gray);font-size:12px;">From</span><br><b>${orEsc(p.from || 'Unknown sender')}</b></div>
+        <div style="text-align:right;"><span style="color:var(--gray);font-size:12px;">Sourcing</span><br><b style="color:var(--gold);">${orEsc(p.brand || '—')}</b></div>
+      </div>
+      <div style="margin-bottom:10px;"><span style="color:var(--gray);font-size:12px;">Their reply</span><div style="font-size:13px;line-height:1.5;margin-top:3px;">${orEsc(p.replySummary || '')}</div></div>
+      <label style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">Drafted follow-up (editable)</label>
+      <textarea class="fi" id="orDraft_${p.id}" style="min-height:150px;resize:vertical;font-family:'Inter',sans-serif;line-height:1.5;margin-bottom:10px;">${orEsc(p.draftedReply || '')}</textarea>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="orDiscardPending('${p.id}')" style="padding:8px 16px;font-size:12px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">Discard</button>
+        <button onclick="orApproveSend('${p.id}')" style="padding:8px 16px;font-size:12px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;">✅ Approve &amp; Send</button>
+      </div>
+    </div>`).join('');
+}
+
+// ---- Tracker actions ----
+function orAddContactPrompt() {
+  const brand = prompt('Brand / supplier name:');
+  if (!brand) return;
+  const email = prompt('Contact email (optional):') || '';
+  orTracker.unshift({ id: orUid(), brand: brand.trim(), contactName: '', contactEmail: email.trim(), status: 'Sent', lastActivity: orToday(), notes: '', threadId: '' });
+  saveOutreachTracker();
+  renderOutreach();
+  toast('✅ Contact added.', 'green');
+}
+
+function orViewThread(id) {
+  const c = orTracker.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('orThBrandTag').textContent = '— ' + (c.brand || '');
+  document.getElementById('orThreadBody').innerHTML = `
+    <div style="margin-bottom:8px;"><span style="color:var(--gray);">Contact:</span> ${orEsc(c.contactName || '')} ${c.contactEmail ? '&lt;' + orEsc(c.contactEmail) + '&gt;' : ''}</div>
+    <div style="margin-bottom:8px;"><span style="color:var(--gray);">Status:</span> ${orStatusBadge(c.status)}</div>
+    <div style="margin-bottom:8px;"><span style="color:var(--gray);">Last activity:</span> ${orEsc(c.lastActivity || '—')}</div>
+    <div style="margin-bottom:8px;"><span style="color:var(--gray);">Thread ID:</span> ${orEsc(c.threadId || '(none)')}</div>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);"><span style="color:var(--gray);">Notes:</span><div style="margin-top:4px;line-height:1.6;">${orEsc(c.notes || 'No notes yet.')}</div></div>`;
+  openModal('orThreadModal');
+}
+
+let orFuActiveId = null;
+function orOpenFollowup(id) {
+  const c = orTracker.find(x => x.id === id);
+  if (!c || c.status === 'Closed') return;
+  orFuActiveId = id;
+  document.getElementById('orFuBrandTag').textContent = '— ' + (c.brand || '');
+  document.getElementById('orFuTo').value = c.contactEmail || '';
+  document.getElementById('orFuSubject').value = 'Following up — Shift64 Diecast x ' + (c.brand || '');
+  document.getElementById('orFuBody').value = '';
+  openModal('orFollowupModal');
+}
+
+async function orSendFollowup() {
+  const c = orTracker.find(x => x.id === orFuActiveId);
+  if (!c) return;
+  const to = document.getElementById('orFuTo').value.trim();
+  const subject = document.getElementById('orFuSubject').value;
+  const body = document.getElementById('orFuBody').value;
+  if (!to) { toast('⚠️ Add a recipient email.', 'yellow'); return; }
+  const btn = document.getElementById('orFuSendBtn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '⏳ Sending…'; btn.disabled = true; }
+  try {
+    const res = await fetch(PROXY_URL + '?type=gmail_send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, body, threadId: c.threadId || undefined })
+    });
+    const d = await res.json();
+    if (!d || !d.ok) throw new Error((d && d.error) || 'send failed');
+    c.contactEmail = to;
+    c.status = 'Follow-up Pending';
+    c.lastActivity = orToday();
+    c.threadId = d.threadId || c.threadId || '';
+    await saveOutreachTracker();
+    renderOutreach();
+    closeModal('orFollowupModal');
+    toast('✅ Follow-up sent to ' + to, 'green');
+  } catch (e) {
+    toast('⚠️ Send failed: ' + ((e && e.message) || 'error'), 'yellow');
+  } finally {
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
+
+async function orMarkClosed(id) {
+  const c = orTracker.find(x => x.id === id);
+  if (!c || c.status === 'Closed') return;
+  c.status = 'Closed';
+  c.lastActivity = orToday();
+  await saveOutreachTracker();
+  renderOutreach();
+  toast('🔒 Marked closed.', 'green');
+}
+
+// ---- Pending approval actions ----
+async function orApproveSend(id) {
+  const p = orPending.find(x => x.id === id);
+  if (!p) return;
+  const ta = document.getElementById('orDraft_' + id);
+  const body = ta ? ta.value : (p.draftedReply || '');
+  if (!p.from) { toast('⚠️ No sender address on this reply.', 'yellow'); return; }
+  try {
+    const res = await fetch(PROXY_URL + '?type=gmail_send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: p.from, subject: p.subject || ('Re: Wholesale inquiry — Shift64 Diecast x ' + (p.brand || '')), body, threadId: p.threadId || undefined })
+    });
+    const d = await res.json();
+    if (!d || !d.ok) throw new Error((d && d.error) || 'send failed');
+    // Move into the tracker as a live conversation.
+    let c = orTracker.find(x => (p.threadId && x.threadId === p.threadId) || (x.contactEmail && x.contactEmail === p.from));
+    if (!c) {
+      c = { id: orUid(), brand: p.brand || '', contactName: '', contactEmail: p.from, status: 'Replied', lastActivity: orToday(), notes: p.replySummary || '', threadId: p.threadId || (d.threadId || '') };
+      orTracker.unshift(c);
+    } else {
+      c.status = 'Replied'; c.lastActivity = orToday(); if (!c.threadId) c.threadId = p.threadId || d.threadId || '';
+    }
+    orPending = orPending.filter(x => x.id !== id);
+    await Promise.all([saveOutreachTracker(), saveOutreachPending()]);
+    renderOutreach();
+    toast('✅ Approved & sent to ' + p.from, 'green');
+  } catch (e) {
+    toast('⚠️ Send failed: ' + ((e && e.message) || 'error'), 'yellow');
+  }
+}
+
+async function orDiscardPending(id) {
+  const p = orPending.find(x => x.id === id);
+  if (!p) return;
+  if (!confirm('Discard this pending reply from ' + (p.from || 'sender') + '?')) return;
+  orPending = orPending.filter(x => x.id !== id);
+  await saveOutreachPending();
+  renderOutreach();
+  toast('🗑️ Discarded.', 'green');
+}
+
 // Init
 renderScreenshots();
 renderCatalogs();               // show default vendor catalogs immediately (independent of KV load)
 renderEversenChips();           // show quick-add chips immediately (independent of KV load)
 window.addEventListener('load', loadData);
+window.addEventListener('load', function () { loadOutreach(false); });
 
 // Filter event listeners - guaranteed to fire
 document.addEventListener('DOMContentLoaded', function() {
