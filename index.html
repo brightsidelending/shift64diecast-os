@@ -5868,6 +5868,19 @@ function renderEversenResearch() {
       `<a href="${escHtmlA(s.url)}" target="_blank" style="color:var(--blue);font-size:12px;display:block;margin-top:3px;">🔗 ${escHtmlA(s.title || s.url)}</a>`).join('');
     const leads = (b.communityLeads || []).filter(s => s && (s.url || s.note)).map(s =>
       `<div style="font-size:12px;color:var(--gray);margin-top:3px;">💬 ${escHtmlA(s.note || '')} ${s.url ? `<a href="${escHtmlA(s.url)}" target="_blank" style="color:var(--blue);">link</a>` : ''}</div>`).join('');
+    // Best 1-2 actionable leads in plain English for the summary card.
+    const leadArr = (b.communityLeads || []).filter(s => s && (s.note || s.url || s.title));
+    const bestLeads = leadArr.slice(0, 2);
+    const bestLeadsHtml = bestLeads.length ? `<div style="margin-top:10px;padding:10px 12px;background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.3);border-radius:8px;">
+        <div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;margin-bottom:4px;">✅ Best ${bestLeads.length === 1 ? 'lead' : 'leads'}</div>
+        ${bestLeads.map(s => `<div style="font-size:13px;line-height:1.5;color:#E4E4E4;">• ${escHtmlA(s.note || s.title || s.url || '')}${s.url ? ` <a href="${escHtmlA(s.url)}" target="_blank" style="color:var(--blue);font-size:12px;">link</a>` : ''}</div>`).join('')}
+      </div>` : '';
+    const nLeads = leadArr.length;
+    // Community leads — collapsed by default behind a toggle.
+    const communityCollapsible = (leads && nLeads) ? `<div style="margin-top:12px;">
+        <button id="evLeadsBtn-${b.id}" onclick="evToggleLeads('${escJs(b.id)}', ${nLeads})" style="background:var(--card);border:1px solid var(--border);color:var(--blue);padding:8px 14px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;">📋 Show ${nLeads} community lead${nLeads === 1 ? '' : 's'} →</button>
+        <div id="evLeads-${b.id}" style="display:none;margin-top:8px;">${leads}</div>
+      </div>` : '';
     return `<div class="card" style="background:var(--black);margin-bottom:12px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
         <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;color:var(--white);">${escHtmlA(b.brand)}</div>
@@ -5875,13 +5888,14 @@ function renderEversenResearch() {
           <span class="ev-badge ev-conf-${conf}">${conf} confidence</span>${langBadge}
         </div>
       </div>
-      <div style="font-size:13px;margin-top:8px;"><span style="color:var(--gray);">Manufacturer:</span> <b>${escHtmlA(b.manufacturer || 'Unknown')}</b>${b.country ? ` <span style="color:var(--gray);">· ${escHtmlA(b.country)}</span>` : ''}</div>
+      <div style="font-size:13px;margin-top:8px;"><span style="color:var(--gray);">📍 Location:</span> <b>${b.country ? escHtmlA(b.country) : 'Unknown'}</b></div>
+      <div style="font-size:13px;margin-top:4px;"><span style="color:var(--gray);">Manufacturer:</span> <b>${b.manufacturer ? escHtmlA(b.manufacturer) : 'Unknown'}</b>${b.manufacturer ? '' : ` <span style="color:var(--yellow);font-size:11px;">(not identified)</span>`}</div>
       ${(b.altNames && b.altNames.length) ? `<div style="font-size:12px;margin-top:4px;"><span style="color:var(--gray);">Also known as:</span> ${escHtmlA(b.altNames.join(', '))}</div>` : ''}
       ${b.website ? `<div style="font-size:13px;margin-top:4px;"><span style="color:var(--gray);">Website:</span> <a href="${escHtmlA(b.website)}" target="_blank" style="color:var(--gold);">${escHtmlA(b.website)}</a></div>` : ''}
       <div style="font-size:13px;margin-top:4px;">${evContactLine(b)}</div>
       ${b.summary ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;line-height:1.5;">${escHtmlA(b.summary)}</div>` : ''}
+      ${bestLeadsHtml}
       ${srcs ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;">Sources</div>${srcs}</div>` : ''}
-      ${leads ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;">Community leads</div>${leads}</div>` : ''}
       ${(b.briefingLoading || b.briefing) ? `<div style="margin-top:12px;padding:12px 14px;background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.28);border-radius:10px;">
         <div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:0.5px;margin-bottom:6px;">🧭 EVERSEN'S PLAN</div>
         ${b.briefingLoading
@@ -5893,8 +5907,21 @@ function renderEversenResearch() {
         <button onclick="evViewCatalog('${escJs(b.id)}')" style="padding:9px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--gold);border:1px solid rgba(201,168,76,0.5);border-radius:6px;cursor:pointer;">📦 View Catalog</button>
         <button onclick="evRemoveBrand('${escJs(b.id)}')" style="padding:9px 14px;font-size:12px;background:var(--card);color:var(--gray);border:1px solid var(--border);border-radius:6px;cursor:pointer;">🗑️ Remove</button>
       </div>
+      ${communityCollapsible}
     </div>`;
   }).join('');
+}
+
+// Toggle a research card's collapsible community-leads list.
+function evToggleLeads(id, count) {
+  const el = document.getElementById('evLeads-' + id);
+  const btn = document.getElementById('evLeadsBtn-' + id);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (btn) btn.textContent = open
+    ? ('📋 Show ' + count + ' community lead' + (count === 1 ? '' : 's') + ' →')
+    : ('📋 Hide community leads ↑');
 }
 
 function renderEversenQueue() {
