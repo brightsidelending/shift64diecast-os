@@ -168,20 +168,23 @@ export default async function handler(req, res) {
 
     console.log(`[cron] done — processed=${summary.processed} autoSent=${summary.autoSent} needsReview=${summary.needsReview} skipped=${summary.skipped} errors=${summary.errors}`);
 
-    // Morning digest email (Resend)
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: 'Shift64Diecast OS <onboarding@resend.dev>',
+    const hour = new Date().getUTCHours();
+    if (hour === 13) {
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.default.createTransport({
+        service: 'gmail',
+        auth: {
+          user: 'Shift64Diecast@gmail.com',
+          pass: process.env.GMAIL_APP_PASSWORD
+        }
+      });
+      await transporter.sendMail({
+        from: 'Shift64Diecast OS <Shift64Diecast@gmail.com>',
         to: ['Shift64Diecast@gmail.com', 'erictran925@gmail.com'],
         subject: `☀️ Shift64 Morning Digest — ${new Date().toLocaleDateString('en-US', {month:'short', day:'numeric'})}`,
-        html: '<p>Good morning Eric! Open your <a href="https://brightsidelending.github.io/shift64diecast-os/">Shift64 OS dashboard</a> for today\'s buy opportunities and auctions.</p>'
-      })
-    });
+        html: '<div style="font-family:sans-serif;max-width:600px;margin:0 auto"><h2 style="color:#d4af37">☀️ Shift64Diecast Morning Digest</h2><p>Good morning Eric! <a href="https://brightsidelending.github.io/shift64diecast-os/" style="background:#d4af37;color:#000;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:bold">Open Shift64 OS →</a></p></div>'
+      });
+    }
 
     return res.status(200).json({ ok: true, startedAt, summary });
   } catch (err) {
