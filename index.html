@@ -2271,10 +2271,15 @@ function renderWants(who) {
   const div = document.getElementById(who+'WantDiv');
   if (!wants.length) { div.innerHTML = '<div class="empty" style="padding:30px;"><div class="empty-icon" style="font-size:28px;">🎯</div><div class="empty-title" style="font-size:15px;">Empty</div></div>'; return; }
   div.innerHTML = wants.map((item,idx) => {
-    const p = item.priceData;
-    const maxBid = Math.round(p.avg * 0.78);
-    const sigColor = !item.max ? 'var(--gray)' : item.max <= maxBid*0.85 ? 'var(--green)' : item.max <= maxBid ? 'var(--yellow)' : 'var(--red)';
-    const sigText = !item.max ? 'Set a max price to see signal' : item.max <= maxBid*0.85 ? '✅ GREAT BUY at your max' : item.max <= maxBid ? '⚠️ FAIR — near max' : '🔴 TOO HIGH — lower your max';
+    const p = item.priceData || lookupPrice(item.name);
+    // Prefer the item's ACTUAL live eBay average; fall back to the static estimate only until it loads.
+    const liveAvg = (item.ebayAvg != null && item.ebayAvg > 0) ? item.ebayAvg : null;
+    const avg = liveAvg != null ? liveAvg : ((p && p.avg > 0) ? p.avg : null);
+    const isEst = liveAvg == null;
+    const maxBid = avg != null ? Math.round(avg * 0.80) : null; // smart default: 80% of eBay average
+    const hasSignal = item.max && maxBid != null;
+    const sigColor = !hasSignal ? 'var(--gray)' : item.max <= maxBid*0.85 ? 'var(--green)' : item.max <= maxBid ? 'var(--yellow)' : 'var(--red)';
+    const sigText = maxBid == null ? '⏳ Loading eBay price…' : !item.max ? 'Set a max price to see signal' : item.max <= maxBid*0.85 ? '✅ GREAT BUY at your max' : item.max <= maxBid ? '⚠️ FAIR — near max bid' : '🔴 TOO HIGH — over max bid';
     const priColor = item.pri.includes('Must') ? 'var(--red)' : item.pri.includes('Want') ? 'var(--yellow)' : 'var(--green)';
     return `<div class="want-card">
       <div style="display:flex;justify-content:space-between;align-items:start;">
@@ -2285,15 +2290,36 @@ function renderWants(who) {
         <button onclick="removeWant('${who}',${idx})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:16px;">✕</button>
       </div>
       <div class="want-prices">
-        <div class="want-price-box"><div class="want-price-val gold">$${p.avg}</div><div class="want-price-lbl">eBay Avg</div></div>
-        <div class="want-price-box"><div class="want-price-val blue-c">$${maxBid}</div><div class="want-price-lbl">Max Bid</div></div>
-        <div class="want-price-box"><div class="want-price-val green">$${p.low}-$${p.high}</div><div class="want-price-lbl">Range</div></div>
+        <div class="want-price-box"><div class="want-price-val gold">${avg!=null?'$'+avg:'…'}</div><div class="want-price-lbl">eBay Avg${isEst&&avg!=null?' (est)':''}</div></div>
+        <div class="want-price-box"><div class="want-price-val blue-c">${maxBid!=null?'$'+maxBid:'…'}</div><div class="want-price-lbl">Max Bid (80%)</div></div>
+        <div class="want-price-box"><div class="want-price-val green">${p&&p.low!=null?'$'+p.low+'-$'+p.high:'—'}</div><div class="want-price-lbl">Range</div></div>
       </div>
       <div class="signal-bar" style="background:${sigColor==='var(--green)'?'#0D2B0D':sigColor==='var(--yellow)'?'#2B2200':'#2B0D0D'};color:${sigColor}">${sigText}${item.max?' · Your max $'+item.max:''}</div>
       ${item.notes ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;">📝 ${item.notes}</div>` : ''}
       <button onclick="loadBid('${item.name}')" style="margin-top:10px;width:100%;background:var(--gold);color:var(--black);border:none;border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Rajdhani,sans-serif;">⚡ OPEN IN BID CALCULATOR</button>
     </div>`;
   }).join('');
+  queueWantPriceFetch(who); // pull live eBay averages for any items that don't have one yet
+}
+
+// Fetch the real eBay average for each want item once, then re-render so Max Bid updates automatically.
+const wantFetchRunning = {};
+async function queueWantPriceFetch(who) {
+  if (wantFetchRunning[who]) return;
+  const wants = who === 'eric' ? ericWants : khaiWants;
+  const todo = wants.filter(it => it.ebayAvg == null && !it.ebayAvgTried);
+  if (!todo.length) return;
+  wantFetchRunning[who] = true;
+  let changed = false;
+  for (const item of todo) {
+    item.ebayAvgTried = true; // mark so we don't re-fetch on every render (prevents loops)
+    try {
+      const avg = await fetchAvgSold(item.name);
+      if (avg != null && avg > 0) { item.ebayAvg = Math.round(avg * 100) / 100; changed = true; }
+    } catch (e) {}
+  }
+  wantFetchRunning[who] = false;
+  if (changed) { saveData(); renderWants(who); }
 }
 
 function removeWant(who, idx) {
@@ -2310,20 +2336,41 @@ function loadBid(name) {
 
 function updateBid() { if (document.getElementById('bidModel').value && document.getElementById('bidCurrent').value) calcBid(); }
 
-function calcBid() {
+let bidAvgCache = { model: null, avg: null, low: null, high: null, isEst: false };
+async function calcBid() {
   const model = document.getElementById('bidModel').value.trim();
   if (!model) return;
+  // Fetch the item's ACTUAL live eBay average once per model (cached), so the Max Bid is
+  // dynamic and updates when the data loads — no hardcoded default.
+  if (bidAvgCache.model !== model) {
+    bidAvgCache = { model, avg: null, low: null, high: null, isEst: false };
+    document.getElementById('bAvg').textContent = '…';
+    document.getElementById('bMax').textContent = '…';
+    document.getElementById('bidResult').style.display = 'block';
+    const live = await fetchAvgSold(model);
+    if (document.getElementById('bidModel').value.trim() !== model) return; // model changed while awaiting
+    const est = lookupPrice(model);
+    const useLive = (live != null && live > 0);
+    bidAvgCache = { model, avg: useLive ? Math.round(live * 100) / 100 : (est.avg || null), low: est.low, high: est.high, isEst: !useLive };
+  }
+  renderBidResult(model);
+}
+
+function renderBidResult(model) {
   const current = parseFloat(document.getElementById('bidCurrent').value)||0;
   const ship = parseFloat(document.getElementById('bidShip').value)||8;
-  const p = lookupPrice(model);
-  const maxBid = Math.round(p.avg * 0.78);
+  const avg = bidAvgCache.avg;
+  const low = bidAvgCache.low, high = bidAvgCache.high;
+  if (avg == null) { document.getElementById('bMax').textContent = '—'; document.getElementById('bAvg').textContent = '—'; return; }
+  const maxBid = Math.round(avg * 0.80); // smart default: 80% of eBay average
   const totalCost = current + ship;
-  const profit = p.avg - totalCost;
+  const profit = avg - totalCost;
+  const avgLabel = bidAvgCache.isEst ? '$'+avg+' (est)' : '$'+avg;
 
-  document.getElementById('bAvg').textContent = '$'+p.avg;
+  document.getElementById('bAvg').textContent = avgLabel;
   document.getElementById('bMax').textContent = '$'+maxBid;
   document.getElementById('bTotal').textContent = '$'+totalCost.toFixed(2);
-  document.getElementById('bTotal').style.color = totalCost <= p.avg ? 'var(--green)' : 'var(--red)';
+  document.getElementById('bTotal').style.color = totalCost <= avg ? 'var(--green)' : 'var(--red)';
   document.getElementById('bProfit').textContent = (profit>=0?'+':'')+'$'+profit.toFixed(2);
   document.getElementById('bProfit').style.color = profit > 0 ? 'var(--green)' : 'var(--red)';
 
@@ -2335,22 +2382,22 @@ function calcBid() {
   if (current === 0) {
     sig.style.background='#0D1520'; sig.style.border='1px solid #1A3A5C';
     icon.textContent='💡'; text.textContent='ENTER CURRENT BID'; text.style.color='var(--blue)';
-    desc.textContent=`Max bid for ${model}: $${maxBid}. eBay avg: $${p.avg}. Range: $${p.low} - $${p.high}.`;
+    desc.textContent=`Max bid for ${model}: $${maxBid} (80% of eBay avg ${avgLabel})${low!=null?`. Range: $${low} - $${high}`:''}.`;
     desc.style.color='var(--gray)';
   } else if (current <= maxBid * 0.85) {
     sig.style.background='#0D2B0D'; sig.style.border='2px solid var(--green)';
     icon.textContent='🟢'; text.textContent='GO — GREAT DEAL'; text.style.color='var(--green)';
-    desc.innerHTML=`Current bid $${current} is well under max of $${maxBid}. You can bid up to $${maxBid}. eBay avg: $${p.avg}. Est. profit if you resell: $${profit.toFixed(2)}.`;
+    desc.innerHTML=`Current bid $${current} is well under the max bid of $${maxBid}. You can bid up to $${maxBid}. eBay avg: ${avgLabel}. Est. profit if you resell: $${profit.toFixed(2)}.`;
     desc.style.color='var(--white)';
   } else if (current <= maxBid) {
     sig.style.background='#2B2200'; sig.style.border='2px solid var(--yellow)';
     icon.textContent='🟡'; text.textContent='WATCH — GETTING CLOSE'; text.style.color='var(--yellow)';
-    desc.innerHTML=`Current bid $${current} is near your max of $${maxBid}. Only $${(maxBid-current).toFixed(0)} left to bid. Profit margin is thin. Be careful.`;
+    desc.innerHTML=`Current bid $${current} is near the max bid of $${maxBid}. Only $${(maxBid-current).toFixed(0)} left to bid. Profit margin is thin. Be careful.`;
     desc.style.color='var(--white)';
   } else {
     sig.style.background='#2B0D0D'; sig.style.border='2px solid var(--red)';
     icon.textContent='🔴'; text.textContent='STOP — OVERPAYING'; text.style.color='var(--red)';
-    desc.innerHTML=`Current bid $${current} is over your max of $${maxBid}. You are paying $${(current-maxBid).toFixed(0)} too much. Walk away. You would lose $${Math.abs(profit).toFixed(2)} on resale.`;
+    desc.innerHTML=`Current bid $${current} is over the max bid of $${maxBid}. You are paying $${(current-maxBid).toFixed(0)} too much. Walk away. You would lose $${Math.abs(profit).toFixed(2)} on resale.`;
     desc.style.color='var(--white)';
   }
   document.getElementById('bidResult').style.display='block';
