@@ -888,7 +888,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <div id="wantlist" class="section">
   <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:16px;">
     <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">🎯 WANT LIST + BID GUIDE</div>
-    <div style="font-size:13px;">Add items you want. See market prices instantly. Use the Bid Calculator when live on Whatnot so you never overpay.</div>
+    <div style="font-size:13px;">Add items you want to track. Shared across Eric and Khai.</div>
   </div>
 
   <div class="mstack" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
@@ -2312,7 +2312,7 @@ function addWant(who) {
   wantEditing = null;
   renderWants(who);
   closeModal(who+'WantModal');
-  saveData();
+  if (who === 'eric') saveEricWants(); else saveKhaiWants();
 }
 
 // Simple want-list tracker: no prices, no eBay calls — just the model, brand/scale,
@@ -2349,7 +2349,7 @@ function renderWants(who) {
 function removeWant(who, idx) {
   if (who === 'eric') ericWants.splice(idx,1); else khaiWants.splice(idx,1);
   renderWants(who);
-  saveData();
+  if (who === 'eric') saveEricWants(); else saveKhaiWants();
 }
 
 // ============================================================
@@ -2983,7 +2983,8 @@ async function kvSet(key, value) {
   if (!d || !d.ok) throw new Error(d && d.error ? d.error : 'save failed');
 }
 async function kvGet(key) {
-  const r = await fetch(PROXY_URL + '?type=load_data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+  // cache:'no-store' → always read fresh from Redis, never a stale cached HTTP response (mobile PWA).
+  const r = await fetch(PROXY_URL + '?type=load_data', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
   const d = await r.json();
   if (!d || !d.ok) throw new Error('load failed');
   return d.value; // may be null if not stored
@@ -3036,6 +3037,39 @@ async function loadKey(key) {
   try { const ls = localStorage.getItem(key); if (ls) return JSON.parse(ls); } catch(e) {}
   return null;
 }
+
+// ---- Want List persistence (dedicated, with explicit success/failure feedback) ----
+// Keys MUST match loadData exactly: s64_ericW / s64_khaiW.
+async function saveEricWants() { return saveWantList('eric'); }
+async function saveKhaiWants() { return saveWantList('khai'); }
+async function saveWantList(who) {
+  const key = who === 'eric' ? 's64_ericW' : 's64_khaiW';
+  const data = who === 'eric' ? ericWants : khaiWants;
+  try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
+  try {
+    await kvSet(key, data);
+    toast('✓ Saved', 'green');
+    return true;
+  } catch (e) {
+    console.error('[wantlist] cloud save failed for ' + key + ':', e); // silent error logging
+    toast('⚠️ Save failed — check your connection and try again', 'yellow');
+    return false;
+  }
+}
+
+// Pull the latest want lists straight from Redis (used on app open / PWA foreground).
+async function reloadWantsFromCloud() {
+  try {
+    const [ew, kw] = await Promise.all([kvGet('s64_ericW'), kvGet('s64_khaiW')]);
+    if (Array.isArray(ew)) ericWants = ew;
+    if (Array.isArray(kw)) khaiWants = kw;
+    renderWants('eric');
+    renderWants('khai');
+  } catch (e) { console.error('[wantlist] cloud reload failed:', e); }
+}
+// On mobile PWA, reopening restores from bfcache (pageshow.persisted) rather than a full load —
+// force a fresh Redis fetch so items added in a previous session always appear.
+window.addEventListener('pageshow', function (e) { if (e.persisted) reloadWantsFromCloud(); });
 async function loadData() {
   const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta, auctWatch, auctSettings, whatnot, buyRep, eversen] = await Promise.all([
     loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings'), loadKey('s64_whatnot_shows'), loadKey('s64_buy_report'), loadKey('s64_eversen_brands')
@@ -3052,8 +3086,8 @@ async function loadData() {
   if (allItems.length) renderResults();
   if (ericColl.length) renderCollection('eric');
   if (khaiColl.length) renderCollection('khai');
-  if (ericWants.length) renderWants('eric');
-  if (khaiWants.length) renderWants('khai');
+  renderWants('eric'); // always render so a fresh Redis load is reflected (even after clearing)
+  renderWants('khai');
   renderCatalogs();
   applyAuctionSettingsToInputs();
   renderWatchlist();
@@ -5327,8 +5361,8 @@ function addScanToWant(btn) {
     return;
   }
   wants.push({ name, brand: _scanWant.brand || '', scale: _scanWant.scale || '', pri: '🟢 Nice to Have', notes: _scanWant.notes || '' });
-  saveData();
   if (typeof renderWants === 'function') renderWants(who);
+  if (who === 'eric') saveEricWants(); else saveKhaiWants();
   if (btn) { btn.textContent = '✓ Added to Want List'; btn.disabled = true; btn.style.color = 'var(--green)'; btn.style.borderColor = 'var(--green)'; }
 }
 
@@ -6484,8 +6518,8 @@ function evAddCatalogToWant(key, idx) {
     pri: '🟢 Nice to Have',
     notes: 'From vendor catalog' + (p.releaseDate ? ' · ' + p.releaseDate : '')
   });
-  saveData();
   renderWants('eric');
+  saveEricWants();
   toast('✅ Added “' + name + '” to Eric\'s Want List.', 'green');
 }
 
@@ -7222,8 +7256,8 @@ function wcAddToWant(i) {
   if (ericWants.some(w => (w.name || '').toLowerCase() === name.toLowerCase())) { toast('Already in Eric\'s Want List.', 'yellow'); return; }
   const v = wcVendor();
   ericWants.push({ name, brand: v.brand || '', scale: '', pri: '🟢 Nice to Have', notes: 'Wholesale catalog' + (p.wholesalePrice != null ? ' · cost $' + p.wholesalePrice : '') + (p.moq != null ? ' · MOQ ' + p.moq : '') });
-  saveData();
   renderWants('eric');
+  saveEricWants();
   toast('✅ Added “' + name + '” to Eric\'s Want List.', 'green');
 }
 async function wcRefresh() {
