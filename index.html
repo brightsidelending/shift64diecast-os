@@ -928,16 +928,12 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button class="btn-red" onclick="calcBid()">CALCULATE</button>
     </div>
     <div id="bidResult" style="display:none;">
-      <div class="bid-grid">
-        <div class="bid-box"><div class="bid-val gold" id="bAvg">$0</div><div class="bid-lbl">eBay Avg Sold</div></div>
-        <div class="bid-box"><div class="bid-val blue-c" id="bMax">$0</div><div class="bid-lbl">Max Recommended Bid</div></div>
-        <div class="bid-box"><div class="bid-val" id="bTotal">$0</div><div class="bid-lbl">Total w/ Shipping</div></div>
-        <div class="bid-box"><div class="bid-val" id="bProfit">$0</div><div class="bid-lbl">Est. Resale Profit</div></div>
-      </div>
-      <div class="signal-big" id="bidSignal">
-        <div class="signal-icon" id="sigIcon">🟡</div>
-        <div class="signal-text" id="sigText">ENTER A BID</div>
-        <div class="signal-desc" id="sigDesc"></div>
+      <div id="bidSources" style="display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--gray);margin-bottom:16px;"></div>
+      <div id="bidSignal" style="text-align:center;padding:20px;border-radius:12px;background:#1A1D24;transition:background 0.2s;">
+        <div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Max Bid</div>
+        <div id="bMaxBig" style="font-family:'Rajdhani',sans-serif;font-size:54px;font-weight:800;line-height:1;">$0</div>
+        <div id="sigText" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:800;letter-spacing:2px;margin-top:8px;">—</div>
+        <div id="sigDesc" style="font-size:13px;color:var(--gray);margin-top:8px;line-height:1.5;"></div>
       </div>
     </div>
   </div>
@@ -2323,7 +2319,10 @@ function renderWants(who) {
         </div>
         <button onclick="removeWant('${who}',${idx})" title="Delete" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:16px;">✕</button>
       </div>
-      <div style="margin-top:8px;"><span class="badge" style="background:${priBg};color:${priColor};">${escHtmlA(item.pri || 'Nice to Have')}</span></div>
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <span class="badge" style="background:${priBg};color:${priColor};">${escHtmlA(item.pri || 'Nice to Have')}</span>
+        <span class="badge" style="background:#0D1520;color:var(--blue);">${who === 'eric' ? '🏎️ Eric' : '🏎️ Khai'}</span>
+      </div>
       ${item.notes ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;">📝 ${escHtmlA(item.notes)}</div>` : ''}
     </div>`;
   }).join('');
@@ -2341,81 +2340,99 @@ function loadBid(name) {
   document.getElementById('bidResult').scrollIntoView({behavior:'smooth'});
 }
 
-function updateBid() { if (document.getElementById('bidModel').value && document.getElementById('bidCurrent').value) calcBid(); }
+// Live-adjust the signal as the current bid changes — but only re-fetch prices on Calculate.
+function updateBid() {
+  const model = document.getElementById('bidModel').value.trim();
+  if (bidCache.model === model && !bidCache.loading) renderBidSignal();
+}
 
-let bidAvgCache = { model: null, avg: null, count: 0 };
+let bidCache = { model: null, loading: false };
+
+// Calculate button: look up Horizon, Carbros, and eBay prices for the model (cached per model).
 async function calcBid() {
   const model = document.getElementById('bidModel').value.trim();
   if (!model) return;
-  // Fetch the item's ACTUAL eBay SOLD average once per model (cached, outlier-filtered),
-  // so the Max Bid is dynamic and updates when the data loads — no static fallback.
-  if (bidAvgCache.model !== model) {
-    bidAvgCache = { model, avg: null, count: 0 };
-    document.getElementById('bAvg').textContent = '…';
-    document.getElementById('bMax').textContent = '…';
-    document.getElementById('bidResult').style.display = 'block';
-    const stats = await fetchSoldStats(model);
+  document.getElementById('bidResult').style.display = 'block';
+  if (bidCache.model !== model) {
+    bidCache = { model, loading: true };
+    document.getElementById('bidSources').innerHTML = '<div style="color:var(--gray);">🔎 Checking Horizon, Carbros, and eBay…</div>';
+    document.getElementById('bMaxBig').textContent = '…';
+    document.getElementById('sigText').textContent = '';
+    document.getElementById('sigDesc').textContent = '';
+    const [retail, sold] = await Promise.all([ bidFetchRetail(model), fetchSoldStats(model) ]);
     if (document.getElementById('bidModel').value.trim() !== model) return; // model changed while awaiting
-    bidAvgCache = { model, avg: stats.avg, count: stats.count };
+    bidCache = { model, horizon: retail.horizon, carbros: retail.carbros, ebayAvg: sold.avg, ebayCount: sold.count, loading: false };
   }
-  renderBidResult(model);
+  renderBidSignal();
 }
 
-function renderBidResult(model) {
-  const current = parseFloat(document.getElementById('bidCurrent').value)||0;
-  const ship = parseFloat(document.getElementById('bidShip').value)||8;
-  const avg = bidAvgCache.avg;
+// Web search Horizon Diecast + Carbros for retail price & stock.
+async function bidFetchRetail(model) {
+  try {
+    const prompt = `Search for the diecast model "${model}" at two US diecast retailers: Horizon Diecast (horizondiecast.com) and Carbros (carbros.com). For each store report the current retail price in USD and whether it is in stock. Return ONLY minified JSON: {"horizon":{"price":<number or null>,"inStock":<true|false>},"carbros":{"price":<number or null>,"inStock":<true|false>}}. If not found at a store, use price null and inStock false.`;
+    const res = await fetch(PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 700, tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }], messages: [{ role: 'user', content: prompt }] }) });
+    const data = await res.json();
+    const p = evParseJson(evAnthropicText(data)) || {};
+    const norm = (o) => ({ price: (o && o.price != null && !isNaN(o.price)) ? Number(o.price) : null, inStock: !!(o && o.inStock) });
+    return { horizon: norm(p.horizon), carbros: norm(p.carbros) };
+  } catch (e) { return { horizon: { price: null, inStock: false }, carbros: { price: null, inStock: false } }; }
+}
+
+function renderBidSignal() {
+  const c = bidCache;
+  const current = parseFloat(document.getElementById('bidCurrent').value) || 0;
+  const h = c.horizon || { price: null, inStock: false };
+  const cb = c.carbros || { price: null, inStock: false };
+  const ea = c.ebayAvg;
+
+  // Three clean source lines.
+  const srcLine = (emoji, label, val) => `<div>${emoji} ${label}: <b style="color:var(--white);">${val}</b></div>`;
+  const retailVal = (o) => o.price != null ? ('$' + o.price + (o.inStock ? '' : ' · sold out')) : 'not found';
+  const retailDot = (o) => o.inStock ? '🟢' : (o.price != null ? '🔴' : '⚪');
+  document.getElementById('bidSources').innerHTML =
+    srcLine(retailDot(h), 'Horizon', retailVal(h)) +
+    srcLine(retailDot(cb), 'Carbros', retailVal(cb)) +
+    srcLine('📦', 'eBay avg', ea != null ? ('$' + ea) : 'not enough data');
+
+  // Max bid: 85% of lowest in-stock retail; else 80% of eBay avg.
+  const inStock = [];
+  if (h.inStock && h.price != null) inStock.push({ name: 'Horizon', price: h.price });
+  if (cb.inStock && cb.price != null) inStock.push({ name: 'Carbros', price: cb.price });
+  let maxBid = null, explain = '';
+  if (inStock.length) {
+    inStock.sort((a, b) => a.price - b.price);
+    const low = inStock[0];
+    maxBid = Math.round(low.price * 0.85);
+    explain = `${low.name} has it for $${low.price} — don't bid over $${maxBid}.`;
+  } else if (ea != null) {
+    maxBid = Math.round(ea * 0.80);
+    explain = `Sold out at retail. eBay avg is $${ea} — don't bid over $${maxBid}.`;
+  } else {
+    explain = `No price found at Horizon, Carbros, or eBay — bid carefully.`;
+  }
+
+  const big = document.getElementById('bMaxBig');
+  const sigText = document.getElementById('sigText');
+  const sigDesc = document.getElementById('sigDesc');
   const sig = document.getElementById('bidSignal');
-  const icon = document.getElementById('sigIcon');
-  const text = document.getElementById('sigText');
-  const desc = document.getElementById('sigDesc');
-  // Fewer than 3 sold results — don't show a potentially wrong average.
-  if (avg == null) {
-    document.getElementById('bMax').textContent = '—';
-    document.getElementById('bAvg').textContent = 'N/A';
-    document.getElementById('bTotal').textContent = '$'+(current + (parseFloat(document.getElementById('bidShip').value)||8)).toFixed(2);
-    document.getElementById('bProfit').textContent = '—';
-    sig.style.background='#2B2200'; sig.style.border='1px solid var(--yellow)';
-    icon.textContent='ℹ️'; text.textContent='NOT ENOUGH DATA'; text.style.color='var(--yellow)';
-    desc.textContent=`Fewer than 3 eBay sold listings found for "${model}". Can't estimate a reliable max bid — check eBay sold listings manually.`;
-    desc.style.color='var(--gray)';
-    document.getElementById('bidResult').style.display='block';
+  sigDesc.textContent = explain;
+
+  if (maxBid == null) {
+    big.textContent = '—'; big.style.color = 'var(--gray)';
+    sigText.textContent = 'NO DATA'; sigText.style.color = 'var(--gray)';
+    sig.style.background = '#1A1D24';
     return;
   }
-  const maxBid = Math.round(avg * 0.80); // smart default: 80% of sold average
-  const totalCost = current + ship;
-  const profit = avg - totalCost;
-  const avgLabel = '$'+avg+' ('+bidAvgCache.count+' sold)';
+  big.textContent = '$' + maxBid;
 
-  document.getElementById('bAvg').textContent = avgLabel;
-  document.getElementById('bMax').textContent = '$'+maxBid;
-  document.getElementById('bTotal').textContent = '$'+totalCost.toFixed(2);
-  document.getElementById('bTotal').style.color = totalCost <= avg ? 'var(--green)' : 'var(--red)';
-  document.getElementById('bProfit').textContent = (profit>=0?'+':'')+'$'+profit.toFixed(2);
-  document.getElementById('bProfit').style.color = profit > 0 ? 'var(--green)' : 'var(--red)';
-
-  if (current === 0) {
-    sig.style.background='#0D1520'; sig.style.border='1px solid #1A3A5C';
-    icon.textContent='💡'; text.textContent='ENTER CURRENT BID'; text.style.color='var(--blue)';
-    desc.textContent=`Max bid for ${model}: $${maxBid} (80% of the ${avgLabel} average).`;
-    desc.style.color='var(--gray)';
-  } else if (current <= maxBid * 0.85) {
-    sig.style.background='#0D2B0D'; sig.style.border='2px solid var(--green)';
-    icon.textContent='🟢'; text.textContent='GO — GREAT DEAL'; text.style.color='var(--green)';
-    desc.innerHTML=`Current bid $${current} is well under the max bid of $${maxBid}. You can bid up to $${maxBid}. eBay avg: ${avgLabel}. Est. profit if you resell: $${profit.toFixed(2)}.`;
-    desc.style.color='var(--white)';
-  } else if (current <= maxBid) {
-    sig.style.background='#2B2200'; sig.style.border='2px solid var(--yellow)';
-    icon.textContent='🟡'; text.textContent='WATCH — GETTING CLOSE'; text.style.color='var(--yellow)';
-    desc.innerHTML=`Current bid $${current} is near the max bid of $${maxBid}. Only $${(maxBid-current).toFixed(0)} left to bid. Profit margin is thin. Be careful.`;
-    desc.style.color='var(--white)';
-  } else {
-    sig.style.background='#2B0D0D'; sig.style.border='2px solid var(--red)';
-    icon.textContent='🔴'; text.textContent='STOP — OVERPAYING'; text.style.color='var(--red)';
-    desc.innerHTML=`Current bid $${current} is over the max bid of $${maxBid}. You are paying $${(current-maxBid).toFixed(0)} too much. Walk away. You would lose $${Math.abs(profit).toFixed(2)} on resale.`;
-    desc.style.color='var(--white)';
-  }
-  document.getElementById('bidResult').style.display='block';
+  let color, txt, bg;
+  if (current === 0) { color = 'var(--blue)'; txt = 'SET YOUR BID'; bg = '#0D1520'; }
+  else if (current <= maxBid * 0.85) { color = 'var(--green)'; txt = '🟢 GO'; bg = '#0D2B0D'; }
+  else if (current <= maxBid) { color = 'var(--yellow)'; txt = '🟡 WATCH'; bg = '#2B2200'; }
+  else { color = 'var(--red)'; txt = '🔴 STOP'; bg = '#2B0D0D'; }
+  big.style.color = color;
+  sigText.textContent = txt; sigText.style.color = color;
+  sig.style.background = bg;
 }
 
 // ============================================================
