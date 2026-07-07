@@ -945,7 +945,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="mstack" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
       <select class="fi" id="palPlatform"><option value="both">Both platforms</option><option value="ebay">eBay only</option><option value="aliexpress">AliExpress only</option></select>
       <select class="fi" id="palCondition"><option value="any">Any condition</option><option value="new">New</option><option value="used">Used</option></select>
-      <select class="fi" id="palListing"><option value="any">Any listing</option><option value="bin">Buy It Now only</option></select>
+      <select class="fi" id="palListing"><option value="any">Any listing</option><option value="bin">Buy It Now only</option><option value="auction">Auctions only</option></select>
     </div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gray);cursor:pointer;"><input type="checkbox" id="palUsOnly"/> US sellers only (eBay)</label>
@@ -6868,17 +6868,22 @@ function palPlatformBadges(p) {
   if (p === 'aliexpress') return badge('AliExpress', '#2A1A05', 'var(--orange)');
   return badge('eBay', '#0D2233', 'var(--blue)') + ' ' + badge('AliExpress', '#2A1A05', 'var(--orange)');
 }
+function palListingBadge(lt) {
+  if (lt === 'bin') return '<span class="badge" style="background:#0D2B1A;color:var(--green);">Buy It Now</span>';
+  if (lt === 'auction') return '<span class="badge" style="background:#2A1A05;color:var(--orange);">⏰ Auctions Only</span>';
+  return '<span class="badge" style="background:#1A1710;color:var(--gold);">Both</span>';
+}
 function renderAlerts() {
   const wrap = document.getElementById('palList');
   if (!wrap) return;
   if (!palAlerts.length) { wrap.innerHTML = '<div style="color:var(--gray);font-size:13px;">No price alerts yet. Add one above.</div>'; return; }
   wrap.innerHTML = palAlerts.map(a => {
-    const bits = [a.condition !== 'any' ? a.condition : null, a.listingType === 'bin' ? 'BIN only' : null, a.usOnly ? 'US only' : null].filter(Boolean).map(escHtmlA).join(' · ');
+    const bits = [a.condition !== 'any' ? a.condition : null, a.usOnly ? 'US only' : null].filter(Boolean).map(escHtmlA).join(' · ');
     return `<div style="background:var(--black);border:1px solid ${a.active ? 'var(--border)' : '#2a2a2a'};border-radius:10px;padding:12px 14px;margin-bottom:8px;opacity:${a.active ? '1' : '0.6'};">
       <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;">
         <div style="flex:1;min-width:180px;">
           <div style="font-weight:600;font-size:14px;">${escHtmlA(a.keyword)}</div>
-          <div style="font-size:12px;color:var(--gray);margin-top:4px;">Target <b style="color:var(--gold);">$${Number(a.targetPrice).toFixed(2)}</b> · ${palPlatformBadges(a.platform)}${bits ? ' · ' + bits : ''}</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;">Target <b style="color:var(--gold);">$${Number(a.targetPrice).toFixed(2)}</b> ${palPlatformBadges(a.platform)} ${palListingBadge(a.listingType)}${bits ? ' <span>· ' + bits + '</span>' : ''}</div>
           <div style="font-size:11px;color:var(--gray);margin-top:4px;">Last checked: ${a.lastChecked ? escHtmlA(a.lastChecked) : 'never'}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">

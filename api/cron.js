@@ -426,8 +426,22 @@ async function runPriceAlerts(summary) {
   }
 }
 
-// eBay via the existing Browse-API proxy (accurate prices + real listing links).
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+
+// eBay dispatch: honor the alert's listing type.
+//  - "bin"      -> Buy It Now only (alert immediately at/below target)
+//  - "auction"  -> Auctions only (alert only when ending within 2h AND current bid <= target)
+//  - "any"      -> both (BIN immediate + auctions with the 2-hour rule)
 async function searchEbayForAlert(alert, target) {
+  const lt = alert.listingType || 'any';
+  const out = [];
+  if (lt === 'bin' || lt === 'any') out.push(...await searchEbayBinForAlert(alert, target));
+  if (lt === 'auction' || lt === 'any') out.push(...await searchEbayAuctionForAlert(alert, target));
+  return out;
+}
+
+// Buy It Now (fixed price) — alert immediately when price is at/below target.
+async function searchEbayBinForAlert(alert, target) {
   try {
     const r = await fetch(PROXY_BASE + '/api/proxy?type=ebay_active', {
       method: 'POST',
@@ -442,12 +456,40 @@ async function searchEbayForAlert(alert, target) {
       if (!(price <= target)) continue;
       if (alert.condition === 'new' && !/new/i.test(it.condition || '')) continue;
       if (alert.condition === 'used' && !/used|pre-?owned/i.test(it.condition || '')) continue;
-      if (alert.listingType === 'bin' && !(Array.isArray(it.buyingOptions) && it.buyingOptions.includes('FIXED_PRICE'))) continue;
       if (alert.usOnly && !(it.itemLocation && it.itemLocation.country === 'US')) continue;
-      out.push({ platform: 'eBay', title: it.title || alert.keyword, price, url: it.itemWebUrl || '' });
+      out.push({ platform: 'eBay', kind: 'bin', title: it.title || alert.keyword, price, url: it.itemWebUrl || '' });
     }
     return out;
-  } catch (e) { console.error('[cron] eBay alert search failed:', e.message); return []; }
+  } catch (e) { console.error('[cron] eBay BIN alert search failed:', e.message); return []; }
+}
+
+// Auctions — only alert when the auction ends within 2 hours AND the current bid is at/below target.
+async function searchEbayAuctionForAlert(alert, target) {
+  try {
+    const r = await fetch(PROXY_BASE + '/api/proxy?type=ebay_auction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: alert.keyword }),
+    });
+    const d = await r.json();
+    const items = (d && d.itemSummaries) || [];
+    const now = Date.now();
+    const out = [];
+    for (const it of items) {
+      if (!(Array.isArray(it.buyingOptions) && it.buyingOptions.includes('AUCTION'))) continue; // must be an auction
+      const bid = parseFloat(it.currentBidPrice && it.currentBidPrice.value);
+      if (!(bid <= target)) continue;                       // current bid at/below target
+      const end = Date.parse(it.itemEndDate);
+      if (isNaN(end)) continue;
+      const remaining = end - now;
+      if (!(remaining > 0 && remaining <= TWO_HOURS_MS)) continue; // ONLY within the final 2 hours
+      if (alert.condition === 'new' && !/new/i.test(it.condition || '')) continue;
+      if (alert.condition === 'used' && !/used|pre-?owned/i.test(it.condition || '')) continue;
+      if (alert.usOnly && !(it.itemLocation && it.itemLocation.country === 'US')) continue;
+      out.push({ platform: 'eBay', kind: 'auction', title: it.title || alert.keyword, price: bid, url: it.itemWebUrl || '', endsInMin: Math.max(1, Math.round(remaining / 60000)) });
+    }
+    return out;
+  } catch (e) { console.error('[cron] eBay auction alert search failed:', e.message); return []; }
 }
 
 // AliExpress via the web_search tool through the proxy passthrough.
@@ -476,13 +518,29 @@ async function searchAliExpressForAlert(alert, target) {
   } catch (e) { console.error('[cron] AliExpress alert search failed:', e.message); return []; }
 }
 
+function formatRemaining(min) {
+  const h = Math.floor((min || 0) / 60);
+  const m = (min || 0) % 60;
+  return (h > 0 ? h + 'h ' : '') + m + 'm';
+}
 function priceAlertEmailHtml(alert, matches, target) {
-  const rows = matches.map(m => `
+  const rows = matches.map(m => {
+    if (m.kind === 'auction') {
+      return `
+    <div style="border:1px solid #E67E22;border-radius:8px;padding:12px;margin-bottom:10px;">
+      <div style="color:#E67E22;font-weight:bold;font-size:13px;margin-bottom:4px;">⏰ Auction Ending Soon — ${formatRemaining(m.endsInMin)} remaining</div>
+      <div style="font-weight:bold;color:#fff;">${escapeHtml(m.title)}</div>
+      <div style="color:#d4af37;font-size:18px;font-weight:bold;margin:4px 0;">Current bid $${Number(m.price).toFixed(2)} <span style="color:#999;font-size:12px;font-weight:normal;">on eBay</span></div>
+      <a href="${escapeHtml(m.url)}" style="color:#4A90D9;font-size:13px;">Bid now →</a>
+    </div>`;
+    }
+    return `
     <div style="border:1px solid #333;border-radius:8px;padding:12px;margin-bottom:10px;">
       <div style="font-weight:bold;color:#fff;">${escapeHtml(m.title)}</div>
       <div style="color:#d4af37;font-size:18px;font-weight:bold;margin:4px 0;">$${Number(m.price).toFixed(2)} <span style="color:#999;font-size:12px;font-weight:normal;">on ${escapeHtml(m.platform)}</span></div>
       <a href="${escapeHtml(m.url)}" style="color:#4A90D9;font-size:13px;">View listing →</a>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#111;padding:20px;color:#eee;">
     <h2 style="color:#d4af37;">🔔 Price Alert Hit</h2>
     <p>Your alert for <b>${escapeHtml(alert.keyword)}</b> (target $${target.toFixed(2)}) matched ${matches.length} listing${matches.length > 1 ? 's' : ''}:</p>
