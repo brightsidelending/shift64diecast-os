@@ -6637,9 +6637,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <button onclick="toggleHelpChat()" style="background:none;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;">×</button>
   </div>
   <div id="helpChatBody"></div>
-  <form id="helpChatForm" onsubmit="return helpChatSend(event)">
-    <input id="helpChatInput" placeholder="Ask how anything works…" autocomplete="off"/>
-    <button id="helpChatSend" type="submit">Send</button>
+  <form id="helpChatForm" onsubmit="event.preventDefault();return false;">
+    <input id="helpChatInput" placeholder="Ask how anything works…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();helpChatSend(event);}"/>
+    <button id="helpChatSend" type="button" onclick="helpChatSend(event)">Send</button>
   </form>
 </div>
 
