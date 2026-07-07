@@ -2285,15 +2285,17 @@ function renderWants(who) {
   const div = document.getElementById(who+'WantDiv');
   if (!wants.length) { div.innerHTML = '<div class="empty" style="padding:30px;"><div class="empty-icon" style="font-size:28px;">🎯</div><div class="empty-title" style="font-size:15px;">Empty</div></div>'; return; }
   div.innerHTML = wants.map((item,idx) => {
-    const p = item.priceData || lookupPrice(item.name);
-    // Prefer the item's ACTUAL live eBay average; fall back to the static estimate only until it loads.
-    const liveAvg = (item.ebayAvg != null && item.ebayAvg > 0) ? item.ebayAvg : null;
-    const avg = liveAvg != null ? liveAvg : ((p && p.avg > 0) ? p.avg : null);
-    const isEst = liveAvg == null;
-    const maxBid = avg != null ? Math.round(avg * 0.80) : null; // smart default: 80% of eBay average
-    const hasSignal = item.max && maxBid != null;
+    // Accurate market value from eBay SOLD listings only (no static fallback).
+    const stats = item.soldStats;                 // undefined until fetched
+    const loading = stats === undefined;
+    const enough = !!(stats && stats.avg != null); // at least 3 usable sold results
+    const avg = enough ? stats.avg : null;
+    const maxBid = enough ? Math.round(avg * 0.80) : null; // smart default: 80% of sold average
+    const avgDisplay = loading ? '⏳' : (enough ? '$' + avg : 'Not enough data');
+    const avgSmall = !enough; // shrink font for the text states
+    const hasSignal = item.max && enough;
     const sigColor = !hasSignal ? 'var(--gray)' : item.max <= maxBid*0.85 ? 'var(--green)' : item.max <= maxBid ? 'var(--yellow)' : 'var(--red)';
-    const sigText = maxBid == null ? '⏳ Loading eBay price…' : !item.max ? 'Set a max price to see signal' : item.max <= maxBid*0.85 ? '✅ GREAT BUY at your max' : item.max <= maxBid ? '⚠️ FAIR — near max bid' : '🔴 TOO HIGH — over max bid';
+    const sigText = loading ? '⏳ Loading sold prices…' : !enough ? 'ℹ️ Not enough sold data for a signal' : !item.max ? 'Set a max price to see signal' : item.max <= maxBid*0.85 ? '✅ GREAT BUY at your max' : item.max <= maxBid ? '⚠️ FAIR — near max bid' : '🔴 TOO HIGH — over max bid';
     const priColor = item.pri.includes('Must') ? 'var(--red)' : item.pri.includes('Want') ? 'var(--yellow)' : 'var(--green)';
     return `<div class="want-card">
       <div style="display:flex;justify-content:space-between;align-items:start;">
@@ -2304,9 +2306,9 @@ function renderWants(who) {
         <button onclick="removeWant('${who}',${idx})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:16px;">✕</button>
       </div>
       <div class="want-prices">
-        <div class="want-price-box"><div class="want-price-val gold">${avg!=null?'$'+avg:'…'}</div><div class="want-price-lbl">eBay Avg${isEst&&avg!=null?' (est)':''}</div></div>
-        <div class="want-price-box"><div class="want-price-val blue-c">${maxBid!=null?'$'+maxBid:'…'}</div><div class="want-price-lbl">Max Bid (80%)</div></div>
-        <div class="want-price-box"><div class="want-price-val green">${p&&p.low!=null?'$'+p.low+'-$'+p.high:'—'}</div><div class="want-price-lbl">Range</div></div>
+        <div class="want-price-box"><div class="want-price-val gold"${avgSmall?' style="font-size:12px;line-height:1.3;"':''}>${avgDisplay}</div><div class="want-price-lbl">Sold avg${enough?' ('+stats.count+')':''}</div></div>
+        <div class="want-price-box"><div class="want-price-val blue-c"${!enough?' style="font-size:14px;"':''}>${maxBid!=null?'$'+maxBid:(loading?'⏳':'—')}</div><div class="want-price-lbl">Max Bid (80%)</div></div>
+        <div class="want-price-box"><div class="want-price-val green"${enough?'':' style="font-size:14px;"'}>${enough?'$'+Math.round(avg*0.80)+'-$'+avg:'—'}</div><div class="want-price-lbl">Buy Range</div></div>
       </div>
       <div class="signal-bar" style="background:${sigColor==='var(--green)'?'#0D2B0D':sigColor==='var(--yellow)'?'#2B2200':'#2B0D0D'};color:${sigColor}">${sigText}${item.max?' · Your max $'+item.max:''}</div>
       ${item.notes ? `<div style="font-size:12px;color:var(--gray);margin-top:8px;">📝 ${item.notes}</div>` : ''}
@@ -2328,8 +2330,10 @@ async function queueWantPriceFetch(who) {
   for (const item of todo) {
     item.ebayAvgTried = true; // mark so we don't re-fetch on every render (prevents loops)
     try {
-      const avg = await fetchAvgSold(item.name);
-      if (avg != null && avg > 0) { item.ebayAvg = Math.round(avg * 100) / 100; changed = true; }
+      const stats = await fetchSoldStats(item.name); // full model name, outlier-filtered sold prices
+      item.soldStats = stats;                         // { count, avg } — avg is null when < 3 sold results
+      if (stats.avg != null) item.ebayAvg = stats.avg;
+      changed = true;
     } catch (e) {}
   }
   wantFetchRunning[who] = false;
@@ -2350,22 +2354,20 @@ function loadBid(name) {
 
 function updateBid() { if (document.getElementById('bidModel').value && document.getElementById('bidCurrent').value) calcBid(); }
 
-let bidAvgCache = { model: null, avg: null, low: null, high: null, isEst: false };
+let bidAvgCache = { model: null, avg: null, count: 0 };
 async function calcBid() {
   const model = document.getElementById('bidModel').value.trim();
   if (!model) return;
-  // Fetch the item's ACTUAL live eBay average once per model (cached), so the Max Bid is
-  // dynamic and updates when the data loads — no hardcoded default.
+  // Fetch the item's ACTUAL eBay SOLD average once per model (cached, outlier-filtered),
+  // so the Max Bid is dynamic and updates when the data loads — no static fallback.
   if (bidAvgCache.model !== model) {
-    bidAvgCache = { model, avg: null, low: null, high: null, isEst: false };
+    bidAvgCache = { model, avg: null, count: 0 };
     document.getElementById('bAvg').textContent = '…';
     document.getElementById('bMax').textContent = '…';
     document.getElementById('bidResult').style.display = 'block';
-    const live = await fetchAvgSold(model);
+    const stats = await fetchSoldStats(model);
     if (document.getElementById('bidModel').value.trim() !== model) return; // model changed while awaiting
-    const est = lookupPrice(model);
-    const useLive = (live != null && live > 0);
-    bidAvgCache = { model, avg: useLive ? Math.round(live * 100) / 100 : (est.avg || null), low: est.low, high: est.high, isEst: !useLive };
+    bidAvgCache = { model, avg: stats.avg, count: stats.count };
   }
   renderBidResult(model);
 }
@@ -2374,12 +2376,27 @@ function renderBidResult(model) {
   const current = parseFloat(document.getElementById('bidCurrent').value)||0;
   const ship = parseFloat(document.getElementById('bidShip').value)||8;
   const avg = bidAvgCache.avg;
-  const low = bidAvgCache.low, high = bidAvgCache.high;
-  if (avg == null) { document.getElementById('bMax').textContent = '—'; document.getElementById('bAvg').textContent = '—'; return; }
-  const maxBid = Math.round(avg * 0.80); // smart default: 80% of eBay average
+  const sig = document.getElementById('bidSignal');
+  const icon = document.getElementById('sigIcon');
+  const text = document.getElementById('sigText');
+  const desc = document.getElementById('sigDesc');
+  // Fewer than 3 sold results — don't show a potentially wrong average.
+  if (avg == null) {
+    document.getElementById('bMax').textContent = '—';
+    document.getElementById('bAvg').textContent = 'N/A';
+    document.getElementById('bTotal').textContent = '$'+(current + (parseFloat(document.getElementById('bidShip').value)||8)).toFixed(2);
+    document.getElementById('bProfit').textContent = '—';
+    sig.style.background='#2B2200'; sig.style.border='1px solid var(--yellow)';
+    icon.textContent='ℹ️'; text.textContent='NOT ENOUGH DATA'; text.style.color='var(--yellow)';
+    desc.textContent=`Fewer than 3 eBay sold listings found for "${model}". Can't estimate a reliable max bid — check eBay sold listings manually.`;
+    desc.style.color='var(--gray)';
+    document.getElementById('bidResult').style.display='block';
+    return;
+  }
+  const maxBid = Math.round(avg * 0.80); // smart default: 80% of sold average
   const totalCost = current + ship;
   const profit = avg - totalCost;
-  const avgLabel = bidAvgCache.isEst ? '$'+avg+' (est)' : '$'+avg;
+  const avgLabel = '$'+avg+' ('+bidAvgCache.count+' sold)';
 
   document.getElementById('bAvg').textContent = avgLabel;
   document.getElementById('bMax').textContent = '$'+maxBid;
@@ -2388,15 +2405,10 @@ function renderBidResult(model) {
   document.getElementById('bProfit').textContent = (profit>=0?'+':'')+'$'+profit.toFixed(2);
   document.getElementById('bProfit').style.color = profit > 0 ? 'var(--green)' : 'var(--red)';
 
-  const sig = document.getElementById('bidSignal');
-  const icon = document.getElementById('sigIcon');
-  const text = document.getElementById('sigText');
-  const desc = document.getElementById('sigDesc');
-
   if (current === 0) {
     sig.style.background='#0D1520'; sig.style.border='1px solid #1A3A5C';
     icon.textContent='💡'; text.textContent='ENTER CURRENT BID'; text.style.color='var(--blue)';
-    desc.textContent=`Max bid for ${model}: $${maxBid} (80% of eBay avg ${avgLabel})${low!=null?`. Range: $${low} - $${high}`:''}.`;
+    desc.textContent=`Max bid for ${model}: $${maxBid} (80% of the ${avgLabel} average).`;
     desc.style.color='var(--gray)';
   } else if (current <= maxBid * 0.85) {
     sig.style.background='#0D2B0D'; sig.style.border='2px solid var(--green)';
@@ -3526,13 +3538,27 @@ async function addToWatchlist(idx) {
 }
 
 // Average of eBay sold prices for a query (via existing ebay_sold proxy)
-async function fetchAvgSold(query) {
+// Robust eBay SOLD-price stats using the FULL model name, with outlier filtering.
+// Returns { count, avg } where avg is null when there aren't at least 3 usable sold results.
+async function fetchSoldStats(query) {
   try {
-    const raw = await fetchEbayItems('ebay_sold', query);
-    const prices = mapSoldItems(raw || [], query).map(m => m.price).filter(p => p > 0);
-    if (!prices.length) return null;
-    return prices.reduce((s, p) => s + p, 0) / prices.length;
-  } catch (e) { return null; }
+    const raw = await fetchEbayItems('ebay_sold', query); // sold/completed listings, full specific query
+    let prices = mapSoldItems(raw || [], query).map(m => m.price).filter(p => p > 0);
+    if (prices.length < 3) return { count: prices.length, avg: null }; // not enough data
+    prices.sort((a, b) => a - b);
+    const median = prices[Math.floor(prices.length / 2)];
+    // Drop clear outliers: way below the median (likely a wrong/cheaper item matched) or way above.
+    let use = prices.filter(p => p >= median * 0.4 && p <= median * 3);
+    if (use.length < 3) use = prices; // don't over-filter tiny samples
+    if (use.length < 3) return { count: use.length, avg: null };
+    const avg = use.reduce((s, p) => s + p, 0) / use.length;
+    return { count: use.length, avg: Math.round(avg * 100) / 100 };
+  } catch (e) { return { count: 0, avg: null }; }
+}
+// Backwards-compatible helper (used by the Auction Watchlist): average sold price or null.
+async function fetchAvgSold(query) {
+  const s = await fetchSoldStats(query);
+  return s.avg;
 }
 
 function removeFromWatchlist(id) {
