@@ -167,10 +167,15 @@ export default async function handler(req, res) {
         }
       });
       const text = await r.text();
+      // Raw mode: return the page text (capped) so the client can parse HTML catalogs.
+      const wantRaw = (req.query && (req.query.raw === '1' || req.query.raw === 'true')) || (req.body && req.body.raw);
+      if (wantRaw) {
+        return res.status(200).json({ raw: text.slice(0, 200000), status: r.status });
+      }
       let data = null;
       try { data = JSON.parse(text); } catch (e) { data = null; }
       if (data === null) {
-        return res.status(200).json({ error: 'Non-JSON response from source', status: r.status });
+        return res.status(200).json({ error: 'Non-JSON response from source', status: r.status, raw: text.slice(0, 200000) });
       }
       return res.status(200).json(data);
     } catch (err) {

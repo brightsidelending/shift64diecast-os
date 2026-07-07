@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Shift64">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#C9A84C">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1210,6 +1211,35 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 
 </div><!-- end main -->
+
+<!-- OUTREACH — WHOLESALE CATALOG MODAL -->
+<div class="modal-overlay" id="wcModal">
+  <div class="modal" style="width:900px;max-width:95vw;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+      <h2 style="color:var(--gold);margin:0;">🔗 Wholesale Catalog <span id="wcVendorTag" style="font-size:13px;color:var(--gray);font-weight:400;"></span></h2>
+      <div style="display:flex;gap:8px;">
+        <button id="wcRefreshBtn" onclick="wcRefresh()" style="padding:8px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">🔄 Refresh</button>
+        <button onclick="closeModal('wcModal')" style="background:none;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;">×</button>
+      </div>
+    </div>
+
+    <div class="mstack" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div style="background:var(--black);border:1px solid var(--border);border-radius:10px;padding:14px;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:0.5px;margin-bottom:8px;">A · WEBSITE / PORTAL</div>
+        <input class="text-input" id="wcUrl" placeholder="https://vendor-wholesale-site.com/catalog" style="width:100%;box-sizing:border-box;margin-bottom:8px;"/>
+        <button onclick="wcScrape()" id="wcScrapeBtn" style="width:100%;padding:9px;font-size:13px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;">🔎 Scrape Catalog</button>
+      </div>
+      <div style="background:var(--black);border:1px solid var(--border);border-radius:10px;padding:14px;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:0.5px;margin-bottom:8px;">B · UPLOAD FILE</div>
+        <div style="font-size:11px;color:var(--gray);margin-bottom:8px;">PDF, Excel (.xlsx), CSV, or an image / screenshot.</div>
+        <input type="file" id="wcFile" accept=".pdf,.xlsx,.xls,.csv,image/*" onchange="wcHandleFile(this)" style="width:100%;font-size:12px;color:var(--gray);"/>
+      </div>
+    </div>
+
+    <div id="wcStatus" style="font-size:12px;color:var(--gray);margin-bottom:10px;"></div>
+    <div id="wcResults"><div style="color:var(--gray);font-size:13px;">Scrape a portal or upload a file to build this vendor's catalog.</div></div>
+  </div>
+</div>
 
 <!-- EVERSEN — VENDOR CATALOG MODAL -->
 <div class="modal-overlay" id="evCatalogModal">
@@ -6669,6 +6699,7 @@ function renderOrTracker() {
       <td style="padding:12px 14px;font-size:13px;color:var(--gray);max-width:220px;">${orEsc(c.notes || '')}</td>
       <td style="padding:12px 14px;white-space:nowrap;">
         <button onclick="orViewThread('${c.id}')" style="padding:5px 9px;font-size:11px;font-weight:600;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:6px;cursor:pointer;margin-right:4px;">View Thread</button>
+        <button onclick="wcOpen('${c.id}')" style="padding:5px 9px;font-size:11px;font-weight:700;background:var(--card);color:var(--gold);border:1px solid rgba(201,168,76,0.5);border-radius:6px;cursor:pointer;margin-right:4px;">📦 Catalog</button>
         <button onclick="orOpenFollowup('${c.id}')" ${closed ? 'disabled' : ''} style="padding:5px 9px;font-size:11px;font-weight:600;background:${closed ? 'var(--card)' : 'var(--gold)'};color:${closed ? 'var(--gray)' : '#000'};border:${closed ? '1px solid var(--border)' : 'none'};border-radius:6px;cursor:${closed ? 'not-allowed' : 'pointer'};margin-right:4px;">Send Follow-up</button>
         <button onclick="orMarkClosed('${c.id}')" ${closed ? 'disabled' : ''} style="padding:5px 9px;font-size:11px;font-weight:600;background:var(--card);color:${closed ? 'var(--gray)' : 'var(--white)'};border:1px solid var(--border);border-radius:6px;cursor:${closed ? 'not-allowed' : 'pointer'};">Mark Closed</button>
       </td>
@@ -7028,6 +7059,218 @@ async function negoLogToTracker() {
     }
     toast('📌 Logged Stage ' + negoConvo.stage + ' to ' + (v.source === 'eversen' ? 'Eversen' : 'tracker') + '.', 'green');
   } catch (e) { toast('⚠️ Could not save stage.', 'yellow'); }
+}
+
+// ============================================================
+// WHOLESALE CATALOG — per-vendor catalog via URL scrape or file upload
+// (Redis "vendor_catalog_[vendorId]")
+// ============================================================
+let wcVendorId = null;
+let wcProducts = [];  // [{name, wholesalePrice, moq, ebayAvg, ebayCount, ebayTried}]
+let wcSource = null;  // { type:'url'|'file', url, fileName }
+
+function wcKey(id) { return 'vendor_catalog_' + id; }
+function wcVendor() { return (typeof orTracker !== 'undefined' ? orTracker.find(x => x.id === wcVendorId) : null) || {}; }
+function wcSetStatus(msg, color) { const el = document.getElementById('wcStatus'); if (el) { el.textContent = msg || ''; el.style.color = color || 'var(--gray)'; } }
+
+async function wcOpen(id) {
+  wcVendorId = id; wcProducts = []; wcSource = null;
+  const v = wcVendor();
+  document.getElementById('wcVendorTag').textContent = '— ' + (v.brand || v.contactEmail || 'vendor');
+  document.getElementById('wcUrl').value = '';
+  wcSetStatus('');
+  document.getElementById('wcResults').innerHTML = '<div style="color:var(--gray);font-size:13px;">Scrape a portal or upload a file to build this vendor\'s catalog.</div>';
+  openModal('wcModal');
+  try {
+    const cached = await kvGet(wcKey(id));
+    if (cached && typeof cached === 'object') {
+      wcProducts = Array.isArray(cached.products) ? cached.products : [];
+      wcSource = cached.source || null;
+      if (wcSource && wcSource.url) document.getElementById('wcUrl').value = wcSource.url;
+      if (wcProducts.length) wcRenderProducts();
+    }
+  } catch (e) {}
+}
+async function wcSaveCatalog() {
+  if (!wcVendorId) return;
+  try { await kvSet(wcKey(wcVendorId), { source: wcSource, products: wcProducts, savedAt: Date.now() }); } catch (e) {}
+}
+
+// ---- Option A: scrape a wholesale URL ----
+async function wcScrape() {
+  const url = (document.getElementById('wcUrl').value || '').trim();
+  if (!url) { toast('⚠️ Paste a wholesale URL first.', 'yellow'); return; }
+  const btn = document.getElementById('wcScrapeBtn'); const orig = btn.innerHTML; btn.innerHTML = '⏳ Scraping…'; btn.disabled = true;
+  wcSetStatus('🔎 Fetching page…');
+  try {
+    const r = await fetch(PROXY_URL + '?type=scrape&raw=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, raw: true }) });
+    const d = await r.json();
+    const raw = d && (typeof d.raw === 'string' ? d.raw : (typeof d === 'string' ? d : ''));
+    if (!raw) throw new Error((d && d.error) || 'Could not fetch that page');
+    wcSetStatus('🧠 Reading the catalog with Claude…');
+    wcProducts = await wcExtractFromText(raw.slice(0, 60000), 'website HTML');
+    wcSource = { type: 'url', url };
+    await wcSaveCatalog();
+    wcRenderProducts();
+    toast(wcProducts.length ? ('📦 Parsed ' + wcProducts.length + ' products.') : 'No products found on that page.', wcProducts.length ? 'green' : 'yellow');
+  } catch (e) {
+    wcSetStatus('⚠️ ' + ((e && e.message) || 'Scrape failed'), 'var(--yellow)');
+  } finally { btn.innerHTML = orig; btn.disabled = false; }
+}
+async function wcExtractFromText(text, sourceLabel) {
+  const prompt = `The following is ${sourceLabel} from a diecast wholesale catalog. Extract every product you can find. Return ONLY minified JSON: {"products":[{"name":"model name","wholesalePrice":<number USD or null>,"moq":<number or null>}]}. Use null when a value is not present.\n\n"""${text}"""`;
+  const res = await fetch(PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }) });
+  const data = await res.json();
+  const parsed = evParseJson(evAnthropicText(data));
+  return (parsed && Array.isArray(parsed.products)) ? parsed.products.map(wcNormProduct) : [];
+}
+function wcNormProduct(p) {
+  return {
+    name: String(p.name || '').trim() || 'Unknown product',
+    wholesalePrice: (p.wholesalePrice != null && !isNaN(p.wholesalePrice)) ? Number(p.wholesalePrice) : null,
+    moq: (p.moq != null && !isNaN(p.moq)) ? Number(p.moq) : null,
+    ebayAvg: null, ebayCount: 0, ebayTried: false
+  };
+}
+
+// ---- Option B: upload a file ----
+async function wcHandleFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const name = file.name.toLowerCase();
+  wcSetStatus('📄 Parsing ' + file.name + '…');
+  try {
+    let products = [];
+    if (name.endsWith('.csv')) products = await wcParseCsv(file);
+    else if (name.endsWith('.xlsx') || name.endsWith('.xls')) products = await wcParseExcel(file);
+    else if (name.endsWith('.pdf')) products = await wcParsePdf(file);
+    else if ((file.type || '').startsWith('image/')) products = await wcParseImage(file);
+    else { wcSetStatus('⚠️ Unsupported file type.', 'var(--yellow)'); return; }
+    wcSource = { type: 'file', fileName: file.name };
+    wcProducts = products;
+    await wcSaveCatalog();
+    wcRenderProducts();
+    toast(products.length ? ('📦 Parsed ' + products.length + ' products.') : 'No products found in that file.', products.length ? 'green' : 'yellow');
+  } catch (e) {
+    wcSetStatus('⚠️ ' + ((e && e.message) || 'Parse failed'), 'var(--yellow)');
+  } finally { input.value = ''; }
+}
+function wcReadText(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsText(file); }); }
+function wcReadDataUrl(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); }); }
+function wcReadArrayBuffer(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsArrayBuffer(file); }); }
+function wcSplitCsvLine(line) {
+  const out = []; let cur = ''; let q = false;
+  for (let i = 0; i < line.length; i++) { const c = line[i];
+    if (c === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+    else if (c === ',' && !q) { out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur); return out.map(s => s.trim());
+}
+function wcColIndex(headers) {
+  return {
+    name: headers.findIndex(h => /name|model|product|item|desc/.test(h)),
+    price: headers.findIndex(h => /price|cost|wholesale|usd/.test(h)),
+    moq: headers.findIndex(h => /moq|min|qty|quantity/.test(h))
+  };
+}
+function wcNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isNaN(n) ? null : n; }
+async function wcParseCsv(file) {
+  const text = await wcReadText(file);
+  const rows = text.split(/\r?\n/).filter(l => l.trim());
+  if (!rows.length) return [];
+  const headers = wcSplitCsvLine(rows[0]).map(h => h.toLowerCase().trim());
+  const col = wcColIndex(headers);
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const cells = wcSplitCsvLine(rows[i]);
+    const nm = (col.name >= 0 ? cells[col.name] : cells[0]) || '';
+    if (!nm.trim()) continue;
+    out.push(wcNormProduct({ name: nm, wholesalePrice: col.price >= 0 ? wcNum(cells[col.price]) : null, moq: col.moq >= 0 ? wcNum(cells[col.moq]) : null }));
+  }
+  return out;
+}
+async function wcParseExcel(file) {
+  if (typeof XLSX === 'undefined') throw new Error('Excel parser still loading — try again in a moment.');
+  const buf = await wcReadArrayBuffer(file);
+  const wb = XLSX.read(buf, { type: 'array' });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+  if (!rows.length) return [];
+  const headers = rows[0].map(h => String(h).toLowerCase().trim());
+  const col = wcColIndex(headers);
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const cells = rows[i];
+    const nm = String((col.name >= 0 ? cells[col.name] : cells[0]) || '').trim();
+    if (!nm) continue;
+    out.push(wcNormProduct({ name: nm, wholesalePrice: col.price >= 0 ? wcNum(cells[col.price]) : null, moq: col.moq >= 0 ? wcNum(cells[col.moq]) : null }));
+  }
+  return out;
+}
+async function wcParseWithClaude(contentBlock) {
+  const res = await fetch(PROXY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+    model: 'claude-sonnet-4-6', max_tokens: 3000,
+    messages: [{ role: 'user', content: [ contentBlock, { type: 'text', text: 'Extract every diecast product from this wholesale catalog. Return ONLY minified JSON: {"products":[{"name":"","wholesalePrice":<number or null>,"moq":<number or null>}]}.' } ] }]
+  }) });
+  const data = await res.json();
+  const parsed = evParseJson(evAnthropicText(data));
+  return (parsed && Array.isArray(parsed.products)) ? parsed.products.map(wcNormProduct) : [];
+}
+async function wcParsePdf(file) {
+  const b64 = (await wcReadDataUrl(file)).split(',')[1];
+  return wcParseWithClaude({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } });
+}
+async function wcParseImage(file) {
+  const b64 = (await wcReadDataUrl(file)).split(',')[1];
+  return wcParseWithClaude({ type: 'image', source: { type: 'base64', media_type: file.type || 'image/png', data: b64 } });
+}
+
+// ---- Render grid + eBay resale enrichment ----
+function wcRenderProducts() {
+  const wrap = document.getElementById('wcResults');
+  if (!wrap) return;
+  if (!wcProducts.length) { wrap.innerHTML = '<div style="color:var(--gray);font-size:13px;">No products found. Try a different URL or file.</div>'; return; }
+  wrap.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;">' +
+    wcProducts.map((p, i) => {
+      const wp = p.wholesalePrice, ea = p.ebayAvg;
+      const margin = (ea != null && wp != null) ? (ea - wp) : null;
+      const marginPct = (margin != null && ea > 0) ? Math.round(margin / ea * 100) : null;
+      const marginColor = margin == null ? 'var(--gray)' : margin > 0 ? 'var(--green)' : 'var(--red)';
+      const ebayText = p.ebayTried ? (ea != null ? '$' + ea + ' (' + p.ebayCount + ')' : 'n/a') : '⏳';
+      return `<div style="background:var(--black);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+        <div style="font-weight:600;font-size:13px;line-height:1.35;">${escHtmlA(p.name)}</div>
+        <div style="font-size:12px;color:var(--gray);">Wholesale: <b style="color:var(--white);">${wp != null ? '$' + wp : '—'}</b>${p.moq != null ? ' · MOQ ' + p.moq : ''}</div>
+        <div style="font-size:12px;color:var(--gray);">eBay resale: <b style="color:var(--gold);">${ebayText}</b></div>
+        <div style="font-size:12px;color:${marginColor};font-weight:700;">${margin != null ? 'Margin ' + (margin >= 0 ? '+' : '') + '$' + margin.toFixed(2) + (marginPct != null ? ' (' + marginPct + '%)' : '') : 'Margin —'}</div>
+        <button onclick="wcAddToWant(${i})" style="margin-top:auto;background:var(--gold);color:#000;border:none;border-radius:7px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;">+ Add to Want List</button>
+      </div>`;
+    }).join('') + '</div>';
+  wcEnrichEbay();
+}
+async function wcEnrichEbay() {
+  const todo = wcProducts.filter(p => !p.ebayTried).slice(0, 20); // cap eBay calls per pass
+  if (!todo.length) return;
+  let changed = false;
+  for (const p of todo) {
+    p.ebayTried = true;
+    try { const s = await fetchSoldStats(p.name); p.ebayAvg = s.avg; p.ebayCount = s.count; changed = true; } catch (e) {}
+  }
+  if (changed) { wcSaveCatalog(); wcRenderProducts(); }
+}
+function wcAddToWant(i) {
+  const p = wcProducts[i]; if (!p) return;
+  const name = p.name;
+  if (ericWants.some(w => (w.name || '').toLowerCase() === name.toLowerCase())) { toast('Already in Eric\'s Want List.', 'yellow'); return; }
+  const v = wcVendor();
+  ericWants.push({ name, brand: v.brand || '', scale: '', max: 0, pri: '🟡 Want', notes: 'Wholesale catalog' + (p.wholesalePrice != null ? ' · cost $' + p.wholesalePrice : '') + (p.moq != null ? ' · MOQ ' + p.moq : ''), priceData: lookupPrice(name) });
+  saveData();
+  renderWants('eric');
+  toast('✅ Added “' + name + '” to Eric\'s Want List.', 'green');
+}
+async function wcRefresh() {
+  if (wcSource && wcSource.type === 'url' && wcSource.url) { document.getElementById('wcUrl').value = wcSource.url; wcScrape(); }
+  else if (wcSource && wcSource.type === 'file') { toast('Re-upload the file to re-parse it.', 'yellow'); }
+  else { toast('Scrape a URL or upload a file first.', 'yellow'); }
 }
 
 // ============================================================
