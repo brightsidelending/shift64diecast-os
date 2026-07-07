@@ -66,12 +66,24 @@ const SCENARIOS = {
 // (referral, unknown) is routed to Pending Approvals for a human to review.
 const AUTO_TYPES = ['positive', 'needs_info', 'call_request'];
 
+// Shared negotiation sequence baked into every outreach and follow-up email.
+const NEGOTIATION_FRAMEWORK = `SHIFT64 NEGOTIATION FRAMEWORK — weave this sequence in naturally (never number it or make it robotic):
+1. Introduce who Shift64 Diecast is and what we do — a US-based diecast retailer.
+2. State what we want: wholesale / direct pricing to eliminate middlemen.
+3. Ask whether they can communicate in English via WeChat.
+4. If language is a barrier, note that our China-based contact can continue in Mandarin or Cantonese.
+5. Ask about sample availability before committing to a larger order.
+6. Ask about MOQ (minimum order quantity) beyond the sample.
+7. Ask about shipping to California — rates, methods, and efficiency.
+8. If they cannot ship directly, ask for a referral to a shipping partner or freight forwarder.
+Tailor the tone and channel to the brand/region (some makers are more reachable via WeChat, Instagram, Alibaba, or trade expos) rather than a one-size-fits-all approach.`;
+
 // ===========================================================================
 export default async function handler(req, res) {
   const startedAt = new Date().toISOString();
   console.log(`[cron] Eversen outreach responder started ${startedAt}`);
 
-  const summary = { processed: 0, autoSent: 0, needsReview: 0, skipped: 0, errors: 0, actions: [] };
+  const summary = { processed: 0, autoSent: 0, needsReview: 0, skipped: 0, errors: 0, followupsSent: 0, actions: [] };
 
   try {
     // nodemailer OAuth2 transport handles token refresh automatically for SENDING.
@@ -183,6 +195,10 @@ export default async function handler(req, res) {
 
     console.log(`[cron] done — processed=${summary.processed} autoSent=${summary.autoSent} needsReview=${summary.needsReview} skipped=${summary.skipped} errors=${summary.errors}`);
 
+    // --- Daily follow-up automation: nudge stale "Sent" outreach with no reply ---
+    await runFollowups(summary);
+    console.log(`[cron] follow-ups sent=${summary.followupsSent}`);
+
     const hour = new Date().getUTCHours();
     if (hour === 13) {
       const nodemailer = await import('nodemailer');
@@ -260,6 +276,80 @@ Write Eversen's email reply. Rules:
 Output ONLY the email body.`;
 
   const data = await callClaude([{ role: 'user', content: prompt }], 700);
+  return (data?.content?.[0]?.text || '').trim();
+}
+
+// ---------------------------------------------------------------------------
+// Follow-up automation — nudge stale "Sent" outreach that got no reply
+// ---------------------------------------------------------------------------
+const FOLLOWUP_SKIP = ['Replied', 'Follow-up Sent', 'Closed', 'Queued'];
+const FOLLOWUP_AFTER_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
+
+async function runFollowups(summary) {
+  try {
+    const raw = await kvCmd(['GET', TRACKER_KEY]);
+    let records = [];
+    if (raw) { try { records = JSON.parse(raw); } catch (_) { records = []; } }
+    if (!Array.isArray(records) || !records.length) return;
+
+    const now = Date.now();
+    let transporter = null;
+    let changed = false;
+
+    for (const rec of records) {
+      if (!rec || FOLLOWUP_SKIP.includes(rec.status)) continue;
+      if (rec.status !== 'Sent') continue;         // only chase records still awaiting a reply
+      if (!rec.contactEmail) continue;              // need somewhere to send
+      const last = Date.parse(rec.lastActivity);
+      if (isNaN(last) || (now - last) < FOLLOWUP_AFTER_MS) continue;
+
+      const draft = await draftFollowup(rec);
+      if (!draft) continue;
+
+      if (!transporter) {
+        const nodemailer = await import('nodemailer');
+        transporter = nodemailer.default.createTransport({
+          service: 'gmail',
+          auth: { user: 'Shift64Diecast@gmail.com', pass: process.env.GMAIL_APP_PASSWORD },
+        });
+      }
+      const mail = {
+        from: 'Eversen Chan <Shift64Diecast@gmail.com>',
+        to: rec.contactEmail,
+        subject: `Following up — Shift64 Diecast${rec.brand ? ' x ' + rec.brand : ''}`,
+        text: draft,
+      };
+      if (rec.threadId) { mail.references = rec.threadId; mail.inReplyTo = rec.threadId; }
+      await transporter.sendMail(mail);
+
+      rec.status = 'Follow-up Sent';
+      rec.lastActivity = displayDate();
+      changed = true;
+      summary.followupsSent = (summary.followupsSent || 0) + 1;
+      console.log(`[cron] follow-up sent to ${rec.contactEmail} (${rec.brand || 'no brand'})`);
+    }
+
+    if (changed) await kvCmd(['SET', TRACKER_KEY, JSON.stringify(records)]);
+  } catch (err) {
+    console.error(`[cron] follow-up automation failed: ${err.message}`);
+  }
+}
+
+async function draftFollowup(rec) {
+  const prompt = `${EVERSEN_PERSONA}
+
+You emailed this supplier about wholesale diecast sourcing more than 5 days ago and have NOT heard back. Write a SHORT, friendly follow-up nudge as Eversen Chan that references that original outreach and gently re-opens the conversation.
+Context — brand: "${rec.brand || '(unspecified)'}"; contact: ${rec.contactEmail}; notes from the first contact: ${rec.notes || '(none)'}.
+
+${NEGOTIATION_FRAMEWORK}
+
+Rules:
+- Plain text only, no subject line, no markdown. 2-3 short paragraphs max.
+- Low-pressure and warm. For a brief follow-up, prioritize re-introducing Shift64, the wholesale/direct-pricing ask, and the "English via WeChat / else Mandarin or Cantonese" option — don't cram all eight points in.
+- End with the "${SIGNATURE} / Shift64 Diecast / ${GMAIL_USER()}" sign-off.
+
+Output ONLY the email body.`;
+  const data = await callClaude([{ role: 'user', content: prompt }], 600);
   return (data?.content?.[0]?.text || '').trim();
 }
 

@@ -1023,6 +1023,22 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
   </div>
 
+  <!-- EVERSEN PLAYBOOK (collapsible, above the directive) -->
+  <div class="card" style="border-color:rgba(201,168,76,0.35);">
+    <button onclick="evTogglePlaybook()" id="evPlaybookToggle" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0;color:var(--gold);font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;">
+      <span id="evPlaybookHeading">📋 Playbook (0 rules)</span>
+      <span id="evPlaybookChevron" style="color:var(--gray);font-size:13px;">▸</span>
+    </button>
+    <div id="evPlaybookPanel" style="display:none;margin-top:14px;">
+      <div style="font-size:12px;color:var(--gray);margin-bottom:10px;line-height:1.5;">Permanent sourcing rules Eversen always follows. Every rule below is injected into every research pass and every outreach/follow-up email. Add lessons learned over time — e.g. “avoid sellers below 95% rating”.</div>
+      <div id="evPlaybookList"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <input class="text-input" id="evPlaybookInput" placeholder="Add a rule Eversen should always follow…" style="flex:1;min-width:220px;" onkeydown="if(event.key==='Enter')evAddRule()"/>
+        <button onclick="evAddRule()" style="padding:10px 18px;font-size:13px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;">+ Add Rule</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SECTION 1: BRAND INPUT -->
   <div class="card">
     <div class="card-title">🔍 Find A Manufacturer</div>
@@ -5398,6 +5414,70 @@ function evGetDirective() {
   return el ? (el.value || '').trim() : '';
 }
 
+// ---- Eversen Playbook (Redis key "eversen_playbook") ----
+let evPlaybook = [];
+const EV_PLAYBOOK_KEY = 'eversen_playbook';
+let evPlaybookOpen = false;
+
+async function loadPlaybook() {
+  try { const v = await kvGet(EV_PLAYBOOK_KEY); evPlaybook = Array.isArray(v) ? v : []; }
+  catch (e) { console.log('Playbook load failed:', e); }
+  renderPlaybook();
+}
+async function savePlaybook() { try { await kvSet(EV_PLAYBOOK_KEY, evPlaybook); } catch (e) { toast('⚠️ Could not save playbook.', 'yellow'); } }
+
+function evTogglePlaybook() {
+  evPlaybookOpen = !evPlaybookOpen;
+  const panel = document.getElementById('evPlaybookPanel');
+  const chev = document.getElementById('evPlaybookChevron');
+  if (panel) panel.style.display = evPlaybookOpen ? 'block' : 'none';
+  if (chev) chev.textContent = evPlaybookOpen ? '▾' : '▸';
+}
+function renderPlaybook() {
+  const heading = document.getElementById('evPlaybookHeading');
+  if (heading) heading.textContent = `📋 Playbook (${evPlaybook.length} rule${evPlaybook.length === 1 ? '' : 's'})`;
+  const list = document.getElementById('evPlaybookList');
+  if (!list) return;
+  if (!evPlaybook.length) { list.innerHTML = '<div style="color:var(--gray);font-size:13px;">No rules yet. Add your first sourcing rule below.</div>'; return; }
+  list.innerHTML = evPlaybook.map((r, i) => `
+    <div style="display:flex;align-items:flex-start;gap:10px;background:var(--black);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+      <div style="flex:1;font-size:13px;line-height:1.5;">${escHtmlA(r)}</div>
+      <button onclick="evDeleteRule(${i})" title="Delete rule" style="background:var(--red);color:#fff;border:none;border-radius:6px;width:24px;height:24px;font-size:12px;font-weight:700;cursor:pointer;flex:none;">✕</button>
+    </div>`).join('');
+}
+async function evAddRule() {
+  const input = document.getElementById('evPlaybookInput');
+  const val = (input.value || '').trim();
+  if (!val) return;
+  evPlaybook.push(val);
+  input.value = '';
+  renderPlaybook();
+  await savePlaybook();
+  toast('✅ Rule added to Eversen Playbook.', 'green');
+}
+async function evDeleteRule(i) {
+  if (i < 0 || i >= evPlaybook.length) return;
+  evPlaybook.splice(i, 1);
+  renderPlaybook();
+  await savePlaybook();
+}
+// Formatted playbook text injected into research + outreach/follow-up prompts.
+function evPlaybookText() {
+  if (!evPlaybook.length) return '';
+  return 'EVERSEN PLAYBOOK — permanent rules you MUST always follow:\n' + evPlaybook.map(r => '- ' + r).join('\n');
+}
+
+// Negotiation sequence baked into every outreach email (mirrors the cron follow-up framework).
+const EV_NEGOTIATION_FRAMEWORK = `SHIFT64 NEGOTIATION FRAMEWORK — weave this sequence in naturally (never number it or make it robotic):
+1. Introduce who Shift64 Diecast is and what we do — a US-based diecast retailer.
+2. State what we want: wholesale / direct pricing to eliminate middlemen.
+3. Ask whether they can communicate in English via WeChat.
+4. If language is a barrier, note that our China-based contact can continue in Mandarin or Cantonese.
+5. Ask about sample availability before committing to a larger order.
+6. Ask about MOQ (minimum order quantity) beyond the sample.
+7. Ask about shipping to California — rates, methods, and efficiency.
+8. If they cannot ship directly, ask for a referral to a shipping partner or freight forwarder.`;
+
 // Live web search: uses the web_search_20250305 server tool so Eversen finds current
 // manufacturer/wholesaler info rather than relying on training knowledge. The proxy
 // forwards the tools array untouched and the Vercel function runs up to 60s for this.
@@ -5414,7 +5494,7 @@ async function evResearchOnce(brand, focusHint) {
         system: `You are Eversen, a sourcing researcher for Shift64 Diecast, a US-based diecast reseller. Use the web_search tool to find the REAL manufacturer, factory, or wholesaler behind a given diecast brand and how a reseller can contact them. Search widely — official sites, trade/OEM pages, and community sources. ${EV_HUBS_KNOWLEDGE} When done, respond with ONLY minified JSON — no prose, no markdown, no code fences.`,
         messages: [{ role: 'user', content:
 `Brand: "${brand}".
-PRIORITY THIS PASS: run web searches about ${focusHint}, then broaden as needed.${directive ? `\n\nSOURCING DIRECTIVE (from the operator — weight this heavily in where you look and what you prioritize): ${directive}` : ''}
+PRIORITY THIS PASS: run web searches about ${focusHint}, then broaden as needed.${directive ? `\n\nSOURCING DIRECTIVE (from the operator — weight this heavily in where you look and what you prioritize): ${directive}` : ''}${evPlaybookText() ? `\n\n${evPlaybookText()}` : ''}
 
 Dig into community and trade sources, not just official websites:
 - Diecast forums and hobby blogs
@@ -5775,16 +5855,18 @@ async function evDraftOutreach(id) {
   if (!b) return;
   const li = evLangInfo(b);
   const directive = evGetDirective();
+  const playbook = evPlaybookText();
   // If a draft already exists, just open it.
   if (b.draft) { evOpenEmailModal(b); return; }
-  toast('✍️ Eversen is drafting outreach…', 'yellow');
+  toast('✍️ Eversen is researching & drafting outreach…', 'yellow');
   try {
     const res = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
+        max_tokens: 2600,
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
         messages: [{ role: 'user', content:
 `Write a first-contact wholesale outreach email as "Eversen", sourcing manager on behalf of Shift64 Diecast (a growing US-based diecast car reseller). Recipient: ${b.manufacturer || 'the manufacturer'} behind the brand "${b.brand}".
 ${b.briefing ? `
@@ -5794,13 +5876,18 @@ Follow this strategy: address the FIRST contact Eversen recommends above, and ma
 SOURCING DIRECTIVE (from the operator — let this shape the email's tone, angle, and channel/approach): ${directive}
 ` : ''}
 ${EV_HUBS_KNOWLEDGE}
-The email must: introduce Shift64 Diecast warmly, express genuine interest in becoming an authorized reseller / stocking their products, and politely request wholesale pricing and MOQ (minimum order quantity) information. Tone: friendly, respectful, professional. Keep it concise (about 130-180 words). Sign off as "Eversen — Sourcing, Shift64 Diecast".
+${playbook ? playbook + '\n' : ''}
+FIRST, use web search to research the best outreach approach for THIS specific brand and region: where this maker is most reachable and responsive (WeChat, Instagram, Alibaba, Made-in-China, trade expos, official site, etc.) and any norms worth respecting. Tailor the email's channel and angle to what you find — never a one-size-fits-all template.
+
+${EV_NEGOTIATION_FRAMEWORK}
+
+Write the email following that framework in order, weaving the points together naturally. Tone: friendly, respectful, professional, specific — never robotic. Keep it focused (about 150-220 words). Sign off as "Eversen — Sourcing, Shift64 Diecast".
 
 Recipient's primary language: ${li.name} (code ${li.code}).
-Always write the entire email in English as the primary language. Do NOT write it in ${li.name} first, and do NOT include a full ${li.name} translation. After the sign-off, add a single closing line offering to communicate in Mandarin or Cantonese if that is more comfortable for their team.
+Write the entire email in English as the primary language. Do NOT write it in ${li.name} first, and do NOT include a full ${li.name} translation. As the framework requires, ask whether they can communicate in English over WeChat, and if language is a barrier note that our China-based contact can continue in Mandarin or Cantonese.
 
-Return ONLY minified JSON:
-{"subjectNative":"","subjectEn":"English subject","bodyNative":"","bodyEn":"full English email body, ending with the single Mandarin/Cantonese offer line"}` }]
+Return ONLY minified JSON (no prose, no markdown, no code fences):
+{"subjectNative":"","subjectEn":"English subject","bodyNative":"","bodyEn":"full English email body following the framework"}` }]
       })
     });
     const data = await res.json();
@@ -6429,6 +6516,7 @@ renderCatalogs();               // show default vendor catalogs immediately (ind
 renderEversenChips();           // show quick-add chips immediately (independent of KV load)
 window.addEventListener('load', loadData);
 window.addEventListener('load', function () { loadOutreach(false); });
+window.addEventListener('load', function () { loadPlaybook(); });
 
 // Filter event listeners - guaranteed to fire
 document.addEventListener('DOMContentLoaded', function() {
