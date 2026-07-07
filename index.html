@@ -1138,6 +1138,46 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div id="orPendingCards"><div style="color:var(--gray);font-size:13px;">Nothing waiting for review. Replies Eversen flags as referrals or unknown will appear here.</div></div>
   </div>
 
+  <!-- SECTION 3: NEGOTIATE -->
+  <div class="card" style="border-color:rgba(201,168,76,0.35);">
+    <div class="card-title">🤝 Negotiate</div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:12px;line-height:1.5;">Paste what a vendor sent you (any language). Eversen translates it, reads the negotiation stage, and drafts your next reply — following the 8-step framework and your Playbook. Khai is the WeChat bridge for Chinese-only vendors.</div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+      <select class="fi" id="negoVendor" onchange="negoSelectVendor()" style="flex:1;min-width:220px;"><option value="">Select a vendor…</option></select>
+      <button onclick="loadNegoVendors()" title="Refresh vendor list" style="padding:9px 14px;font-size:13px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">🔄</button>
+    </div>
+
+    <div id="negoStageWrap" style="display:none;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span id="negoStageBadge" style="font-size:12px;font-weight:700;color:var(--gold);"></span>
+        <span id="negoStageCount" style="font-size:11px;color:var(--gray);"></span>
+      </div>
+      <div id="negoStageBar" style="display:flex;gap:4px;"></div>
+    </div>
+
+    <div id="negoChat" style="display:none;">
+      <div id="negoMessages" style="background:var(--black);border:1px solid var(--border);border-radius:10px;padding:14px;min-height:110px;max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:12px;"></div>
+      <label style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">Paste the vendor's message (any language)</label>
+      <textarea class="fi" id="negoInput" style="min-height:90px;resize:vertical;margin-bottom:10px;" placeholder="Paste what the vendor sent you here…"></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <button onclick="negoAnalyze('full')" id="negoAnalyzeBtn" style="padding:10px 18px;font-size:13px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;">✨ Analyze &amp; Suggest</button>
+        <button onclick="negoAnalyze('translate')" style="padding:10px 16px;font-size:13px;font-weight:600;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">🌐 Translate Only</button>
+        <button onclick="negoAnalyze('suggest')" style="padding:10px 16px;font-size:13px;font-weight:600;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">💬 Suggest Response</button>
+        <button onclick="negoLogToTracker()" style="padding:10px 16px;font-size:13px;font-weight:600;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">📌 Log to Tracker</button>
+      </div>
+      <div id="negoSuggestWrap" style="display:none;">
+        <label style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:5px;">✍️ Suggested reply as Eversen Chan (editable)</label>
+        <textarea class="fi" id="negoSuggestion" style="min-height:140px;resize:vertical;border:2px solid var(--gold);box-shadow:0 0 8px rgba(201,168,76,0.3);background:#1E2330;margin-bottom:10px;"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+          <button onclick="negoCopySuggestion()" style="padding:9px 16px;font-size:12px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;">📋 Copy &amp; Add to History</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="negoEmpty" style="color:var(--gray);font-size:13px;">Select a vendor above to start a negotiation.</div>
+  </div>
+
 </div>
 
 </div><!-- end main -->
@@ -6334,6 +6374,7 @@ function renderOutreach() {
     badge.textContent = n;
     badge.style.display = n > 0 ? '' : 'none';
   }
+  if (typeof loadNegoVendors === 'function') loadNegoVendors();
 }
 
 function orStatusBadge(status) {
@@ -6508,6 +6549,182 @@ async function orDiscardPending(id) {
   await saveOutreachPending();
   renderOutreach();
   toast('🗑️ Discarded.', 'green');
+}
+
+// ============================================================
+// NEGOTIATE — vendor negotiation assistant (Outreach tab)
+// ============================================================
+const NEGO_STAGES = [
+  'Introduction',
+  'Wholesale Interest Stated',
+  'English/WeChat Confirmed',
+  'Samples Discussed',
+  'MOQ Discussed',
+  'Shipping Discussed',
+  'Deal Closing'
+];
+let negoActiveVendorId = null;
+let negoActiveKey = null;
+let negoConvo = { stage: 1, messages: [], notes: '' };
+
+function loadNegoVendors() {
+  const sel = document.getElementById('negoVendor');
+  if (!sel) return;
+  const cur = sel.value;
+  const opts = ['<option value="">Select a vendor…</option>'].concat(
+    (orTracker || []).map(r => {
+      const who = r.contactName || r.contactEmail || '';
+      return `<option value="${escHtmlA(r.id)}">${escHtmlA(r.brand || '(no brand)')}${who ? ' — ' + escHtmlA(who) : ''}</option>`;
+    })
+  );
+  sel.innerHTML = opts.join('');
+  if (cur) sel.value = cur;
+}
+
+function negoKeyFor(rec) { return 'negotiation_' + (rec.threadId || rec.id); }
+
+async function negoSelectVendor() {
+  const id = document.getElementById('negoVendor').value;
+  const rec = (orTracker || []).find(x => x.id === id);
+  if (!rec) { negoActiveVendorId = null; negoActiveKey = null; renderNego(); return; }
+  negoActiveVendorId = id;
+  negoActiveKey = negoKeyFor(rec);
+  await loadNegoConvo(rec);
+  renderNego();
+}
+
+async function loadNegoConvo(rec) {
+  let c = null;
+  try { c = await kvGet(negoActiveKey); } catch (e) {}
+  if (c && typeof c === 'object') {
+    negoConvo = { stage: c.stage || 1, messages: Array.isArray(c.messages) ? c.messages : [], notes: c.notes || '' };
+  } else {
+    negoConvo = { stage: (rec && rec.negoStage) || 1, messages: [], notes: '' };
+  }
+}
+async function saveNegoConvo() { if (negoActiveKey) { try { await kvSet(negoActiveKey, negoConvo); } catch (e) { toast('⚠️ Could not save conversation.', 'yellow'); } } }
+
+function renderNego() {
+  const has = !!negoActiveKey;
+  const empty = document.getElementById('negoEmpty');
+  const chat = document.getElementById('negoChat');
+  const stageWrap = document.getElementById('negoStageWrap');
+  if (empty) empty.style.display = has ? 'none' : 'block';
+  if (chat) chat.style.display = has ? 'block' : 'none';
+  if (stageWrap) stageWrap.style.display = has ? 'block' : 'none';
+  if (!has) return;
+  renderNegoStage();
+  renderNegoMessages();
+}
+function renderNegoStage() {
+  const bar = document.getElementById('negoStageBar');
+  if (bar) bar.innerHTML = NEGO_STAGES.map((s, i) =>
+    `<div title="${escHtmlA((i + 1) + '. ' + s)}" style="flex:1;height:6px;border-radius:3px;background:${i < negoConvo.stage ? 'var(--gold)' : 'var(--border)'};"></div>`
+  ).join('');
+  const badge = document.getElementById('negoStageBadge');
+  if (badge) badge.textContent = 'Stage ' + negoConvo.stage + ': ' + NEGO_STAGES[negoConvo.stage - 1];
+  const count = document.getElementById('negoStageCount');
+  if (count) count.textContent = negoConvo.stage + ' / ' + NEGO_STAGES.length;
+}
+function renderNegoMessages() {
+  const m = document.getElementById('negoMessages');
+  if (!m) return;
+  if (!negoConvo.messages.length) { m.innerHTML = '<div style="color:var(--gray);font-size:12px;">No messages yet. Paste the vendor\'s first message below.</div>'; return; }
+  m.innerHTML = negoConvo.messages.map(x =>
+    `<div class="hc-msg ${x.from === 'eversen' ? 'hc-user' : 'hc-bot'}">${escHtmlA(x.text)}</div>`
+  ).join('');
+  m.scrollTop = m.scrollHeight;
+}
+
+async function negoAnalyze(mode) {
+  if (!negoActiveKey) { toast('⚠️ Select a vendor first.', 'yellow'); return; }
+  const raw = (document.getElementById('negoInput').value || '').trim();
+  if (mode !== 'suggest' && !raw) { toast('⚠️ Paste the vendor message first.', 'yellow'); return; }
+
+  const rec = (orTracker || []).find(x => x.id === negoActiveVendorId) || {};
+  const vendorLabel = (rec.brand || '(brand unknown)') + (rec.contactName || rec.contactEmail ? ' — ' + (rec.contactName || rec.contactEmail) : '');
+  const history = negoConvo.messages.map(m => (m.from === 'vendor' ? 'VENDOR: ' : 'EVERSEN: ') + m.text).join('\n');
+  const stageList = NEGO_STAGES.map((s, i) => (i + 1) + '. ' + s).join('\n');
+  const playbook = (typeof evPlaybookText === 'function' ? evPlaybookText() : '');
+  const framework = (typeof EV_NEGOTIATION_FRAMEWORK !== 'undefined' ? EV_NEGOTIATION_FRAMEWORK : '');
+
+  const sys = `You are Eversen Chan, wholesale sourcing negotiator for Shift64 Diecast, a US-based diecast retailer. You negotiate with vendors over WeChat and email.
+${framework}
+${playbook}
+NEGOTIATION STAGES:
+${stageList}
+Khai is Shift64's WeChat bridge who can continue the conversation in Mandarin or Cantonese for Chinese-only vendors — offer Khai when language is a barrier.
+Currently negotiating with: ${vendorLabel}. Current stage: ${negoConvo.stage} (${NEGO_STAGES[negoConvo.stage - 1]}).
+Conversation so far:
+${history || '(none yet)'}`;
+
+  let instruction;
+  if (mode === 'translate') {
+    instruction = `Translate this vendor message into natural English (return it unchanged if already English). Vendor message:\n"""${raw}"""\nReturn ONLY minified JSON: {"translation":"..."}`;
+  } else if (mode === 'suggest') {
+    instruction = `Write Eversen's best next reply following the framework and playbook${raw ? `. The vendor just said: """${raw}"""` : ' based on the conversation so far'}. Also identify the current negotiation stage (1-7). Return ONLY minified JSON: {"detectedStage":<1-7>,"suggestedResponse":"..."}`;
+  } else {
+    instruction = `Do three things: (1) translate the vendor message into English (unchanged if already English); (2) identify the current negotiation stage (1-7); (3) write Eversen's best next reply following the framework and playbook. Vendor message:\n"""${raw}"""\nReturn ONLY minified JSON: {"translation":"...","detectedStage":<1-7>,"suggestedResponse":"..."}`;
+  }
+
+  const btn = document.getElementById('negoAnalyzeBtn');
+  const origTxt = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '⏳ Working…'; btn.disabled = true; }
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1400, system: sys, messages: [{ role: 'user', content: instruction }] })
+    });
+    const data = await res.json();
+    if (data && data.error) throw new Error(data.error.message || 'analyze failed');
+    const p = evParseJson(evAnthropicText(data));
+
+    if ((mode === 'full' || mode === 'translate') && p.translation) {
+      negoConvo.messages.push({ from: 'vendor', text: p.translation });
+      document.getElementById('negoInput').value = '';
+    }
+    if (p.detectedStage && p.detectedStage >= 1 && p.detectedStage <= 7) negoConvo.stage = p.detectedStage;
+    if ((mode === 'full' || mode === 'suggest') && p.suggestedResponse) {
+      document.getElementById('negoSuggestion').value = p.suggestedResponse;
+      document.getElementById('negoSuggestWrap').style.display = 'block';
+    }
+    await saveNegoConvo();
+    renderNego();
+    toast('✅ Done.', 'green');
+  } catch (e) {
+    toast('⚠️ ' + ((e && e.message) || 'Analysis failed'), 'yellow');
+  } finally {
+    if (btn) { btn.innerHTML = origTxt; btn.disabled = false; }
+  }
+}
+
+async function negoCopySuggestion() {
+  const ta = document.getElementById('negoSuggestion');
+  const text = (ta.value || '').trim();
+  if (!text) return;
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) { try { ta.select(); document.execCommand('copy'); } catch (e2) {} }
+  negoConvo.messages.push({ from: 'eversen', text });
+  document.getElementById('negoSuggestWrap').style.display = 'none';
+  ta.value = '';
+  await saveNegoConvo();
+  renderNego();
+  toast('📋 Copied — paste into WeChat. Added to history.', 'green');
+}
+
+async function negoLogToTracker() {
+  const rec = (orTracker || []).find(x => x.id === negoActiveVendorId);
+  if (!rec) { toast('⚠️ No vendor selected.', 'yellow'); return; }
+  const stageName = NEGO_STAGES[negoConvo.stage - 1];
+  rec.negoStage = negoConvo.stage;
+  const baseNotes = (rec.notes || '').replace(/\s*\|\s*Negotiation:.*$/, '');
+  rec.notes = (baseNotes ? baseNotes + ' ' : '') + `| Negotiation: Stage ${negoConvo.stage} — ${stageName}`;
+  rec.lastActivity = orToday();
+  try {
+    await saveOutreachTracker();
+    renderOutreach();
+    toast('📌 Logged Stage ' + negoConvo.stage + ' to tracker.', 'green');
+  } catch (e) { toast('⚠️ Could not update tracker.', 'yellow'); }
 }
 
 // Init
