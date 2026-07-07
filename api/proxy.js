@@ -178,32 +178,31 @@ export default async function handler(req, res) {
     }
   }
 
-  // Gmail — send an email (or reply on a thread) from shift64diecast@gmail.com
+  // Gmail — send an email (or reply on a thread) via nodemailer (Gmail App Password)
   if (type === 'gmail_send') {
     try {
       const { to, subject, body, threadId } = req.body || {};
       if (!to || !subject) return res.status(400).json({ ok: false, error: 'Missing to or subject' });
-      const token = await getGmailToken();
-      if (!token) return res.status(200).json({ ok: false, error: 'Gmail not configured (missing GMAIL_* env vars)' });
-      const from = process.env.GMAIL_USER || 'shift64diecast@gmail.com';
-      const mime = [
-        `From: ${from}`,
-        `To: ${to}`,
-        `Subject: ${subject}`,
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset="UTF-8"',
-        'Content-Transfer-Encoding: 7bit'
-      ].join('\r\n') + '\r\n\r\n' + String(body || '');
-      const payload = { raw: b64urlEncode(mime) };
-      if (threadId) payload.threadId = threadId;
-      const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.default.createTransport({
+        service: 'gmail',
+        auth: {
+          user: 'Shift64Diecast@gmail.com',
+          pass: process.env.GMAIL_APP_PASSWORD
+        }
       });
-      const data = await r.json();
-      if (data.error) return res.status(200).json({ ok: false, error: (data.error.message || 'Gmail send failed') });
-      return res.status(200).json({ ok: true, messageId: data.id, threadId: data.threadId });
+      const mailOptions = {
+        from: 'Eversen Chan <Shift64Diecast@gmail.com>',
+        to,
+        subject,
+        html: body,
+      };
+      if (threadId) {
+        mailOptions.references = threadId;
+        mailOptions.inReplyTo = threadId;
+      }
+      const info = await transporter.sendMail(mailOptions);
+      return res.status(200).json({ ok: true, messageId: info.messageId, threadId: info.messageId });
     } catch (err) {
       return res.status(200).json({ ok: false, error: err.message });
     }
