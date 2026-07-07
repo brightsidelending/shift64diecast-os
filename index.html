@@ -5579,13 +5579,11 @@ function evOpenEmailModal(b) {
   evDraftParts = Object.assign({ subjectNative:'', subjectEn:'', bodyNative:'', bodyEn:'', needsNative:false }, b.draft || {});
   document.getElementById('evEmailBrandTag').textContent = '— ' + b.brand;
   document.getElementById('evEmailTo').value = b.contactEmail || '';
-  // Show native view first when applicable (native leads as a sign of respect), else both/english.
-  evLangView = evDraftParts.needsNative ? 'both' : 'english';
-  // Hide the native toggle button when there is no native version.
-  document.querySelectorAll('#evLangToggle .ev-lang-btn').forEach(btn => {
-    const m = btn.getAttribute('data-mode');
-    btn.style.display = (!evDraftParts.needsNative && (m === 'native' || m === 'both')) ? 'none' : '';
-  });
+  // Outreach is English-first: always show and send the English subject/body as primary.
+  evLangView = 'english';
+  // Outreach is English-only: hide the language toggle entirely.
+  const langToggle = document.getElementById('evLangToggle');
+  if (langToggle) langToggle.style.display = 'none';
   evSetLangView(evLangView);
   openModal('evEmailModal');
 }
