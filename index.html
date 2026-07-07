@@ -325,6 +325,28 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   #khai .tbl-wrap table th:nth-child(3), #khai .tbl-wrap table td:nth-child(3),
   #khai .tbl-wrap table th:nth-child(14), #khai .tbl-wrap table td:nth-child(14) { display: none !important; }
 }
+/* ===== HELP SYSTEM ===== */
+.help-tip{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;min-width:16px;border-radius:50%;background:var(--border);color:var(--gray);font-size:11px;font-weight:700;line-height:1;cursor:help;margin-left:6px;position:relative;vertical-align:middle;user-select:none;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0}
+.help-tip:hover{background:var(--gold);color:#000}
+.help-tip .help-pop{display:none;position:absolute;bottom:150%;left:50%;transform:translateX(-50%);width:250px;max-width:60vw;background:var(--dark);border:1px solid var(--gold);border-radius:8px;padding:10px 12px;font-size:12px;font-weight:400;color:var(--white);line-height:1.5;letter-spacing:0;text-transform:none;text-align:left;white-space:normal;z-index:400;box-shadow:0 8px 24px rgba(0,0,0,0.55)}
+.help-tip .help-pop::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--gold)}
+.help-tip:hover .help-pop,.help-tip.open .help-pop{display:block}
+.help-tip.hp-right .help-pop{left:auto;right:0;transform:none}
+.help-tip.hp-right .help-pop::after{left:auto;right:6px;transform:none}
+/* Floating help chat */
+#helpFab{position:fixed;bottom:24px;right:24px;width:54px;height:54px;border-radius:50%;background:var(--gold);color:#000;border:none;font-size:26px;font-weight:800;font-family:'Rajdhani',sans-serif;cursor:pointer;z-index:500;box-shadow:0 6px 20px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;transition:transform 0.15s}
+#helpFab:hover{transform:scale(1.08)}
+#helpChat{position:fixed;bottom:90px;right:24px;width:360px;max-width:92vw;height:480px;max-height:72vh;background:var(--card);border:1px solid var(--gold);border-radius:14px;z-index:500;display:none;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.6)}
+#helpChat.open{display:flex}
+#helpChatHead{background:linear-gradient(135deg,#16191F 0%,#1A1710 100%);padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+#helpChatBody{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.hc-msg{max-width:85%;padding:9px 12px;border-radius:12px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
+.hc-user{align-self:flex-end;background:var(--gold);color:#000;border-bottom-right-radius:4px}
+.hc-bot{align-self:flex-start;background:var(--black);border:1px solid var(--border);color:var(--white);border-bottom-left-radius:4px}
+#helpChatForm{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border)}
+#helpChatInput{flex:1;background:var(--black);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--white);font-size:13px;font-family:'Inter',sans-serif;outline:none}
+#helpChatInput:focus{border-color:var(--gold)}
+#helpChatSend{background:var(--gold);color:#000;border:none;border-radius:8px;padding:0 16px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -6518,6 +6540,167 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </div>
 </div>
+
+<!-- ===== HELP SYSTEM ===== -->
+<button id="helpFab" onclick="toggleHelpChat()" title="Help & Guide" aria-label="Help">?</button>
+<div id="helpChat">
+  <div id="helpChatHead">
+    <div style="font-family:'Rajdhani',sans-serif;font-weight:700;color:var(--gold);font-size:15px;letter-spacing:1px;">💬 SHIFT64 GUIDE</div>
+    <button onclick="toggleHelpChat()" style="background:none;border:none;color:var(--gray);font-size:22px;line-height:1;cursor:pointer;">×</button>
+  </div>
+  <div id="helpChatBody"></div>
+  <form id="helpChatForm" onsubmit="return helpChatSend(event)">
+    <input id="helpChatInput" placeholder="Ask how anything works…" autocomplete="off"/>
+    <button id="helpChatSend" type="submit">Send</button>
+  </form>
+</div>
+
+<script>
+// ============================================================
+// HELP SYSTEM — tooltips + floating guide chat
+// ============================================================
+const HELP = {
+  tabs: {
+    price_scanner: "Look up a diecast model's real market price. Pulls live active, sold, and auction listings from eBay so you can gauge what it actually sells for.",
+    scanner: "Analyze a competitor's storefront. Upload screenshots or a CSV to see their pricing and what they stock.",
+    auction_watch: "Track live eBay auctions ending soon so you can snipe underpriced diecast before they close.",
+    buy_report: "Your ranked Top 10 buying opportunities — the models with the best margin potential right now.",
+    inventory: "Everything you own or have on order, with cost, sell price, margin, and status.",
+    suppliers: "Your wholesale supplier contacts and the status of outreach to each.",
+    negotiation: "Track price negotiations with suppliers — their quote, your counter, and where each deal stands.",
+    delivery: "Track incoming shipments from suppliers to your door.",
+    accounting: "Your sales, costs, and profit at a glance.",
+    eric: "Eric's personal diecast collection.",
+    khai: "Khai's personal diecast collection.",
+    wantlist: "Models you're hunting for, with your max price and priority.",
+    intel: "Market intelligence pulled from Whatnot and other sources.",
+    eversen: "Your AI sourcing agent. Finds the real manufacturer behind a brand and drafts wholesale outreach for you.",
+    outreach: "Track every supplier conversation and approve the replies Eversen flags for review."
+  },
+  labels: {
+    "find a manufacturer": "Runs a deep web search to find the real Chinese manufacturer or wholesaler behind a diecast brand.",
+    "find manufacturer": "Runs a deep web search to find the real Chinese manufacturer or wholesaler behind a diecast brand.",
+    "auto source": "Searches eBay, Alibaba, and AliExpress for manufacturers and sellers of this brand. Extracts publicly available contact info and adds them as leads to your Outreach Tracker.",
+    "auto sourced leads": "Sellers and suppliers found across eBay, Alibaba, and AliExpress. Click “Add to Outreach” on any lead to queue it in your tracker.",
+    "sourcing directive": "Give Eversen specific instructions that shape every search and email. Example: focus on Shenzhen, approach via WeChat first.",
+    "eversen playbook": "Permanent sourcing rules Eversen always follows. Add lessons learned over time — e.g. avoid sellers below 95% rating.",
+    "draft outreach": "Generates a professional English-first cold email as Eversen Chan targeting this supplier for wholesale pricing.",
+    "research findings": "What Eversen found about the brand's maker, official contact info, and community leads.",
+    "outreach queue": "Brands with a found contact, ready for you to draft outreach.",
+    "outreach tracker": "Every supplier you've contacted, their status, and quick actions to follow up or close the conversation.",
+    "pending approvals": "Replies Eversen flagged as referrals or unclear. Review and edit the drafted response, then Approve & Send or Discard.",
+    "top buyers leaderboard": "Your biggest Whatnot buyers ranked by total spend.",
+    "sales analysis": "A breakdown of your sales performance over time.",
+    "ai sourcing recommendations": "AI suggestions on what to source next, based on your sales and market data.",
+    "select competitor": "Pick which competitor storefront you're analyzing.",
+    "import cost settings": "Set duty, shipping, and fees so every margin calculation reflects your true landed cost.",
+    "auction watchlist": "Live eBay auctions you're tracking, sorted by soonest to end.",
+    "upload whatnot spy csv": "Upload your Whatnot sales CSV to populate buyer and sales analytics."
+  }
+};
+
+const HELP_SYSTEM = `You are the built-in guide for "Shift64 Diecast OS", a web app a diecast reseller uses to find products, price them, source suppliers, and track outreach. Answer questions about how to use the app clearly and briefly (2-5 sentences, plain English). The app's tabs and features:
+- Price Scanner: look up a model's real market price from live eBay active/sold/auction listings.
+- Competitor Scanner: analyze a competitor storefront from screenshots/CSV.
+- Auction Watch: track live eBay auctions ending soon.
+- Buy Report: ranked Top 10 buying opportunities by margin.
+- Inventory / Suppliers / Negotiation / Delivery / Accounting: standard reselling operations tracking.
+- Eversen: AI sourcing agent — "Find Manufacturer" deep-web-searches the real maker behind a brand; "Auto-Source" scans eBay/Alibaba/AliExpress for sellers and contact info; "Sourcing Directive" gives Eversen standing instructions; "Draft Outreach" writes an English-first cold email as Eversen Chan.
+- Outreach tab: tracks every supplier conversation (statuses: Queued, Sent, Replied, Needs Review, Follow-up Pending, Closed) and a Pending Approvals queue for bot-flagged replies.
+If you don't know a specific detail, say so and suggest where in the app to look. Never invent features that don't exist above.`;
+
+function normHelp(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
+function bestHelpKey(norm){
+  let best=null;
+  for(const k in HELP.labels){ if(norm===k || norm.startsWith(k+' ')){ if(!best||k.length>best.length) best=k; } }
+  return best;
+}
+function makeHelpTip(text){
+  const s=document.createElement('span');
+  s.className='help-tip';
+  s.innerHTML='?<span class="help-pop"></span>';
+  s.querySelector('.help-pop').textContent=text;
+  s.addEventListener('click',function(e){
+    e.stopPropagation(); e.preventDefault();
+    document.querySelectorAll('.help-tip.open').forEach(t=>{ if(t!==s) t.classList.remove('open'); });
+    // Flip popover if the tip sits in the right third of the viewport.
+    const r=s.getBoundingClientRect();
+    s.classList.toggle('hp-right', r.left > window.innerWidth*0.62);
+    s.classList.toggle('open');
+  });
+  return s;
+}
+function initHelpTips(){
+  // Nav tabs — keyed by the tab id in their showTab('id') onclick.
+  document.querySelectorAll('.nav-tab').forEach(tab=>{
+    if(tab.querySelector('.help-tip')) return;
+    const m=(tab.getAttribute('onclick')||'').match(/showTab\('([^']+)'/);
+    if(m && HELP.tabs[m[1]]) tab.appendChild(makeHelpTip(HELP.tabs[m[1]]));
+  });
+  // Section headers + named buttons/labels — keyed by their text.
+  document.querySelectorAll('.card-title, button, label').forEach(el=>{
+    if(el.id==='helpChatSend' || el.closest('#helpChat') || el.closest('#helpFab')) return;
+    if(el.getAttribute('data-help-added') || el.querySelector('.help-tip')) return;
+    const key=bestHelpKey(normHelp(el.textContent));
+    if(key){ el.setAttribute('data-help-added','1'); el.appendChild(makeHelpTip(HELP.labels[key])); }
+  });
+}
+
+// ---- Floating guide chat ----
+let helpChatHistory=[];
+function toggleHelpChat(){
+  const c=document.getElementById('helpChat');
+  c.classList.toggle('open');
+  if(c.classList.contains('open')){
+    if(!helpChatHistory.length) helpAddMsg('bot',"Hi! I'm your Shift64 OS guide. Ask me how any feature works — Price Scanner, Auto-Source, Outreach, Eversen, anything.");
+    setTimeout(()=>{ const i=document.getElementById('helpChatInput'); if(i) i.focus(); },60);
+  }
+}
+function helpAddMsg(role,text){
+  const body=document.getElementById('helpChatBody');
+  const d=document.createElement('div');
+  d.className='hc-msg '+(role==='user'?'hc-user':'hc-bot');
+  d.textContent=text;
+  body.appendChild(d); body.scrollTop=body.scrollHeight;
+  return d;
+}
+async function helpChatSend(e){
+  if(e) e.preventDefault();
+  const input=document.getElementById('helpChatInput');
+  const q=(input.value||'').trim(); if(!q) return false;
+  input.value='';
+  helpAddMsg('user',q);
+  helpChatHistory.push({ role:'user', content:q });
+  const thinking=helpAddMsg('bot','…');
+  try{
+    const res=await fetch(PROXY_URL,{
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:600, system:HELP_SYSTEM, messages:helpChatHistory.slice(-8) })
+    });
+    const data=await res.json();
+    let txt='';
+    if(data && Array.isArray(data.content)) txt=data.content.filter(c=>c.type==='text').map(c=>c.text||'').join('\n').trim();
+    if(!txt && data && data.error) txt='⚠️ '+(data.error.message||'error');
+    if(!txt) txt='Sorry, I could not answer that. Try rephrasing.';
+    thinking.textContent=txt;
+    helpChatHistory.push({ role:'assistant', content:txt });
+  }catch(err){ thinking.textContent='⚠️ '+((err&&err.message)||'Network error'); }
+  return false;
+}
+
+// Close any open tooltip when clicking elsewhere.
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.help-tip')) document.querySelectorAll('.help-tip.open').forEach(t=>t.classList.remove('open'));
+});
+
+// Inject tooltips now and re-scan when the app renders new content (debounced, idempotent).
+initHelpTips();
+(function(){
+  let t=null;
+  const mo=new MutationObserver(function(){ clearTimeout(t); t=setTimeout(initHelpTips,350); });
+  mo.observe(document.body,{ childList:true, subtree:true });
+})();
+</script>
 
 </body>
 </html>
