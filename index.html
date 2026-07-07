@@ -5284,74 +5284,10 @@ async function runPriceScan() {
         </div>
       </div>`;
     renderCompetitorPrices(); // populate the competitor list + highlight the active filter
-    // 🎯 Whatnot Max Bid — one clean panel at the bottom of the results.
-    let ebayAvgForBid = null, ebayCountForBid = 0;
-    if (ebaySoldPrices.length > 0) { ebayAvgForBid = sold; ebayCountForBid = ebaySoldPrices.length; }
-    else if (ebayActivePrices.length > 0) { ebayAvgForBid = active; ebayCountForBid = ebayActivePrices.length; }
-    document.getElementById('psResults').insertAdjacentHTML('beforeend', whatnotMaxBidLine(_compMatches, ebayAvgForBid, ebayCountForBid));
     stopScanTimer();
     document.getElementById('psLoading').style.display = 'none';
     document.getElementById('psScanBtn').disabled = false;
   }
-}
-
-// Whatnot Max Bid: 85% of the lowest Horizon/Carbros retail (in USD), else 80% of the eBay avg.
-// Shows per-retailer status (price or "🔴 Not available") and handles limited / no-data cases.
-function whatnotMaxBidLine(compMatches, ebayAvg, ebayCount) {
-  const rate = (typeof _cadUsdRate === 'number' && _cadUsdRate > 0) ? _cadUsdRate : 0.73;
-  const money = (v) => '$' + (Math.round(v * 100) / 100);
-  // Lowest in-stock USD price for a retailer (matched from scans + vendor catalogs), or null if not found.
-  const findRetail = (re, isCad) => {
-    let best = null;
-    (compMatches || []).forEach(m => {
-      if (!re.test(String(m.site || '').toLowerCase())) return;
-      if (String(m.status || '').toLowerCase() === 'out of stock') return;
-      const pr = parseFloat(m.price);
-      if (isNaN(pr) || pr <= 0) return;
-      const usd = isCad ? pr * rate : pr;
-      if (best == null || usd < best) best = usd;
-    });
-    return best;
-  };
-  const horizon = findRetail(/horizon/, false);
-  const carbros = findRetail(/carbro/, true); // CarBromc is priced in CAD → convert to USD
-
-  // Per-retailer status lines (item 3: show "🔴 Not available" when searched but not found).
-  const rLine = (label, val) => val != null
-    ? `<div>🟢 ${label}: <b style="color:var(--white);">${money(val)}</b></div>`
-    : `<div style="color:var(--red);">🔴 ${label}: Not available</div>`;
-  const ebayLine = (ebayAvg != null && ebayAvg > 0)
-    ? `<div>📦 eBay avg: <b style="color:var(--white);">$${ebayAvg}${ebayCount ? ' (' + ebayCount + ')' : ''}</b></div>`
-    : `<div style="color:var(--red);">🔴 eBay: no sold data</div>`;
-
-  // Conclusion line (items 1 & 2).
-  const retail = [horizon, carbros].filter(v => v != null && v > 0);
-  let conclusion, cColor;
-  if (retail.length) {
-    conclusion = '🎯 Whatnot Max Bid: $' + Math.round(Math.min(...retail) * 0.85);
-    cColor = 'var(--gold)';
-  } else if (ebayAvg != null && ebayAvg > 0) {
-    const est = Math.round(ebayAvg * 0.80);
-    if (ebayCount != null && ebayCount >= 1 && ebayCount <= 2) {
-      conclusion = '⚠️ Limited data — estimated max $' + est + ', verify before bidding';
-      cColor = 'var(--yellow)';
-    } else {
-      conclusion = '🎯 Whatnot Max Bid: $' + est;
-      cColor = 'var(--gold)';
-    }
-  } else {
-    conclusion = '🔴 Not available anywhere — bid carefully, no price reference';
-    cColor = 'var(--red)';
-  }
-
-  return `<div style="margin-top:16px;padding:14px 18px;background:#1A1710;border:2px solid var(--gold);border-radius:10px;">
-    <div style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--gray);margin-bottom:10px;">
-      ${rLine('Horizon', horizon)}${rLine('Carbros', carbros)}${ebayLine}
-    </div>
-    <div style="border-top:1px solid rgba(201,168,76,0.3);padding-top:10px;text-align:center;">
-      <span style="font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:800;color:${cColor};letter-spacing:0.5px;">${conclusion}</span>
-    </div>
-  </div>`;
 }
 
 // ===== BUSINESS MODULE FUNCTIONS =====
