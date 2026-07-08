@@ -5085,7 +5085,7 @@ async function identifyDiecastImages(images, correction) {
   const thumbUrl = (images[0] && images[0].dataUrl) || '';
   const base = 'You are given multiple angles of the same diecast model. Carefully READ any visible printed text in every image — especially on the base plate or underside, packaging, or any label. Brand names, model names, scale (1:64, 1:18), and part numbers are often printed directly on the base. Use all text and visual details together to identify the exact brand, model name, scale, and color. Return JSON only.';
   const userText = correction
-    ? `The user has identified this as: '${correction}'. Treat this as confirmed and use it as your primary search lead. Verify against the images and provide details about this specific model. ${base}`
+    ? `Your previous identification was incorrect. The user says this item is: '${correction}'. Re-examine the images carefully with this correction as strong context. ${base}`
     : base;
   // Build a content array: one image block per loaded angle, then the instruction text
   const content = images.map(im => ({ type: 'image', source: { type: 'base64', media_type: im.mediaType, data: im.base64 } }));
@@ -5220,7 +5220,6 @@ async function showIdentifyResult(r, dataUrl) {
   if (conf === 'high') {
     _autoScanAfterId = false;
     document.getElementById('psSearchInput').value = buildIdSearchTerm(r);
-    _lastAutoSearchTerm = document.getElementById('psSearchInput').value.trim();
     togglePsClear();
     const banner = `<div style="background:#0D2B0D;border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--green);">✅ Identified: ${escHtmlA(model)}<span style="color:var(--green);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}${notesHtml}</div></div>`;
     await runPriceScan();
@@ -5233,7 +5232,6 @@ async function showIdentifyResult(r, dataUrl) {
   if (_autoScanAfterId && model) {
     _autoScanAfterId = false;
     document.getElementById('psSearchInput').value = buildIdSearchTerm(r);
-    _lastAutoSearchTerm = document.getElementById('psSearchInput').value.trim();
     togglePsClear();
     const banner = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:10px;padding:16px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;">${thumb}<div style="min-width:0;"><div style="font-family:Rajdhani,sans-serif;font-size:15px;font-weight:700;color:var(--yellow);">🔎 Identified from photo: ${escHtmlA(model)}<span style="color:var(--yellow);">${confBadge}</span>${enrichedTag}</div>${detailsHtml}<div style="font-size:12px;color:var(--gray);margin-top:6px;">Lower-confidence match — showing prices for this best guess. Correct it below if needed.</div></div></div>`;
     await runPriceScan();
