@@ -4085,7 +4085,7 @@ function renderWhatnotShows() {
     const showDisp = s.showDate || ((computeShowDate(s) || {}).display) || '';
     const upDisp = s.uploadedDate ? s.uploadedDate : fmtMonDD(s.date);
     return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">
-      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${showDisp ? 'Show: ' + escHtmlA(showDisp) + ' · ' : ''}Uploaded: ${escHtmlA(upDisp || '—')} ${badge}</div>${s.streamTitle ? `<div style="font-size:12px;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📺 ${escHtmlA(s.streamTitle)}</div>` : ''}<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(files)} · ${totalRows} rows</div></div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${showDisp ? `<span style="color:var(--gold);font-weight:600;">Show: ${escHtmlA(showDisp)}</span> · ` : ''}<span style="color:var(--gray);">Uploaded: ${escHtmlA(upDisp || '—')}</span> ${badge}</div>${s.streamTitle ? `<div style="font-size:12px;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📺 ${escHtmlA(s.streamTitle)}</div>` : ''}<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(files)} · ${totalRows} rows</div></div>
       <button onclick="deleteWhatnotShow('${s.id}')" class="row-action row-del" title="Delete show">🗑️</button>
     </div>`;
   }).join('') + '</div>';
