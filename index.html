@@ -1041,6 +1041,19 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </table>
     </div>
   </div>
+
+  <!-- ASK EVERSEN CHAT -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">💬 Ask Eversen</div>
+      <button onclick="evChatClear()" style="padding:6px 12px;font-size:11px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">Clear Chat</button>
+    </div>
+    <div id="evChatBody" style="background:var(--black);border:1px solid var(--border);border-radius:10px;padding:14px;max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:12px;"></div>
+    <form onsubmit="return false;" style="display:flex;gap:8px;">
+      <input class="text-input" id="evChatInput" placeholder="Ask Eversen about sourcing, brands, pricing…" style="flex:1;min-width:180px;" onkeydown="if(event.key==='Enter'){event.preventDefault();evChatSend();}"/>
+      <button type="button" id="evChatSendBtn" onclick="evChatSend()" style="padding:10px 20px;font-size:14px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">Send</button>
+    </form>
+  </div>
 </div>
 
 <!-- ===== EVERSEN (legacy AI agent — replaced by the pipeline tab above; kept for data compatibility) ===== -->
@@ -7699,6 +7712,7 @@ window.addEventListener('load', function () { loadOutreach(false); });
 window.addEventListener('load', function () { loadPlaybook(); });
 window.addEventListener('load', function () { sqLoad(); });
 window.addEventListener('load', function () { epLoad(); });
+window.addEventListener('load', function () { if (typeof evChatRender === 'function') evChatRender(); });
 
 // ============================================================
 // EVERSEN PIPELINE — simple brand pipeline (localStorage "eversenPipeline")
@@ -7777,6 +7791,23 @@ function epRender() {
   body.innerHTML = epPipeline.map(r => {
     const href = /^https?:\/\//i.test(r.website) ? r.website : ('https://' + r.website);
     const web = r.website ? `<a href="${escHtmlA(href)}" target="_blank" rel="noopener" style="color:var(--blue);">${escHtmlA(r.website)}</a>` : '—';
+    if (epEditingId === r.id) {
+      // Inline edit mode: Contact Email, Status, Notes are editable.
+      const opts = EP_STATUS_ORDER.map(st => `<option value="${st}"${r.status === st ? ' selected' : ''}>${st}</option>`).join('');
+      return `<tr style="border-bottom:1px solid var(--border);background:#12151b;">
+        <td style="padding:8px 12px;font-weight:600;">${escHtmlA(r.brand)}</td>
+        <td style="padding:8px 12px;font-size:12px;">${web}</td>
+        <td style="padding:8px 12px;"><input class="fi" id="epEditEmail_${r.id}" value="${escHtmlA(r.contactEmail || '')}" placeholder="email" style="font-size:12px;padding:6px 8px;"/></td>
+        <td style="padding:8px 12px;"><select class="fi" id="epEditStatus_${r.id}" style="font-size:12px;padding:6px 8px;">${opts}</select></td>
+        <td style="padding:8px 12px;font-size:12px;color:var(--gray);">${escHtmlA(r.dateAdded || '—')}</td>
+        <td style="padding:8px 12px;font-size:12px;color:var(--gray);">${escHtmlA(r.lastActivity || '—')}</td>
+        <td style="padding:8px 12px;"><input class="fi" id="epEditNotes_${r.id}" value="${escHtmlA(r.notes || '')}" placeholder="notes" style="font-size:12px;padding:6px 8px;"/></td>
+        <td style="padding:8px 12px;white-space:nowrap;">
+          <button onclick="epSaveEdit('${r.id}')" style="padding:5px 10px;font-size:11px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:6px;cursor:pointer;margin-right:4px;">Save</button>
+          <button onclick="epCancelEdit()" style="padding:5px 10px;font-size:11px;font-weight:600;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:6px;cursor:pointer;">Cancel</button>
+        </td>
+      </tr>`;
+    }
     return `<tr style="border-bottom:1px solid var(--border);">
       <td style="padding:10px 12px;font-weight:600;">${escHtmlA(r.brand)}</td>
       <td style="padding:10px 12px;font-size:12px;">${web}</td>
@@ -7785,9 +7816,75 @@ function epRender() {
       <td style="padding:10px 12px;font-size:12px;color:var(--gray);">${escHtmlA(r.dateAdded || '—')}</td>
       <td style="padding:10px 12px;font-size:12px;color:var(--gray);">${escHtmlA(r.lastActivity || '—')}</td>
       <td style="padding:10px 12px;font-size:12px;color:var(--gray);max-width:180px;">${escHtmlA(r.notes || '')}</td>
-      <td style="padding:10px 12px;"><button onclick="epRemove('${r.id}')" style="padding:5px 10px;font-size:11px;font-weight:600;background:var(--card);color:var(--red);border:1px solid var(--border);border-radius:6px;cursor:pointer;">Remove</button></td>
+      <td style="padding:10px 12px;white-space:nowrap;">
+        <button onclick="epEdit('${r.id}')" style="padding:5px 10px;font-size:11px;font-weight:600;background:var(--card);color:var(--gold);border:1px solid var(--border);border-radius:6px;cursor:pointer;margin-right:4px;">Edit</button>
+        <button onclick="epRemove('${r.id}')" style="padding:5px 10px;font-size:11px;font-weight:600;background:var(--card);color:var(--red);border:1px solid var(--border);border-radius:6px;cursor:pointer;">Remove</button>
+      </td>
     </tr>`;
   }).join('');
+}
+const EP_STATUS_ORDER = ['Queued', 'Researching', 'Contacted', 'Replied', 'Positive', 'Needs Review', 'Dead'];
+let epEditingId = null;
+function epEdit(id) { epEditingId = id; epRender(); }
+function epCancelEdit() { epEditingId = null; epRender(); }
+async function epSaveEdit(id) {
+  const r = epPipeline.find(x => x.id === id);
+  if (!r) return;
+  const gv = (pfx) => { const el = document.getElementById(pfx + id); return el ? el.value : undefined; };
+  const updates = {
+    contactEmail: (gv('epEditEmail_') || '').trim(),
+    status: gv('epEditStatus_') || r.status,
+    notes: (gv('epEditNotes_') || '').trim(),
+    lastActivity: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  };
+  Object.assign(r, updates);   // update locally
+  epEditingId = null;
+  epRender();                  // refresh table + stats immediately
+  try {
+    await fetch(PROXY_URL + '?action=updateEversenBrand', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brand: r.brand, updates }) });
+  } catch (e) { console.log('[pipeline] updateEversenBrand failed:', e); }
+  epSave();                    // keep the full pipeline (localStorage + Redis) in sync
+  toast('✓ Saved', 'green');
+}
+
+// ---- Ask Eversen chat (session history; Anthropic via ?action=claude) ----
+let evChatHistory = []; // { role:'user'|'assistant', content }
+const EV_CHAT_SYSTEM = "You are Eversen Chan, Shift64 Diecast's AI procurement agent. You help Eric and Khai with wholesale sourcing strategy, supplier research, brand analysis, pricing intelligence, and outreach decisions. You know their target brands: Demon King Auto, TPC, Flame, Pop Race, LCD Models, Inno64, MiniGT, Kaido House. You are direct, strategic, and always focused on finding factory-direct buying opportunities.";
+function evChatRender() {
+  const body = document.getElementById('evChatBody');
+  if (!body) return;
+  if (!evChatHistory.length) { body.innerHTML = '<div style="color:var(--gray);font-size:12px;">Ask Eversen anything about sourcing strategy, target brands, or pricing.</div>'; return; }
+  body.innerHTML = evChatHistory.map(m => {
+    const isUser = m.role === 'user';
+    return `<div style="font-size:13px;line-height:1.5;"><span style="color:${isUser ? 'var(--white)' : 'var(--gold)'};font-weight:700;">${isUser ? 'You:' : 'Eversen:'}</span> <span style="color:${isUser ? 'var(--white)' : '#E4E4E4'};white-space:pre-wrap;">${escHtmlA(m.content)}</span></div>`;
+  }).join('');
+  body.scrollTop = body.scrollHeight;
+}
+function evChatClear() { evChatHistory = []; evChatRender(); }
+async function evChatSend() {
+  const input = document.getElementById('evChatInput');
+  const q = (input.value || '').trim();
+  if (!q) return;
+  input.value = '';
+  evChatHistory.push({ role: 'user', content: q });
+  evChatRender();
+  const msgs = evChatHistory.map(m => ({ role: m.role, content: m.content })).slice(-12); // real history (ends on user)
+  const thinking = { role: 'assistant', content: '…' };
+  evChatHistory.push(thinking);
+  evChatRender();
+  try {
+    const res = await fetch(PROXY_URL + '?action=claude', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 900, system: EV_CHAT_SYSTEM, messages: msgs })
+    });
+    const data = await res.json();
+    let txt = '';
+    if (data && Array.isArray(data.content)) txt = data.content.filter(c => c.type === 'text').map(c => c.text || '').join('\n').trim();
+    if (!txt && data && data.error) txt = '⚠️ ' + (data.error.message || 'error');
+    if (!txt) txt = 'Sorry, I could not answer that. Try rephrasing.';
+    thinking.content = txt;
+  } catch (e) { thinking.content = '⚠️ ' + ((e && e.message) || 'Network error'); }
+  evChatRender();
 }
 window.addEventListener('load', function () { loadAlerts(); });
 

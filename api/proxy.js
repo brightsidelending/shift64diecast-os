@@ -57,6 +57,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, brand: pipeline[idx] });
     } catch (err) { return res.status(200).json({ success: false, error: err.message }); }
   }
+  // Ask Eversen chat — forward the request body to the Anthropic Messages API.
+  if (action === 'claude') {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json();
+      return res.status(200).json(data);
+    } catch (err) { return res.status(500).json({ error: err.message }); }
+  }
 
   // eBay Browse API - Active Listings
   if (type === 'ebay_active') {
