@@ -1946,6 +1946,8 @@ function showTab(id, el) {
   // Refresh per-tab data that depends on other tabs' state.
   if (id === 'outreach' && typeof loadNegoVendors === 'function') loadNegoVendors();
   if (id === 'wantlist' && typeof renderAlerts === 'function') renderAlerts();
+  // Always pull the freshest want lists from Redis when the tab is opened (not just on page load).
+  if (id === 'wantlist' && typeof reloadWantsFromCloud === 'function') reloadWantsFromCloud();
 }
 
 // ============================================================
@@ -3445,7 +3447,12 @@ async function saveWantList(who) {
 // Pull the latest want lists straight from Redis (used on app open / PWA foreground).
 async function reloadWantsFromCloud() {
   try {
-    const [ew, kw] = await Promise.all([kvGet('s64_ericW'), kvGet('s64_khaiW')]);
+    // Want-list data lives in Redis under "ericWants"/"khaiWants".
+    // Read those first, falling back to the legacy "s64_ericW"/"s64_khaiW" keys.
+    let [ew, kw] = await Promise.all([kvGet('ericWants'), kvGet('khaiWants')]);
+    console.log('[wantlist] Redis load → ericWants:', ew, '| khaiWants:', kw);
+    if (ew == null) { ew = await kvGet('s64_ericW'); console.log('[wantlist] fallback s64_ericW:', ew); }
+    if (kw == null) { kw = await kvGet('s64_khaiW'); console.log('[wantlist] fallback s64_khaiW:', kw); }
     if (Array.isArray(ew)) ericWants = ew;
     if (Array.isArray(kw)) khaiWants = kw;
     renderWants('eric');
