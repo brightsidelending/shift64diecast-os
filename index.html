@@ -952,6 +952,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
     <input type="file" id="whatnotFileInput" accept=".csv,text/csv" multiple style="display:none" onchange="handleWhatnotFiles(this.files)"/>
     <div id="whatnotUploadStatus" style="font-size:12px;color:var(--gray);margin-top:10px;"></div>
+    <div id="whatnotDupBanner" style="display:none;margin-top:10px;"></div>
     <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;margin:18px 0 8px;">Uploaded Shows</div>
     <div id="whatnotShowsList"></div>
   </div>
@@ -3866,6 +3867,36 @@ function findCol(headers, patterns) {
   for (const h of headers) { const lh = h.toLowerCase(); for (const p of patterns) { if (lh.includes(p)) return h; } }
   return null;
 }
+// Extract the actual show/stream date = the EARLIEST parseable date found in the rows.
+// Returns { ts, display } (display like "Jun 28"), or null if no date column/values.
+function extractShowDate(headers, objects) {
+  // Candidate date-ish columns, excluding money / id / count columns (e.g. sold_price).
+  const candidates = (headers || []).filter(h => {
+    const lh = String(h).toLowerCase();
+    if (/price|amount|spent|total|count|qty|fee|tax|_id|\bid\b/.test(lh)) return false;
+    return /date|time|created|timestamp|purchas|order|sold|_at$/.test(lh);
+  });
+  // Parse a cell to a timestamp; date-only "YYYY-MM-DD" is treated as LOCAL (avoids off-by-one).
+  const parseCell = (raw) => {
+    const s = String(raw).trim();
+    const dOnly = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dOnly) return new Date(+dOnly[1], +dOnly[2] - 1, +dOnly[3]).getTime();
+    const t = Date.parse(s);
+    return isNaN(t) ? null : t;
+  };
+  let min = null;
+  for (const col of candidates) {
+    for (const o of (objects || [])) {
+      if (!o[col]) continue;
+      const t = parseCell(o[col]);
+      if (t == null) continue;
+      if (min == null || t < min) min = t;
+    }
+    if (min != null) break; // first column that actually yields dates wins
+  }
+  if (min == null) return null;
+  return { ts: min, display: new Date(min).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+}
 function parseMoney(v) { if (v == null) return 0; const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
 
 // Auto-detect Sales vs Buyers CSV — the real header's first column is decisive
@@ -3912,11 +3943,24 @@ function extractSellerFromFilename(fileName) {
   return m[1].replace(/[-_]+/g, ' ').trim();
 }
 
-function addWhatnotShow(fileName, text) {
+let _pendingWhatnot = null;
+function addWhatnotShow(fileName, text, forceUpload) {
   const { headers, objects, meta } = csvToObjects(text);
   if (!headers.length || !objects.length) { toast('Could not read that CSV (no rows).', 'red'); return; }
   const type = detectCsvType(headers);
   const streamTitle = extractStreamTitle(meta);
+
+  // Duplicate CSV guard (Part 1): if a show with this title already has this dataset type,
+  // warn before overwriting. (A different type for the same title is a legitimate Sales+Buyers merge.)
+  const _normTitle = String(streamTitle || '').trim().toLowerCase();
+  if (!forceUpload && _normTitle) {
+    const dup = whatnotShows.find(s =>
+      String(s.streamTitle || '').trim().toLowerCase() === _normTitle &&
+      (type === 'sales' ? showSalesData(s) : showBuyersData(s)));
+    if (dup) { _pendingWhatnot = { fileName, text }; showWhatnotDupBanner(streamTitle); return; }
+  }
+  const showDateInfo = extractShowDate(headers, objects);
+  const uploadedDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   // Seller + its source, ranked so a stronger source upgrades a weaker one on merge:
   // user input > Sales seller_username > (Buyers) filename slug > Unknown
   let seller = '', sellerSource = 'unknown';
@@ -3951,10 +3995,13 @@ function addWhatnotShow(fileName, text) {
     // upgrades a weaker/Unknown one — so a later Sales upload fixes a Buyers-only "Unknown".
     const existingSrc = existing.sellerSource || ((existing.seller && existing.seller !== 'Unknown') ? 'sales' : 'unknown');
     if (SRC_RANK[sellerSource] > SRC_RANK[existingSrc]) { existing.seller = seller; existing.sellerSource = sellerSource; }
+    // Keep the earliest show date across the merged datasets; preserve the first upload date.
+    if (showDateInfo && (existing.showDateTs == null || showDateInfo.ts < existing.showDateTs)) { existing.showDate = showDateInfo.display; existing.showDateTs = showDateInfo.ts; }
+    if (!existing.uploadedDate) existing.uploadedDate = uploadedDate;
     merged = true;
     console.log('🔀 MERGE: added ' + type.toUpperCase() + ' into show →', existing.seller, '·', date, '·', streamTitle || '(no title)');
   } else {
-    const show = { id: Date.now() + '_' + Math.floor(Math.random() * 1000), seller, sellerSource, date, streamTitle };
+    const show = { id: Date.now() + '_' + Math.floor(Math.random() * 1000), seller, sellerSource, date, streamTitle, showDate: showDateInfo ? showDateInfo.display : '', showDateTs: showDateInfo ? showDateInfo.ts : null, uploadedDate };
     show[type] = dataset;                      // new entry with one dataset slot
     whatnotShows.push(show);
     console.log('➕ NEW SHOW: created entry →', seller, '·', date, '·', (streamTitle || '(no title)'), '(' + type + ')');
@@ -3965,6 +4012,28 @@ function addWhatnotShow(fileName, text) {
   renderWhatnotAll();
   saveWhatnotShows();
   toast((merged ? '🔀 Merged ' + type + ' into ' : '📺 Show added: ') + seller + ' (' + objects.length + ' rows)', 'green');
+}
+
+// Duplicate-upload warning banner with Yes/No.
+function showWhatnotDupBanner(title) {
+  const el = document.getElementById('whatnotDupBanner');
+  if (!el) return;
+  el.style.display = 'block';
+  el.innerHTML = `<div style="background:#2B2200;border:1px solid var(--yellow);border-radius:8px;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <div style="flex:1;min-width:180px;color:var(--yellow);font-size:13px;font-weight:600;">⚠️ This show appears to already be uploaded${title ? ' (“' + escHtmlA(title) + '”)' : ''}. Upload anyway?</div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="whatnotConfirmDup(true)" style="padding:6px 14px;font-size:12px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:6px;cursor:pointer;">Yes</button>
+      <button onclick="whatnotConfirmDup(false)" style="padding:6px 14px;font-size:12px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:6px;cursor:pointer;">No</button>
+    </div>
+  </div>`;
+}
+function whatnotConfirmDup(yes) {
+  const el = document.getElementById('whatnotDupBanner');
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+  const pending = _pendingWhatnot;
+  _pendingWhatnot = null;
+  if (yes && pending) addWhatnotShow(pending.fileName, pending.text, true);
+  else if (!yes) toast('Upload cancelled.', 'yellow');
 }
 
 function deleteWhatnotShow(id) {
@@ -3988,7 +4057,7 @@ function renderWhatnotShows() {
     const totalRows = (sd ? sd.rows.length : 0) + (bd ? bd.rows.length : 0);
     const files = [sd && sd.fileName, bd && bd.fileName].filter(Boolean).join(', ') || (s.fileName || '');
     return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">
-      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${escHtmlA(s.date)} ${badge}</div>${s.streamTitle ? `<div style="font-size:12px;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📺 ${escHtmlA(s.streamTitle)}</div>` : ''}<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(files)} · ${totalRows} rows</div></div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${s.showDate ? 'Show: ' + escHtmlA(s.showDate) + ' · ' : ''}Uploaded: ${escHtmlA(s.uploadedDate || s.date || '—')} ${badge}</div>${s.streamTitle ? `<div style="font-size:12px;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📺 ${escHtmlA(s.streamTitle)}</div>` : ''}<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(files)} · ${totalRows} rows</div></div>
       <button onclick="deleteWhatnotShow('${s.id}')" class="row-action row-del" title="Delete show">🗑️</button>
     </div>`;
   }).join('') + '</div>';
