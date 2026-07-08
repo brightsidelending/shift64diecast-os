@@ -36,6 +36,9 @@ body{background:var(--black);color:var(--white);font-family:'Inter',sans-serif;m
 .main{padding:24px 32px;max-width:1400px;margin:0 auto}
 .section{display:none}
 .section.active{display:block}
+.chen-qa{background:rgba(224,43,43,0.12);border:1px solid rgba(224,43,43,0.45);color:#F0A8A8;border-radius:8px;padding:8px 13px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s}
+.chen-qa:hover{background:var(--red);color:#fff}
+#chen_dashboard td input,#chen_dashboard td select{background:#0E1015;border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--white);font-size:13px;font-family:inherit;width:100%}
 /* CARDS */
 .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
 .card-title{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
@@ -400,7 +403,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
   </div>
 </div>
-<div class="nav" style="overflow-x:auto;">
+<div class="nav" id="mainNav" style="overflow-x:auto;">
   <button class="nav-tab active" onclick="showTab('price_scanner',this)">🔍 Price Scanner</button>
   <button class="nav-tab" onclick="showTab('scanner',this)">🕵️ Competitor Scanner</button>
   <button class="nav-tab" onclick="showTab('wantlist',this)">🎯 Want List</button>
@@ -419,6 +422,93 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 
 <div class="main">
+
+<!-- ===== 小陈 CHINESE DASHBOARD (password 8888) ===== -->
+<div id="chen_dashboard" class="section">
+  <!-- HEADER -->
+  <div style="margin-bottom:16px;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:800;color:var(--red);">欢迎，小陈！<span style="color:var(--gray);font-weight:600;font-size:18px;"> | Shift64 采购助手</span></div>
+  </div>
+
+  <!-- BUYER NAME EDITOR -->
+  <div class="card" style="border-color:rgba(224,43,43,0.4);">
+    <label style="display:block;font-size:12px;color:var(--gray);margin-bottom:7px;">当前买家名称 (Current Buyer Name):</label>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <input id="chenBuyerName" type="text" value="小陈" style="flex:1;min-width:180px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--white);font-size:14px;"/>
+      <button onclick="chenSaveBuyerName()" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;">保存 (Save)</button>
+    </div>
+    <div style="font-size:12px;color:var(--gray);margin-top:9px;">可以根据厂家更改名字 (You can change your name depending on the manufacturer)</div>
+  </div>
+
+  <!-- SECTION 1 — 采购清单 -->
+  <div class="card">
+    <div class="card-title" style="color:var(--red);">📋 采购清单 (Sourcing List)</div>
+    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="cursor:default;">品牌</th>
+        <th style="cursor:default;">目标单价</th>
+        <th style="cursor:default;">优先级</th>
+        <th style="cursor:default;">备注</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>Demon King Auto</td><td>¥25-35</td><td><span style="color:var(--red);font-weight:700;">高</span></td><td>找厂家直销，避免中间商</td></tr>
+        <tr><td>TPC</td><td>¥20-30</td><td><span style="color:var(--red);font-weight:700;">高</span></td><td>1688或微信联系</td></tr>
+        <tr><td>Flame</td><td>¥15-25</td><td><span style="color:var(--gold);font-weight:700;">中</span></td><td>找国内经销商</td></tr>
+        <tr><td>Pop Race</td><td>¥20-30</td><td><span style="color:var(--red);font-weight:700;">高</span></td><td>找厂家直销</td></tr>
+        <tr><td>LCD Models</td><td>¥25-35</td><td><span style="color:var(--gold);font-weight:700;">中</span></td><td>香港品牌，找大陆代理</td></tr>
+        <tr><td>Inno64</td><td>¥20-30</td><td><span style="color:var(--gold);font-weight:700;">中</span></td><td>找大陆总代</td></tr>
+        <tr><td>MiniGT</td><td>¥25-35</td><td><span style="color:var(--red);font-weight:700;">高</span></td><td>找大陆总经销</td></tr>
+        <tr><td>Kaido House</td><td>¥30-40</td><td><span style="color:var(--gold);font-weight:700;">中</span></td><td>小批量起订</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- SECTION 2 — 智能助手 -->
+  <div class="card">
+    <div class="card-title" style="color:var(--red);">🤖 智能助手 (AI Assistant)</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <select id="chenBrandSel" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--white);font-size:13px;">
+        <option>Demon King Auto</option>
+        <option>TPC</option>
+        <option>Flame</option>
+        <option>Pop Race</option>
+        <option>LCD Models</option>
+        <option>Inno64</option>
+        <option>MiniGT</option>
+        <option>Kaido House</option>
+      </select>
+      <button class="chen-qa" onclick="chenQuickAction('wechat')">📱 微信开场白</button>
+      <button class="chen-qa" onclick="chenQuickAction('inquiry1688')">🛒 1688询价</button>
+      <button class="chen-qa" onclick="chenQuickAction('bargain')">💰 砍价话术</button>
+      <button class="chen-qa" onclick="chenQuickAction('sample')">📦 要样品</button>
+      <button class="chen-qa" onclick="chenQuickAction('followup')">🔄 跟进消息</button>
+    </div>
+    <div id="chenChatLog" style="min-height:200px;max-height:440px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px 12px;"></div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <textarea id="chenChatInput" rows="2" placeholder="输入消息…（例如：帮我给 MiniGT 大陆总经销写一条微信开场白）" style="flex:1;resize:vertical;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--white);font-size:14px;font-family:inherit;"></textarea>
+      <button onclick="chenChatSend()" id="chenChatSendBtn" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:0 22px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;">发送</button>
+    </div>
+    <div style="margin-top:8px;"><button onclick="chenClearChat()" style="background:none;border:1px solid var(--border);color:var(--gray);border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;">🗑 清空对话</button></div>
+  </div>
+
+  <!-- SECTION 3 — 订单记录 -->
+  <div class="card">
+    <div class="card-title" style="color:var(--red);">📦 订单记录 (Order Log)</div>
+    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="cursor:default;">品牌</th>
+        <th style="cursor:default;">数量</th>
+        <th style="cursor:default;">单价</th>
+        <th style="cursor:default;">总价</th>
+        <th style="cursor:default;">状态</th>
+        <th style="cursor:default;">备注</th>
+        <th style="cursor:default;text-align:right;">操作</th>
+      </tr></thead>
+      <tbody id="chenOrderBody"></tbody>
+    </table></div>
+    <button onclick="chenAddOrder()" style="margin-top:12px;background:var(--red);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;font-size:14px;cursor:pointer;">➕ 添加记录</button>
+  </div>
+</div>
 
 <!-- ===== PRICE SCANNER ===== -->
 <div id="price_scanner" class="section active">
@@ -1535,6 +1625,7 @@ function checkPin() {
   const pins = getPins();
   if (pinEntry === pins.eric) { loginAs('eric'); }
   else if (pinEntry === pins.khai) { loginAs('khai'); }
+  else if (pinEntry === '8888') { loginAs('chen'); }
   else {
     document.getElementById('pinError').textContent = 'Wrong passcode';
     const box = document.getElementById('loginBox');
@@ -1548,7 +1639,7 @@ function checkPin() {
 
 function loginAs(user) {
   currentUser = user;
-  const name = user === 'eric' ? 'Eric' : 'Khai';
+  const name = user === 'eric' ? 'Eric' : user === 'khai' ? 'Khai' : chenBuyerName();
   document.getElementById('loginOverlay').style.display = 'none';
   const bar = document.getElementById('userBar');
   bar.style.display = 'flex';
@@ -1558,9 +1649,28 @@ function loginAs(user) {
   const av = document.getElementById('userAvatar'); if (av) av.textContent = name.charAt(0);
   const nm = document.getElementById('userMenuName'); if (nm) nm.textContent = name;
   const ami = document.getElementById('adminMenuItem'); if (ami) ami.style.display = user === 'eric' ? 'block' : 'none';
+  applyRoleView(user);
   pinEntry = '';
   renderDots();
   document.getElementById('pinError').textContent = '';
+}
+
+// 小陈 (Chinese contact, password 8888) sees ONLY the Chinese dashboard — all tabs/sections hidden.
+function applyRoleView(user) {
+  const nav = document.getElementById('mainNav');
+  const chen = document.getElementById('chen_dashboard');
+  if (user === 'chen') {
+    if (nav) nav.style.display = 'none';
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    if (chen) chen.classList.add('active');
+    chenInit();
+  } else {
+    if (nav) nav.style.display = '';
+    if (chen) chen.classList.remove('active');
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    const def = document.getElementById('price_scanner'); if (def) def.classList.add('active');
+    document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+  }
 }
 
 function toggleUserMenu(e) {
@@ -1568,6 +1678,198 @@ function toggleUserMenu(e) {
   const m = document.getElementById('userMenu');
   if (m) m.classList.toggle('open');
 }
+
+// ============================================================
+// 小陈 CHINESE DASHBOARD (password 8888)
+// ============================================================
+const CHEN_BRANDS = ['Demon King Auto','TPC','Flame','Pop Race','LCD Models','Inno64','MiniGT','Kaido House'];
+
+const CHEN_SYSTEM = `你是一位专业的国内模型车采购助手。用户是一位年轻的国内买家，专门收购1:64和1:18比例的合金车模型。他以本地买家身份采购，绝对不代表任何外国公司。帮他用中文写微信消息、1688询价、砍价话术、要样品和跟进消息。每条消息先写中文，然后用---分隔，附上英文翻译。签名使用用户设置的买家名称。永远不要提到美国、出口或外贸。语气要自然、年轻、接地气。`;
+
+const CHEN_QUICK = {
+  wechat:      '帮我写一条给 [品牌] 厂家或经销商的微信开场白，介绍我是国内的买家，想长期大批量拿货。',
+  inquiry1688: '帮我写一条在1688上给 [品牌] 卖家的询价消息，询问最低批发价、起订量和现货情况。',
+  bargain:     '帮我写一段和 [品牌] 供应商砍价的话术，争取更低的拿货价，同时保持关系融洽。',
+  sample:      '帮我写一条向 [品牌] 供应商索要样品的消息，说明我想先看质量再下大单。',
+  followup:    '帮我写一条给 [品牌] 供应商的跟进消息，之前聊过但还没成交，礼貌地推进一下。'
+};
+
+let chenChatHistory = [];
+let chenOrders = [];
+let chenOrderSaveTimer = null;
+
+function chenEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function chenBuyerName() {
+  const v = (localStorage.getItem('xiaochenBuyerName') || '').trim();
+  return v || '小陈';
+}
+function chenSaveBuyerName() {
+  const inp = document.getElementById('chenBuyerName');
+  if (!inp) return;
+  const v = (inp.value || '').trim() || '小陈';
+  localStorage.setItem('xiaochenBuyerName', v);
+  inp.value = v;
+  const lbl = document.getElementById('userLabel'); if (lbl && currentUser === 'chen') lbl.textContent = v;
+  toast('✅ 买家名称已保存：' + v, 'green');
+}
+
+// Called whenever 小陈 logs in — hydrate name field, greeting, and orders.
+function chenInit() {
+  const inp = document.getElementById('chenBuyerName'); if (inp) inp.value = chenBuyerName();
+  const log = document.getElementById('chenChatLog');
+  if (log && !log.children.length) chenGreet();
+  chenLoadOrders();
+}
+
+function chenGreet() {
+  chenAppendMsg('assistant', '你好！我是你的采购助手。选一个品牌，点上面的快捷按钮，或者直接告诉我你想联系哪个厂家、要写什么消息。');
+}
+
+function chenAppendMsg(role, text) {
+  const log = document.getElementById('chenChatLog');
+  if (!log) return null;
+  const wrap = document.createElement('div');
+  const mine = role === 'user';
+  wrap.style.cssText = 'max-width:82%;padding:10px 13px;border-radius:12px;font-size:14px;line-height:1.55;white-space:pre-wrap;word-break:break-word;' +
+    (mine
+      ? 'align-self:flex-end;background:var(--red);color:#fff;border-bottom-right-radius:4px;'
+      : 'align-self:flex-start;background:#0E1015;border:1px solid var(--border);color:var(--white);border-bottom-left-radius:4px;');
+  wrap.textContent = text;
+  log.appendChild(wrap);
+  log.scrollTop = log.scrollHeight;
+  return wrap;
+}
+
+function chenSelectedBrand() {
+  const s = document.getElementById('chenBrandSel');
+  return s ? s.value : CHEN_BRANDS[0];
+}
+
+function chenQuickAction(key) {
+  const tmpl = CHEN_QUICK[key];
+  if (!tmpl) return;
+  const msg = tmpl.replace(/\[品牌\]/g, chenSelectedBrand());
+  const input = document.getElementById('chenChatInput');
+  if (input) input.value = msg;
+  chenChatSend();
+}
+
+async function chenChatSend() {
+  const input = document.getElementById('chenChatInput');
+  const btn = document.getElementById('chenChatSendBtn');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  chenAppendMsg('user', text);
+  chenChatHistory.push({ role: 'user', content: text });
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  const thinking = chenAppendMsg('assistant', '正在思考…');
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1400,
+        system: CHEN_SYSTEM + '\n\n用户设置的买家名称（签名时必须使用）：' + chenBuyerName(),
+        messages: chenChatHistory.slice(-12)
+      })
+    });
+    const data = await res.json();
+    if (data && data.error) throw new Error(data.error.message || 'proxy error');
+    const reply = (evAnthropicText(data) || '').trim() || '抱歉，这次没有收到回复，请再试一次。';
+    if (thinking) thinking.textContent = reply;
+    chenChatHistory.push({ role: 'assistant', content: reply });
+  } catch (e) {
+    if (thinking) thinking.textContent = '⚠️ 连接失败，请稍后再试。';
+    console.log('小陈 chat failed:', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '发送'; }
+  }
+}
+
+function chenClearChat() {
+  chenChatHistory = [];
+  const log = document.getElementById('chenChatLog');
+  if (log) log.innerHTML = '';
+  chenGreet();
+}
+
+// ── Order log (persisted to Redis under key "xiaochen_orders") ──
+async function chenLoadOrders() {
+  try { const v = await kvGet('xiaochen_orders'); chenOrders = Array.isArray(v) ? v : []; }
+  catch (e) {
+    try { const l = JSON.parse(localStorage.getItem('xiaochen_orders')); chenOrders = Array.isArray(l) ? l : []; }
+    catch (e2) { chenOrders = []; }
+  }
+  chenRenderOrders();
+}
+
+function chenSaveOrders() {
+  try { localStorage.setItem('xiaochen_orders', JSON.stringify(chenOrders)); } catch (e) {}
+  clearTimeout(chenOrderSaveTimer);
+  chenOrderSaveTimer = setTimeout(async () => {
+    try { await kvSet('xiaochen_orders', chenOrders); }
+    catch (e) { console.log('xiaochen_orders save failed:', e); }
+  }, 600);
+}
+
+function chenOrderTotal(o) {
+  const t = (parseFloat(o.qty) || 0) * (parseFloat(o.price) || 0);
+  return t ? t.toFixed(2) : '0.00';
+}
+
+function chenRenderOrders() {
+  const body = document.getElementById('chenOrderBody');
+  if (!body) return;
+  if (!chenOrders.length) {
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:26px;">暂无订单记录，点"添加记录"新增一条。</td></tr>';
+    return;
+  }
+  body.innerHTML = chenOrders.map((o, i) => `<tr>
+    <td style="min-width:130px;"><select onchange="chenOrderEdit(${i},'brand',this.value)">${CHEN_BRANDS.map(b => `<option ${b === o.brand ? 'selected' : ''}>${chenEsc(b)}</option>`).join('')}</select></td>
+    <td style="min-width:70px;"><input type="number" value="${chenEsc(o.qty)}" oninput="chenOrderEdit(${i},'qty',this.value)"/></td>
+    <td style="min-width:80px;"><input type="number" value="${chenEsc(o.price)}" oninput="chenOrderEdit(${i},'price',this.value)"/></td>
+    <td style="min-width:80px;white-space:nowrap;" id="chenTot${i}">¥${chenOrderTotal(o)}</td>
+    <td style="min-width:100px;"><input type="text" value="${chenEsc(o.status)}" placeholder="待联系/已下单/已收货" oninput="chenOrderEdit(${i},'status',this.value)"/></td>
+    <td style="min-width:140px;"><input type="text" value="${chenEsc(o.notes)}" oninput="chenOrderEdit(${i},'notes',this.value)"/></td>
+    <td style="text-align:right;"><button onclick="chenDeleteOrder(${i})" style="background:none;border:1px solid var(--border);color:var(--red);border-radius:6px;padding:5px 9px;cursor:pointer;">✕</button></td>
+  </tr>`).join('');
+}
+
+function chenOrderEdit(i, field, val) {
+  if (!chenOrders[i]) return;
+  chenOrders[i][field] = val;
+  if (field === 'qty' || field === 'price') {
+    const cell = document.getElementById('chenTot' + i);
+    if (cell) cell.textContent = '¥' + chenOrderTotal(chenOrders[i]);
+  }
+  chenSaveOrders();
+}
+
+function chenAddOrder() {
+  chenOrders.push({ brand: CHEN_BRANDS[0], qty: '', price: '', status: '', notes: '' });
+  chenRenderOrders();
+  chenSaveOrders();
+}
+
+function chenDeleteOrder(i) {
+  chenOrders.splice(i, 1);
+  chenRenderOrders();
+  chenSaveOrders();
+}
+
+// Enter to send in the 小陈 chat (Shift+Enter = newline)
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey && document.activeElement && document.activeElement.id === 'chenChatInput') {
+    e.preventDefault();
+    chenChatSend();
+  }
+});
 
 // Collapse/expand the Import Cost Settings card (used mainly on mobile)
 function toggleImpCost() {
