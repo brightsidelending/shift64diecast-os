@@ -3272,8 +3272,10 @@ function togglePsClear() {
   const inp = document.getElementById('psSearchInput');
   const btn = document.getElementById('psClearBtn');
   if (inp && btn) btn.style.display = inp.value.length ? 'block' : 'none';
-  // Emptying the search also resets the Image ID grid back to one empty slot
-  if (inp && inp.value.length === 0) resetIdImages();
+  // NOTE: do NOT reset the Image ID queue here. This runs on every search input/clear event,
+  // and since images are pasted while the search box is empty, resetting here wiped the
+  // multi-image paste queue (made a 2nd paste "replace" the 1st). The × button (clearPsSearch)
+  // clears the queue explicitly instead.
 }
 function clearPsSearch() {
   const inp = document.getElementById('psSearchInput');
