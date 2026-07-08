@@ -414,8 +414,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <button class="nav-tab" onclick="showTab('eric',this)">🏎️ Eric</button>
   <button class="nav-tab" onclick="showTab('khai',this)">🏎️ Khai</button>
   <button class="nav-tab" onclick="showTab('intel',this)">💡 Intel</button>
-  <button class="nav-tab" onclick="showTab('eversen',this)">🤖 Eversen <span id="evTabBadge" style="display:none;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:2px;">0</span></button>
   <button class="nav-tab" onclick="showTab('outreach',this)">📮 Outreach <span id="outreachTabBadge" style="display:none;background:var(--gold);color:#000;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:2px;">0</span></button>
+  <button class="nav-tab" onclick="showTab('eversenpipe',this)">🤖 Eversen</button>
 </div>
 
 <div class="main">
@@ -1001,6 +1001,48 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 
 <!-- ===== EVERSEN — AI SOURCING AGENT ===== -->
+<!-- ===== EVERSEN PIPELINE ===== -->
+<div id="eversenpipe" class="section">
+  <!-- STATS BAR -->
+  <div class="mstack" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;">
+    <div class="card" style="text-align:center;margin-bottom:0;"><div class="stat-val" style="color:var(--gold);" id="epStatTotal">0</div><div class="stat-lbl">Total Brands</div></div>
+    <div class="card" style="text-align:center;margin-bottom:0;"><div class="stat-val" style="color:var(--yellow);" id="epStatContacted">0</div><div class="stat-lbl">Contacted</div></div>
+    <div class="card" style="text-align:center;margin-bottom:0;"><div class="stat-val" style="color:var(--green);" id="epStatPositive">0</div><div class="stat-lbl">Positive Replies</div></div>
+    <div class="card" style="text-align:center;margin-bottom:0;"><div class="stat-val" style="color:var(--orange);" id="epStatReview">0</div><div class="stat-lbl">Needs Review</div></div>
+  </div>
+
+  <!-- ADD BRAND FORM -->
+  <div class="card">
+    <div class="card-title">➕ Add Brand to Pipeline</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <input class="text-input" id="epBrand" placeholder="Brand Name — e.g. Demon King Auto" style="flex:1;min-width:200px;" onkeydown="if(event.key==='Enter')epAdd()"/>
+      <input class="text-input" id="epWebsite" placeholder="Website — e.g. demonkingauto.com" style="flex:1;min-width:200px;" onkeydown="if(event.key==='Enter')epAdd()"/>
+      <button onclick="epAdd()" style="padding:12px 22px;font-size:14px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;font-family:'Rajdhani',sans-serif;letter-spacing:1px;white-space:nowrap;">Add to Pipeline</button>
+    </div>
+  </div>
+
+  <!-- PIPELINE TABLE -->
+  <div class="card">
+    <div class="card-title">📋 Pipeline</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>
+          <th style="background:#0E1015;padding:11px 12px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Brand</th>
+          <th style="background:#0E1015;padding:11px 12px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Website</th>
+          <th style="background:#0E1015;padding:11px 12px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Contact Email</th>
+          <th style="background:#0E1015;padding:11px 12px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Status</th>
+          <th style="background:#0E1015;padding:11px 12px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Date Added</th>
+          <th style="background:#0E1015;padding:11px 12px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Last Activity</th>
+          <th style="background:#0E1015;padding:11px 12px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Notes</th>
+          <th style="background:#0E1015;padding:11px 12px;text-align:left;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;">Actions</th>
+        </tr></thead>
+        <tbody id="epTableBody"><tr><td colspan="8" style="text-align:center;color:var(--gray);padding:30px;">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EVERSEN (legacy AI agent — replaced by the pipeline tab above; kept for data compatibility) ===== -->
 <div id="eversen" class="section">
 
   <!-- 🎯 DECISION REQUIRED (only appears when a vendor offer is ready for Eric to act on) -->
@@ -7559,6 +7601,83 @@ window.addEventListener('load', loadData);
 window.addEventListener('load', function () { loadOutreach(false); });
 window.addEventListener('load', function () { loadPlaybook(); });
 window.addEventListener('load', function () { sqLoad(); });
+window.addEventListener('load', function () { epLoad(); });
+
+// ============================================================
+// EVERSEN PIPELINE — simple brand pipeline (localStorage "eversenPipeline")
+// ============================================================
+const EP_KEY = 'eversenPipeline';
+const EP_STARTERS = [
+  { brand: 'Demon King Auto', website: 'demonkingauto.com' },
+  { brand: 'TPC', website: 'tpc-model.com' },
+  { brand: 'Flame', website: '' },
+  { brand: 'Pop Race', website: 'poprace.net' },
+  { brand: 'LCD Models', website: 'lcdmodels.com' },
+  { brand: 'Inno64', website: 'inno64.com' },
+  { brand: 'MiniGT', website: 'mini-gt.com' },
+  { brand: 'Kaido House', website: 'kaidohouse.com' }
+];
+let epPipeline = [];
+function epToday() { return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+function epUid() { return 'ep_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+function epNewRow(brand, website) { return { id: epUid(), brand: brand, website: website || '', contactEmail: '', status: 'Queued', dateAdded: epToday(), lastActivity: '', notes: '' }; }
+
+function epLoad() {
+  try { const raw = localStorage.getItem(EP_KEY); if (raw) { const v = JSON.parse(raw); if (Array.isArray(v)) epPipeline = v; } } catch (e) {}
+  if (!epPipeline.length) { epPipeline = EP_STARTERS.map(s => epNewRow(s.brand, s.website)); epSave(); }
+  epRender();
+}
+function epSave() { try { localStorage.setItem(EP_KEY, JSON.stringify(epPipeline)); } catch (e) {} }
+
+function epAdd() {
+  const brand = (document.getElementById('epBrand').value || '').trim();
+  const website = (document.getElementById('epWebsite').value || '').trim();
+  if (!brand) { toast('⚠️ Enter a brand name.', 'yellow'); return; }
+  epPipeline.push(epNewRow(brand, website));
+  document.getElementById('epBrand').value = '';
+  document.getElementById('epWebsite').value = '';
+  epSave();
+  epRender();
+  toast('✅ Added to pipeline.', 'green');
+}
+function epRemove(id) { epPipeline = epPipeline.filter(x => x.id !== id); epSave(); epRender(); }
+
+const EP_STATUS = {
+  'Queued':       { label: '🔵 Queued', style: 'background:#1A1D24;color:var(--gray);' },
+  'Researching':  { label: '🔍 Researching', style: 'background:#0D2233;color:var(--blue);' },
+  'Contacted':    { label: '📤 Contacted', style: 'background:#2B2200;color:var(--gold);' },
+  'Replied':      { label: '💬 Replied', style: 'background:#1E1030;color:#B98CFF;' },
+  'Positive':     { label: '✅ Positive', style: 'background:#0D2B1A;color:var(--green);' },
+  'Needs Review': { label: '🟡 Needs Review', style: 'background:#2A1A05;color:var(--orange);' },
+  'Dead':         { label: '❌ Dead', style: 'background:#2B0D0D;color:var(--red);' }
+};
+function epBadge(status) { const s = EP_STATUS[status] || EP_STATUS['Queued']; return `<span class="badge" style="${s.style}">${s.label}</span>`; }
+
+function epRender() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const contactedBeyond = ['Contacted', 'Replied', 'Positive', 'Needs Review', 'Dead'];
+  set('epStatTotal', epPipeline.length);
+  set('epStatContacted', epPipeline.filter(x => contactedBeyond.indexOf(x.status) >= 0).length);
+  set('epStatPositive', epPipeline.filter(x => x.status === 'Positive').length);
+  set('epStatReview', epPipeline.filter(x => x.status === 'Needs Review').length);
+  const body = document.getElementById('epTableBody');
+  if (!body) return;
+  if (!epPipeline.length) { body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:30px;">No brands yet. Add one above.</td></tr>'; return; }
+  body.innerHTML = epPipeline.map(r => {
+    const href = /^https?:\/\//i.test(r.website) ? r.website : ('https://' + r.website);
+    const web = r.website ? `<a href="${escHtmlA(href)}" target="_blank" rel="noopener" style="color:var(--blue);">${escHtmlA(r.website)}</a>` : '—';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:10px 12px;font-weight:600;">${escHtmlA(r.brand)}</td>
+      <td style="padding:10px 12px;font-size:12px;">${web}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--gray);">${r.contactEmail ? escHtmlA(r.contactEmail) : '—'}</td>
+      <td style="padding:10px 12px;">${epBadge(r.status)}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--gray);">${escHtmlA(r.dateAdded || '—')}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--gray);">${escHtmlA(r.lastActivity || '—')}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--gray);max-width:180px;">${escHtmlA(r.notes || '')}</td>
+      <td style="padding:10px 12px;"><button onclick="epRemove('${r.id}')" style="padding:5px 10px;font-size:11px;font-weight:600;background:var(--card);color:var(--red);border:1px solid var(--border);border-radius:6px;cursor:pointer;">Remove</button></td>
+    </tr>`;
+  }).join('');
+}
 window.addEventListener('load', function () { loadAlerts(); });
 
 // Filter event listeners - guaranteed to fire
