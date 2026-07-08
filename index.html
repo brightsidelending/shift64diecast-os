@@ -3895,7 +3895,30 @@ function extractShowDate(headers, objects) {
     if (min != null) break; // first column that actually yields dates wins
   }
   if (min == null) return null;
-  return { ts: min, display: new Date(min).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+  return { ts: min, col: (candidates.find(c => (objects || []).some(o => o[c])) || ''), display: new Date(min).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+}
+// Format any date-ish value to "Jul 7" (date-only strings parsed as local to avoid off-by-one).
+function fmtMonDD(v) {
+  if (!v) return '';
+  const s = String(v).trim();
+  const d = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const dt = d ? new Date(+d[1], +d[2] - 1, +d[3]) : new Date(Date.parse(s));
+  return isNaN(dt) ? s : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+// Compute a show's date live from its stored Sales/Buyers rows (works for old records too).
+// Logs the detected columns once per show so we can see what's available in the CSV.
+function computeShowDate(show) {
+  const datasets = [showSalesData(show), showBuyersData(show)].filter(d => d && Array.isArray(d.rows) && d.rows.length);
+  let best = null;
+  datasets.forEach(ds => {
+    const headers = (ds.headers && ds.headers.length) ? ds.headers : Object.keys(ds.rows[0] || {});
+    if (!show._sdLogged) console.log('[Whatnot show date] columns for "' + (show.streamTitle || show.seller) + '":', headers.join(', '));
+    const info = extractShowDate(headers, ds.rows);
+    if (info && (best == null || info.ts < best.ts)) best = info;
+  });
+  if (!show._sdLogged) console.log('[Whatnot show date] result for "' + (show.streamTitle || show.seller) + '":', best ? (best.display + ' (from column: ' + best.col + ')') : 'no date found');
+  show._sdLogged = true;
+  return best;
 }
 function parseMoney(v) { if (v == null) return 0; const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
 
@@ -3959,7 +3982,9 @@ function addWhatnotShow(fileName, text, forceUpload) {
       (type === 'sales' ? showSalesData(s) : showBuyersData(s)));
     if (dup) { _pendingWhatnot = { fileName, text }; showWhatnotDupBanner(streamTitle); return; }
   }
+  console.log('[Whatnot upload] "' + fileName + '" columns:', headers.join(', '));
   const showDateInfo = extractShowDate(headers, objects);
+  console.log('[Whatnot upload] show date extracted:', showDateInfo ? (showDateInfo.display + ' (from column: ' + showDateInfo.col + ')') : 'none found');
   const uploadedDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   // Seller + its source, ranked so a stronger source upgrades a weaker one on merge:
   // user input > Sales seller_username > (Buyers) filename slug > Unknown
@@ -4056,8 +4081,11 @@ function renderWhatnotShows() {
     const badge = [salesBadge, buyersBadge].filter(Boolean).join(' ');
     const totalRows = (sd ? sd.rows.length : 0) + (bd ? bd.rows.length : 0);
     const files = [sd && sd.fileName, bd && bd.fileName].filter(Boolean).join(', ') || (s.fileName || '');
+    // Show date: use stored value, else compute live from the CSV rows (fixes older records).
+    const showDisp = s.showDate || ((computeShowDate(s) || {}).display) || '';
+    const upDisp = s.uploadedDate ? s.uploadedDate : fmtMonDD(s.date);
     return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">
-      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${s.showDate ? 'Show: ' + escHtmlA(s.showDate) + ' · ' : ''}Uploaded: ${escHtmlA(s.uploadedDate || s.date || '—')} ${badge}</div>${s.streamTitle ? `<div style="font-size:12px;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📺 ${escHtmlA(s.streamTitle)}</div>` : ''}<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(files)} · ${totalRows} rows</div></div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;"><strong>${escHtmlA(s.seller)}</strong> · ${showDisp ? 'Show: ' + escHtmlA(showDisp) + ' · ' : ''}Uploaded: ${escHtmlA(upDisp || '—')} ${badge}</div>${s.streamTitle ? `<div style="font-size:12px;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📺 ${escHtmlA(s.streamTitle)}</div>` : ''}<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(files)} · ${totalRows} rows</div></div>
       <button onclick="deleteWhatnotShow('${s.id}')" class="row-action row-del" title="Delete show">🗑️</button>
     </div>`;
   }).join('') + '</div>';
