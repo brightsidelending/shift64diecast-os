@@ -52,7 +52,14 @@ export default async function handler(req, res) {
       const pipeline = await orLoadArray('eversenPipeline');
       const idx = pipeline.findIndex(b => String(b.brand || '').toLowerCase().trim() === String(brand).toLowerCase().trim());
       if (idx < 0) return res.status(200).json({ success: false, error: 'Brand not found' });
-      pipeline[idx] = Object.assign({}, pipeline[idx], updates || {});
+      const merged = Object.assign({}, pipeline[idx], updates || {});
+      // Track when a brand entered "Researching" so the stuck-timer is accurate across refreshes.
+      if (updates && updates.status === 'Researching') {
+        if (!merged.researchingStarted) merged.researchingStarted = Date.now();
+      } else if (updates && updates.status) {
+        merged.researchingStarted = null; // moved out of Researching → clear the timer
+      }
+      pipeline[idx] = merged;
       await orKvCmd(['SET', 'eversenPipeline', JSON.stringify(pipeline)]);
       return res.status(200).json({ success: true, brand: pipeline[idx] });
     } catch (err) { return res.status(200).json({ success: false, error: err.message }); }

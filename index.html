@@ -7778,6 +7778,70 @@ const EP_STATUS = {
 };
 function epBadge(status) { const s = EP_STATUS[status] || EP_STATUS['Queued']; return `<span class="badge" style="${s.style}">${s.label}</span>`; }
 
+// ---- Researching "stuck" timer (live duration + >30min warning) ----
+const EP_STUCK_MS = 30 * 60 * 1000; // 30 minutes
+function epResearchStart(r) {
+  if (r.researchingStarted) { const t = Number(r.researchingStarted); if (!isNaN(t) && t > 0) return t; }
+  if (r.lastActivity) { const t = Date.parse(r.lastActivity); if (!isNaN(t)) return t; } // fallback for legacy rows
+  return null;
+}
+function epFmtDur(ms) {
+  if (!(ms > 0)) ms = 0;
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
+}
+function epStatusCell(r) {
+  if (r.status !== 'Researching') return epBadge(r.status);
+  const start = epResearchStart(r);
+  const elapsed = start ? (Date.now() - start) : 0;
+  const stuck = start ? (elapsed > EP_STUCK_MS) : false;
+  const durTxt = start ? epFmtDur(elapsed) : '';
+  const badgeStyle = stuck ? 'background:#2A1A05;color:var(--orange);' : 'background:#0D2233;color:var(--blue);';
+  const durSpan = `<span id="epDur_${r.id}">${durTxt ? ' (' + durTxt + ')' : ''}</span>`;
+  let html = `<span class="badge" id="epBadge_${r.id}" style="${badgeStyle}">🔍 Researching${durSpan}</span>`;
+  if (stuck) {
+    html += `<div id="epStuck_${r.id}" style="color:var(--red);font-size:11px;margin-top:5px;line-height:1.4;">⚠️ Stuck — reset to Queued? <button onclick="epResetStuck('${r.id}')" style="margin-left:4px;padding:2px 9px;font-size:10px;font-weight:700;background:var(--orange);color:#000;border:none;border-radius:5px;cursor:pointer;">Reset</button></div>`;
+  }
+  return html;
+}
+// Live tick: update duration text every minute; full re-render only when a row crosses the stuck threshold.
+let epTickTimer = null;
+function epStartTick() {
+  if (epTickTimer) return;
+  epTickTimer = setInterval(function () {
+    let needFull = false;
+    epPipeline.forEach(function (r) {
+      if (r.status !== 'Researching') return;
+      const start = epResearchStart(r);
+      if (!start) return;
+      const elapsed = Date.now() - start;
+      const durEl = document.getElementById('epDur_' + r.id);
+      if (durEl) durEl.textContent = ' (' + epFmtDur(elapsed) + ')';
+      const stuckNow = elapsed > EP_STUCK_MS;
+      const stuckShown = !!document.getElementById('epStuck_' + r.id);
+      if (stuckNow !== stuckShown) needFull = true;
+    });
+    if (needFull) epRender();
+  }, 60000);
+}
+async function epResetStuck(id) {
+  const r = epPipeline.find(x => x.id === id);
+  if (!r) return;
+  const updates = {
+    status: 'Queued',
+    researchingStarted: null,
+    lastActivity: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  };
+  Object.assign(r, updates);
+  epRender();
+  try {
+    await fetch(PROXY_URL + '?action=updateEversenBrand', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brand: r.brand, updates }) });
+  } catch (e) { console.log('[pipeline] reset stuck failed:', e); }
+  epSave();
+  toast('↩ Reset to Queued', 'gold');
+}
+
 function epRender() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   const contactedBeyond = ['Contacted', 'Replied', 'Positive', 'Needs Review', 'Dead'];
@@ -7812,7 +7876,7 @@ function epRender() {
       <td style="padding:10px 12px;font-weight:600;">${escHtmlA(r.brand)}</td>
       <td style="padding:10px 12px;font-size:12px;">${web}</td>
       <td style="padding:10px 12px;font-size:12px;color:var(--gray);">${r.contactEmail ? escHtmlA(r.contactEmail) : '—'}</td>
-      <td style="padding:10px 12px;">${epBadge(r.status)}</td>
+      <td style="padding:10px 12px;">${epStatusCell(r)}</td>
       <td style="padding:10px 12px;font-size:12px;color:var(--gray);">${escHtmlA(r.dateAdded || '—')}</td>
       <td style="padding:10px 12px;font-size:12px;color:var(--gray);">${escHtmlA(r.lastActivity || '—')}</td>
       <td style="padding:10px 12px;font-size:12px;color:var(--gray);max-width:180px;">${escHtmlA(r.notes || '')}</td>
@@ -7822,6 +7886,7 @@ function epRender() {
       </td>
     </tr>`;
   }).join('');
+  epStartTick();
 }
 const EP_STATUS_ORDER = ['Queued', 'Researching', 'Contacted', 'Replied', 'Positive', 'Needs Review', 'Dead'];
 let epEditingId = null;
@@ -7831,12 +7896,16 @@ async function epSaveEdit(id) {
   const r = epPipeline.find(x => x.id === id);
   if (!r) return;
   const gv = (pfx) => { const el = document.getElementById(pfx + id); return el ? el.value : undefined; };
+  const newStatus = gv('epEditStatus_') || r.status;
   const updates = {
     contactEmail: (gv('epEditEmail_') || '').trim(),
-    status: gv('epEditStatus_') || r.status,
+    status: newStatus,
     notes: (gv('epEditNotes_') || '').trim(),
     lastActivity: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   };
+  // Stamp when a brand ENTERS Researching (for the stuck-timer); clear it when it leaves.
+  if (newStatus === 'Researching' && r.status !== 'Researching') updates.researchingStarted = Date.now();
+  else if (newStatus !== 'Researching') updates.researchingStarted = null;
   Object.assign(r, updates);   // update locally
   epEditingId = null;
   epRender();                  // refresh table + stats immediately
