@@ -7719,12 +7719,26 @@ function epToday() { return new Date().toLocaleDateString('en-US', { month: 'sho
 function epUid() { return 'ep_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 function epNewRow(brand, website) { return { id: epUid(), brand: brand, website: website || '', contactEmail: '', status: 'Queued', dateAdded: epToday(), lastActivity: '', notes: '' }; }
 
-function epLoad() {
-  try { const raw = localStorage.getItem(EP_KEY); if (raw) { const v = JSON.parse(raw); if (Array.isArray(v)) epPipeline = v; } } catch (e) {}
-  if (!epPipeline.length) { epPipeline = EP_STARTERS.map(s => epNewRow(s.brand, s.website)); epSave(); }
+async function epLoad() {
+  let loaded = false;
+  // Redis first (shared across devices)…
+  try {
+    const res = await fetch(PROXY_URL + '?action=getEversenPipeline', { cache: 'no-store' });
+    if (res.ok) { const arr = await res.json(); if (Array.isArray(arr)) { epPipeline = arr; loaded = true; } }
+  } catch (e) { console.log('[pipeline] Redis load failed, falling back to localStorage:', e); }
+  // …localStorage fallback if Redis is unavailable.
+  if (!loaded) {
+    try { const raw = localStorage.getItem(EP_KEY); if (raw) { const v = JSON.parse(raw); if (Array.isArray(v)) epPipeline = v; } } catch (e) {}
+  }
+  if (!epPipeline.length) { epPipeline = EP_STARTERS.map(s => epNewRow(s.brand, s.website)); await epSave(); }
   epRender();
 }
-function epSave() { try { localStorage.setItem(EP_KEY, JSON.stringify(epPipeline)); } catch (e) {} }
+async function epSave() {
+  try { localStorage.setItem(EP_KEY, JSON.stringify(epPipeline)); } catch (e) {} // local fallback always written
+  try {
+    await fetch(PROXY_URL + '?action=saveEversenPipeline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pipeline: epPipeline }) });
+  } catch (e) { console.log('[pipeline] Redis save failed (kept local copy):', e); }
+}
 
 function epAdd() {
   const brand = (document.getElementById('epBrand').value || '').trim();

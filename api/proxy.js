@@ -31,6 +31,32 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { type } = req.query;
+  const action = req.query && req.query.action;
+
+  // ── Eversen Pipeline endpoints (Upstash Redis key "eversenPipeline") ──
+  if (action === 'getEversenPipeline') {
+    try { return res.status(200).json(await orLoadArray('eversenPipeline')); }
+    catch (err) { return res.status(200).json([]); }
+  }
+  if (action === 'saveEversenPipeline') {
+    try {
+      const pipeline = (req.body && req.body.pipeline) || [];
+      await orKvCmd(['SET', 'eversenPipeline', JSON.stringify(Array.isArray(pipeline) ? pipeline : [])]);
+      return res.status(200).json({ success: true });
+    } catch (err) { return res.status(200).json({ success: false, error: err.message }); }
+  }
+  if (action === 'updateEversenBrand') {
+    try {
+      const { brand, updates } = req.body || {};
+      if (!brand) return res.status(400).json({ success: false, error: 'Missing brand' });
+      const pipeline = await orLoadArray('eversenPipeline');
+      const idx = pipeline.findIndex(b => String(b.brand || '').toLowerCase().trim() === String(brand).toLowerCase().trim());
+      if (idx < 0) return res.status(200).json({ success: false, error: 'Brand not found' });
+      pipeline[idx] = Object.assign({}, pipeline[idx], updates || {});
+      await orKvCmd(['SET', 'eversenPipeline', JSON.stringify(pipeline)]);
+      return res.status(200).json({ success: true, brand: pipeline[idx] });
+    } catch (err) { return res.status(200).json({ success: false, error: err.message }); }
+  }
 
   // eBay Browse API - Active Listings
   if (type === 'ebay_active') {
