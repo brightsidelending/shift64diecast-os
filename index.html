@@ -1049,6 +1049,18 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button onclick="evChatClear()" style="padding:6px 12px;font-size:11px;font-weight:700;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;cursor:pointer;">Clear Chat</button>
     </div>
     <div id="evChatBody" style="background:var(--black);border:1px solid var(--border);border-radius:10px;padding:14px;max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:12px;"></div>
+    <!-- Brand selector -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <label for="evChatBrand" style="font-size:12px;color:var(--gray);font-weight:600;">Brand:</label>
+      <select id="evChatBrand" class="text-input" style="max-width:220px;font-size:13px;padding:7px 10px;"><option value="">Select a brand…</option></select>
+    </div>
+    <!-- Quick actions -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <button type="button" onclick="evQuickFill('ig')" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">📸 Write Instagram DM</button>
+      <button type="button" onclick="evQuickFill('1688')" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">🛒 Find on 1688</button>
+      <button type="button" onclick="evQuickFill('email')" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">📧 Write Cold Email</button>
+      <button type="button" onclick="evQuickFill('research')" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">🔍 Research Brand</button>
+    </div>
     <form onsubmit="return false;" style="display:flex;gap:8px;">
       <input class="text-input" id="evChatInput" placeholder="Ask Eversen about sourcing, brands, pricing…" style="flex:1;min-width:180px;" onkeydown="if(event.key==='Enter'){event.preventDefault();evChatSend();}"/>
       <button type="button" id="evChatSendBtn" onclick="evChatSend()" style="padding:10px 20px;font-size:14px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:8px;cursor:pointer;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">Send</button>
@@ -7887,6 +7899,7 @@ function epRender() {
     </tr>`;
   }).join('');
   epStartTick();
+  if (typeof evPopulateBrands === 'function') evPopulateBrands();
 }
 const EP_STATUS_ORDER = ['Queued', 'Researching', 'Contacted', 'Replied', 'Positive', 'Needs Review', 'Dead'];
 let epEditingId = null;
@@ -7918,7 +7931,7 @@ async function epSaveEdit(id) {
 
 // ---- Ask Eversen chat (session history; Anthropic via ?action=claude) ----
 let evChatHistory = []; // { role:'user'|'assistant', content }
-const EV_CHAT_SYSTEM = "You are Eversen Chan, Shift64 Diecast's AI procurement agent. You help Eric and Khai with wholesale sourcing strategy, supplier research, brand analysis, pricing intelligence, and outreach decisions. You know their target brands: Demon King Auto, TPC, Flame, Pop Race, LCD Models, Inno64, MiniGT, Kaido House. You are direct, strategic, and always focused on finding factory-direct buying opportunities.";
+const EV_CHAT_SYSTEM = "You are Eversen Chan, Shift64 Diecast's AI procurement agent. You help Eric and Khai with wholesale sourcing strategy, supplier research, brand analysis, pricing intelligence, and outreach decisions. You know their target brands: Demon King Auto, TPC, Flame, Pop Race, LCD Models, Inno64, MiniGT, Kaido House. You are direct, strategic, and ALWAYS focused on finding factory-direct contacts and buying opportunities.\n\nCAPABILITIES:\n- Instagram DM writing: when asked, write a short DM (3-4 lines max), casual but professional, expressing genuine wholesale buying interest for a US retailer. Do NOT ask about price or MOQ on first contact — the goal is just to open the conversation and get routed to the right person. Make it copy-paste ready.\n- Cold email writing: professional wholesale inquiry a buyer can send manually, introducing Shift64 Diecast as a US retail buyer seeking factory-direct/wholesale terms.\n- 1688 sourcing guidance: you know the Chinese brand names and Chinese-language search terms for diecast brands (e.g. 合金车模 = alloy car model, 1:64 车模, 汽车模型, plus brand-specific transliterations). Explain how to search 1688.com, filter for manufacturers (生产厂家) vs traders, and evaluate suppliers.\n- Brand research: supply chain, likely factory/manufacturer, distributors, and the best contact strategy to reach a factory-direct decision maker.";
 function evChatRender() {
   const body = document.getElementById('evChatBody');
   if (!body) return;
@@ -7930,6 +7943,29 @@ function evChatRender() {
   body.scrollTop = body.scrollHeight;
 }
 function evChatClear() { evChatHistory = []; evChatRender(); }
+// Populate the brand selector from the current pipeline (called on render/load).
+function evPopulateBrands() {
+  const sel = document.getElementById('evChatBrand');
+  if (!sel) return;
+  const prev = sel.value;
+  const brands = (typeof epPipeline !== 'undefined' && Array.isArray(epPipeline)) ? epPipeline.map(b => b.brand).filter(Boolean) : [];
+  sel.innerHTML = '<option value="">Select a brand…</option>' + brands.map(b => `<option value="${escHtmlA(b)}"${b === prev ? ' selected' : ''}>${escHtmlA(b)}</option>`).join('');
+}
+// Quick-action templates — pre-fill the input (don't auto-send) with [brand] swapped for the selected brand.
+const EV_QUICK = {
+  ig: 'Write me an Instagram DM for [brand] that I can copy and paste',
+  '1688': 'How do I find [brand] on 1688 and what Chinese search terms should I use?',
+  email: 'Write me a cold email for [brand] I can send manually',
+  research: 'Research everything you know about [brand] — supply chain, factory, distributors, contact strategy'
+};
+function evQuickFill(kind) {
+  const tpl = EV_QUICK[kind];
+  if (!tpl) return;
+  const sel = document.getElementById('evChatBrand');
+  const brand = (sel && sel.value) ? sel.value : '[brand]';
+  const input = document.getElementById('evChatInput');
+  if (input) { input.value = tpl.replace('[brand]', brand); input.focus(); }
+}
 async function evChatSend() {
   const input = document.getElementById('evChatInput');
   const q = (input.value || '').trim();
