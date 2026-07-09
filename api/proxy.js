@@ -1,4 +1,3 @@
-
 // Allow large request bodies (image ID payloads, long prompts) and give the function the
 // maximum runtime, since web_search tool calls take longer than a standard completion.
 // Tools arrays (including web_search_20250305) are always forwarded to Anthropic as-is —
@@ -83,27 +82,31 @@ export default async function handler(req, res) {
   // current pricing, etc.). Takes { messages, system } from the request body,
   // returns { response: <final text block> }.
   if (action === 'eversenChat') {
-    const { messages, system } = req.body;
-    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'web-search-2025-03-05'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 2000,
-        system: system,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: messages
-      })
-    });
-    const aiData = await aiRes.json();
-    const textBlock = aiData.content.filter(c => c.type === 'text').pop();
-    console.log('eversenChat response:', JSON.stringify(aiData).substring(0, 500));
-    return res.json({ response: textBlock ? textBlock.text : 'No response' });
+    try {
+      const { messages, system } = req.body;
+      const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-beta': 'web-search-2025-03-05'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 2000,
+          system: system,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: messages
+        })
+      });
+      const aiData = await aiRes.json();
+      console.log('eversenChat:', JSON.stringify(aiData).substring(0, 500));
+      const textBlock = aiData.content.filter(c => c.type === 'text').pop();
+      return res.json({ response: textBlock ? textBlock.text : 'No response' });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
   }
 
   // eBay Browse API - Active Listings
@@ -585,3 +588,4 @@ async function getEbayToken() {
   const data = await r.json();
   return data.access_token;
 }
+ 
