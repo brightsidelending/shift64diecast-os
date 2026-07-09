@@ -523,56 +523,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div><label style="font-size:10px;color:var(--gray);text-transform:uppercase;display:block;margin-bottom:4px;">Payment Fee %</label><input class="text-input" id="t_payment" type="number" value="3" step="0.25" style="width:100%;"/></div>
     </div>
   </div>
-  <!-- ===== QUICK MARGIN CALCULATOR ===== -->
-  <div class="card" id="marginCalcCard" style="margin-bottom:16px;">
-    <div class="card-title">🧮 Margin Calculator</div>
-    <div style="color:var(--gray);font-size:12px;margin-bottom:14px;">Enter what you pay and your eBay list price — eBay fees are figured automatically at 13.25%.</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-      <div>
-        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Buy Price $ (what we pay)</label>
-        <input class="text-input" id="mc_buy" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
-      </div>
-      <div>
-        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">eBay Selling Price $</label>
-        <input class="text-input" id="mc_sell" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
-      </div>
-      <div>
-        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Shipping Cost $</label>
-        <input class="text-input" id="mc_ship" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;">
-      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">eBay Fees (13.25%)</div>
-        <div id="mc_fee" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-top:6px;">$0.00</div>
-      </div>
-      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">Net Profit</div>
-        <div id="mc_profit" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--green);margin-top:6px;">$0.00</div>
-      </div>
-      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">Margin %</div>
-        <div id="mc_margin" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-top:6px;">0.0%</div>
-      </div>
-    </div>
-  </div>
-  <script>
-  function mcCalc() {
-    var buy = parseFloat(document.getElementById('mc_buy').value) || 0;
-    var sell = parseFloat(document.getElementById('mc_sell').value) || 0;
-    var ship = parseFloat(document.getElementById('mc_ship').value) || 0;
-    var fee = sell * 0.1325;                       // eBay fees auto-calculated at 13.25%
-    var profit = sell - buy - fee - ship;          // net profit after fees + shipping
-    var margin = sell > 0 ? (profit / sell) * 100 : 0;
-    document.getElementById('mc_fee').textContent = '$' + fee.toFixed(2);
-    var pe = document.getElementById('mc_profit');
-    pe.textContent = '$' + profit.toFixed(2);
-    pe.style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
-    var me = document.getElementById('mc_margin');
-    me.textContent = margin.toFixed(1) + '%';
-    me.style.color = margin >= 0 ? 'var(--gold)' : 'var(--red)';
-  }
-  </script>
   <div class="card">
     <div style="font-family:Rajdhani,sans-serif;font-size:22px;font-weight:700;margin-bottom:4px;">MARKET PRICE SCANNER + TRUE MARGIN CALCULATOR</div>
     <div style="color:var(--gray);font-size:13px;margin-bottom:20px;">Type any diecast model. Get price estimates, true landed cost, and real margin after ALL fees.</div>
@@ -624,6 +574,56 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div>Type any model above and hit Scan to see your TRUE margin after all fees.</div>
     </div>
   </div>
+  <!-- ===== QUICK MARGIN CALCULATOR ===== -->
+  <div class="card" id="marginCalcCard" style="margin-bottom:16px;">
+    <div class="card-title">🧮 Margin Calculator</div>
+    <div style="color:var(--gray);font-size:12px;margin-bottom:14px;">Enter what you pay and your eBay list price — eBay fees are figured automatically at 13.25%.</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+      <div>
+        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Buy Price $ (what we pay)</label>
+        <input class="text-input" id="mc_buy" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">eBay Selling Price $</label>
+        <input class="text-input" id="mc_sell" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Shipping Cost $</label>
+        <input class="text-input" id="mc_ship" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;">
+      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">eBay Fees (13.25%)</div>
+        <div id="mc_fee" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-top:6px;">$0.00</div>
+      </div>
+      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">Net Profit</div>
+        <div id="mc_profit" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--green);margin-top:6px;">$0.00</div>
+      </div>
+      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">Margin %</div>
+        <div id="mc_margin" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-top:6px;">0.0%</div>
+      </div>
+    </div>
+  </div>
+  <script>
+  function mcCalc() {
+    var buy = parseFloat(document.getElementById('mc_buy').value) || 0;
+    var sell = parseFloat(document.getElementById('mc_sell').value) || 0;
+    var ship = parseFloat(document.getElementById('mc_ship').value) || 0;
+    var fee = sell * 0.1325;                       // eBay fees auto-calculated at 13.25%
+    var profit = sell - buy - fee - ship;          // net profit after fees + shipping
+    var margin = sell > 0 ? (profit / sell) * 100 : 0;
+    document.getElementById('mc_fee').textContent = '$' + fee.toFixed(2);
+    var pe = document.getElementById('mc_profit');
+    pe.textContent = '$' + profit.toFixed(2);
+    pe.style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+    var me = document.getElementById('mc_margin');
+    me.textContent = margin.toFixed(1) + '%';
+    me.style.color = margin >= 0 ? 'var(--gold)' : 'var(--red)';
+  }
+  </script>
 </div>
 
 
