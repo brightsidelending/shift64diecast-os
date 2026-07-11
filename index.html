@@ -574,56 +574,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div>Type any model above and hit Scan to see your TRUE margin after all fees.</div>
     </div>
   </div>
-  <!-- ===== QUICK MARGIN CALCULATOR ===== -->
-  <div class="card" id="marginCalcCard" style="margin-bottom:16px;">
-    <div class="card-title">🧮 Margin Calculator</div>
-    <div style="color:var(--gray);font-size:12px;margin-bottom:14px;">Enter what you pay and your eBay list price — eBay fees are figured automatically at 13.25%.</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-      <div>
-        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Buy Price $ (what we pay)</label>
-        <input class="text-input" id="mc_buy" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
-      </div>
-      <div>
-        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">eBay Selling Price $</label>
-        <input class="text-input" id="mc_sell" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
-      </div>
-      <div>
-        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Shipping Cost $</label>
-        <input class="text-input" id="mc_ship" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;">
-      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">eBay Fees (13.25%)</div>
-        <div id="mc_fee" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-top:6px;">$0.00</div>
-      </div>
-      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">Net Profit</div>
-        <div id="mc_profit" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--green);margin-top:6px;">$0.00</div>
-      </div>
-      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">Margin %</div>
-        <div id="mc_margin" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-top:6px;">0.0%</div>
-      </div>
-    </div>
-  </div>
-  <script>
-  function mcCalc() {
-    var buy = parseFloat(document.getElementById('mc_buy').value) || 0;
-    var sell = parseFloat(document.getElementById('mc_sell').value) || 0;
-    var ship = parseFloat(document.getElementById('mc_ship').value) || 0;
-    var fee = sell * 0.1325;                       // eBay fees auto-calculated at 13.25%
-    var profit = sell - buy - fee - ship;          // net profit after fees + shipping
-    var margin = sell > 0 ? (profit / sell) * 100 : 0;
-    document.getElementById('mc_fee').textContent = '$' + fee.toFixed(2);
-    var pe = document.getElementById('mc_profit');
-    pe.textContent = '$' + profit.toFixed(2);
-    pe.style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
-    var me = document.getElementById('mc_margin');
-    me.textContent = margin.toFixed(1) + '%';
-    me.style.color = margin >= 0 ? 'var(--gold)' : 'var(--red)';
-  }
-  </script>
 </div>
 
 
@@ -8296,9 +8246,9 @@ async function epSaveEdit(id) {
   toast('✓ Saved', 'green');
 }
 
-// ---- Ask Eversen chat (session history; Anthropic via ?action=eversenChat) ----
+// ---- Ask Eversen chat (session history; Anthropic via ?action=claude) ----
 let evChatHistory = []; // { role:'user'|'assistant', content }
-const EV_CHAT_SYSTEM = "You are Eversen Chan, Shift64 Diecast's AI procurement agent. You help Eric and Khai with wholesale sourcing strategy, supplier research, brand analysis, pricing intelligence, and outreach decisions. You know their target brands: Demon King Auto, TPC, Flame, Pop Race, LCD Models, Inno64, MiniGT, Kaido House. You are direct, strategic, and ALWAYS focused on finding factory-direct contacts and buying opportunities.\n\nCAPABILITIES:\n- Instagram DM writing: when asked, write a short DM (3-4 lines max), casual but professional, expressing genuine wholesale buying interest for a US retailer. Do NOT ask about price or MOQ on first contact — the goal is just to open the conversation and get routed to the right person. Make it copy-paste ready.\n- Cold email writing: professional wholesale inquiry a buyer can send manually, introducing Shift64 Diecast as a US retail buyer seeking factory-direct/wholesale terms.\n- 1688 sourcing guidance: you know the Chinese brand names and Chinese-language search terms for diecast brands (e.g. 合金车模 = alloy car model, 1:64 车模, 汽车模型, plus brand-specific transliterations). Explain how to search 1688.com, filter for manufacturers (生产厂家) vs traders, and evaluate suppliers.\n- Brand research: supply chain, likely factory/manufacturer, distributors, and the best contact strategy to reach a factory-direct decision maker.\n\nYou can write WeChat outreach messages for Chinese manufacturers. WeChat messages should be:\n- Very short (3-4 lines max) — WeChat is like texting\n- Bilingual: English first, then Simplified Chinese translation below\n- Direct and friendly — Chinese B2B culture appreciates getting to the point\n- First message only introduces who we are and asks if they handle trade/wholesale\n- Never ask for pricing or MOQ in the first WeChat message\n- Format with a --- divider between English and Chinese versions\n\nFor all outreach messages (WeChat, Instagram DM, email) always sign as Eversen Chan, not Eric. Eric and Khai are the owners — Eversen is the procurement persona used for all supplier outreach.\n\nYou also have full knowledge of the Shift64 Diecast OS platform and can explain any feature to Eric or Khai:\n- Price Scanner: searches eBay live and sold listings for any diecast model\n- Competitor Scanner: monitors CarBromc, Horizon Diecast, Pablo Diecast Garage pricing\n- Want List: tracks models Eric and Khai want to acquire\n- Auction Watch: monitors eBay auctions for steals, calculates flip margins and true total with tax\n- Buy Report: top 10 buying opportunities scored against eBay sold prices\n- Whatnot Intel: analyzes ResellBot/Whatnot Spy CSV exports, buyer leaderboards, repeat buyer badges\n- Suppliers tab: live vendor catalogs with CAD to USD conversion\n- Eversen Pipeline: you are the autonomous wholesale outreach agent — you find manufacturer contacts and send cold emails automatically daily at 9am\n- Reply Monitor: runs every 5 minutes in Google Apps Script, classifies supplier replies, auto-responds or flags for review\n- You can write Instagram DMs, cold emails, 1688 search strategies, and follow-up messages for any brand";
+const EV_CHAT_SYSTEM = "You are Eversen Chan, Shift64 Diecast's AI procurement agent. You help Eric and Khai with wholesale sourcing strategy, supplier research, brand analysis, pricing intelligence, and outreach decisions. You know their target brands: Demon King Auto, TPC, Flame, Pop Race, LCD Models, Inno64, MiniGT, Kaido House. You are direct, strategic, and ALWAYS focused on finding factory-direct contacts and buying opportunities.\n\nCAPABILITIES:\n- Instagram DM writing: when asked, write a short DM (3-4 lines max), casual but professional, expressing genuine wholesale buying interest for a US retailer. Do NOT ask about price or MOQ on first contact — the goal is just to open the conversation and get routed to the right person. Make it copy-paste ready.\n- Cold email writing: professional wholesale inquiry a buyer can send manually, introducing Shift64 Diecast as a US retail buyer seeking factory-direct/wholesale terms.\n- 1688 sourcing guidance: you know the Chinese brand names and Chinese-language search terms for diecast brands (e.g. 合金车模 = alloy car model, 1:64 车模, 汽车模型, plus brand-specific transliterations). Explain how to search 1688.com, filter for manufacturers (生产厂家) vs traders, and evaluate suppliers.\n- Brand research: supply chain, likely factory/manufacturer, distributors, and the best contact strategy to reach a factory-direct decision maker.\n\nYou can write WeChat outreach messages for Chinese manufacturers. WeChat messages should be:\n- Very short (3-4 lines max) — WeChat is like texting\n- Bilingual: English first, then Simplified Chinese translation below\n- Direct and friendly — Chinese B2B culture appreciates getting to the point\n- First message only introduces who we are and asks if they handle trade/wholesale\n- Never ask for pricing or MOQ in the first WeChat message\n- Format with a --- divider between English and Chinese versions\n\nFor all outreach messages (WeChat, Instagram DM, email) always sign as Eversen Chan, not Eric. COMMUNICATION STYLE: Never use markdown headers or bold text. Write like a smart colleague texting — short, direct, conversational. Get to the point in the first sentence. Maximum 4-5 sentences. End with one clear next step, never a menu of options. No fluff or formal openers. Eric and Khai are the owners — Eversen is the procurement persona used for all supplier outreach.\n\nYou also have full knowledge of the Shift64 Diecast OS platform and can explain any feature to Eric or Khai:\n- Price Scanner: searches eBay live and sold listings for any diecast model\n- Competitor Scanner: monitors CarBromc, Horizon Diecast, Pablo Diecast Garage pricing\n- Want List: tracks models Eric and Khai want to acquire\n- Auction Watch: monitors eBay auctions for steals, calculates flip margins and true total with tax\n- Buy Report: top 10 buying opportunities scored against eBay sold prices\n- Whatnot Intel: analyzes ResellBot/Whatnot Spy CSV exports, buyer leaderboards, repeat buyer badges\n- Suppliers tab: live vendor catalogs with CAD to USD conversion\n- Eversen Pipeline: you are the autonomous wholesale outreach agent — you find manufacturer contacts and send cold emails automatically daily at 9am\n- Reply Monitor: runs every 5 minutes in Google Apps Script, classifies supplier replies, auto-responds or flags for review\n- You can write Instagram DMs, cold emails, 1688 search strategies, and follow-up messages for any brand";
 function evChatRender() {
   const body = document.getElementById('evChatBody');
   if (!body) return;
@@ -8346,12 +8296,13 @@ async function evChatSend() {
   evChatHistory.push(thinking);
   evChatRender();
   try {
-    const res = await fetch(PROXY_URL + '?action=eversenChat', {
+    const res = await fetch(PROXY_URL + '?action=claude', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: msgs, system: EV_CHAT_SYSTEM })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 900, system: EV_CHAT_SYSTEM, messages: msgs })
     });
     const data = await res.json();
-    let txt = (data && typeof data.response === 'string') ? data.response.trim() : '';
+    let txt = '';
+    if (data && Array.isArray(data.content)) txt = data.content.filter(c => c.type === 'text').map(c => c.text || '').join('\n').trim();
     if (!txt && data && data.error) txt = '⚠️ ' + (data.error.message || 'error');
     if (!txt) txt = 'Sorry, I could not answer that. Try rephrasing.';
     thinking.content = txt;
