@@ -3449,7 +3449,7 @@ async function reloadWantsFromCloud() {
   try {
     // Want-list data lives in Redis under "ericWants"/"khaiWants".
     // Read those first, falling back to the legacy "s64_ericW"/"s64_khaiW" keys.
-    let [ew, kw] = await Promise.all([kvGet('ericWants'), kvGet('khaiWants')]);
+    let [ew, kw] = await Promise.all([kvGet('s64_ericW'), kvGet('s64_khaiW')]);
     console.log('[wantlist] Redis load → ericWants:', ew, '| khaiWants:', kw);
     if (ew == null) { ew = await kvGet('s64_ericW'); console.log('[wantlist] fallback s64_ericW:', ew); }
     if (kw == null) { kw = await kvGet('s64_khaiW'); console.log('[wantlist] fallback s64_khaiW:', kw); }
