@@ -3916,7 +3916,9 @@ function renderAuctionSearchResults() {
     const btn = onWatch
       ? `<button disabled style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--border);color:var(--gray);border:none;border-radius:7px;white-space:nowrap;">✓ Added</button>`
       : `<button onclick="addToWatchlist(${idx})" style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:7px;cursor:pointer;white-space:nowrap;">+ Watchlist</button>`;
-    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">${img}<div style="flex:1;min-width:0;"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(a.title)}</div><div style="font-size:11px;color:var(--gray);">$${a.currentBid.toFixed(2)} · ${bids}${ends}${a.shipping != null ? ' · +$' + a.shipping.toFixed(2) + ' ship' : ''}</div></div>${btn}</div>`;
+    const viewUrl = a.url ? a.url : ('https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(a.title || ''));
+    const viewLink = `<a href="${escAttr(viewUrl)}" target="_blank" rel="noopener noreferrer" title="View this auction on eBay" style="font-size:11px;color:var(--gray);text-decoration:none;white-space:nowrap;flex-shrink:0;margin-right:2px;">eBay ↗</a>`;
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">${img}<div style="flex:1;min-width:0;"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(a.title)}</div><div style="font-size:11px;color:var(--gray);">$${a.currentBid.toFixed(2)} · ${bids}${ends}${a.shipping != null ? ' · +$' + a.shipping.toFixed(2) + ' ship' : ''}</div></div>${viewLink}${btn}</div>`;
   }).join('') + '</div>';
 }
 
