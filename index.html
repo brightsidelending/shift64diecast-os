@@ -335,6 +335,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   #eric .tbl-wrap table th:nth-child(14), #eric .tbl-wrap table td:nth-child(14),
   #khai .tbl-wrap table th:nth-child(3), #khai .tbl-wrap table td:nth-child(3),
   #khai .tbl-wrap table th:nth-child(14), #khai .tbl-wrap table td:nth-child(14) { display: none !important; }
+
+  /* Auction search results — guarantee the eBay link stays visible + tappable on mobile */
+  #auctSearchResults a.auc-ebay-link { display: inline-flex !important; align-items: center; min-height: 40px; padding: 0 6px; font-size: 13px !important; flex-shrink: 0; white-space: nowrap; }
 }
 /* ===== HELP SYSTEM ===== */
 .help-tip{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;min-width:16px;border-radius:50%;background:var(--border);color:var(--gray);font-size:11px;font-weight:700;line-height:1;cursor:help;margin-left:6px;position:relative;vertical-align:middle;user-select:none;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0}
@@ -3917,7 +3920,7 @@ function renderAuctionSearchResults() {
       ? `<button disabled style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--border);color:var(--gray);border:none;border-radius:7px;white-space:nowrap;">✓ Added</button>`
       : `<button onclick="addToWatchlist(${idx})" style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:7px;cursor:pointer;white-space:nowrap;">+ Watchlist</button>`;
     const viewUrl = a.url ? a.url : ('https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(a.title || ''));
-    const viewLink = `<a href="${escAttr(viewUrl)}" target="_blank" rel="noopener noreferrer" title="View this auction on eBay" style="font-size:11px;color:var(--gray);text-decoration:none;white-space:nowrap;flex-shrink:0;margin-right:2px;">eBay ↗</a>`;
+    const viewLink = `<a href="${escAttr(viewUrl)}" class="auc-ebay-link" target="_blank" rel="noopener noreferrer" title="View this auction on eBay" style="font-size:11px;color:var(--gray);text-decoration:none;white-space:nowrap;flex-shrink:0;margin-right:2px;">eBay ↗</a>`;
     return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">${img}<div style="flex:1;min-width:0;"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(a.title)}</div><div style="font-size:11px;color:var(--gray);">$${a.currentBid.toFixed(2)} · ${bids}${ends}${a.shipping != null ? ' · +$' + a.shipping.toFixed(2) + ' ship' : ''}</div></div>${viewLink}${btn}</div>`;
   }).join('') + '</div>';
 }
