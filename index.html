@@ -5767,7 +5767,8 @@ async function runPriceScan() {
       // Active listings get a drill-in checkbox: search this exact listing title
       const drill = !isSold ? `<input type="checkbox" class="drill-check" title="Search this exact listing title" onclick="event.stopPropagation();drillInto(this.dataset.title)" ondblclick="event.stopPropagation()" data-title="${encodeURIComponent(i.title || '')}" style="cursor:pointer;flex-shrink:0;"/>` : '';
       const wantBtn = `<button class="scan-want-btn" onclick="event.stopPropagation();addScanToWant(this)" ondblclick="event.stopPropagation()" title="Add to your Want List" style="padding:5px 9px;font-size:11px;font-weight:700;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ Want</button>`;
-      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}${drill}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div>${wantBtn}</div>`;
+      const ebayLink = `<a href="https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(i.title||'')}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" title="Search this title on eBay" style="font-size:11px;color:var(--gray);text-decoration:none;white-space:nowrap;flex-shrink:0;">eBay ↗</a>`;
+      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}${drill}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div>${ebayLink}${wantBtn}</div>`;
     }).join('');
     const renderColumn = (items, isSold, colId) => {
       const first = items.slice(0, 4);
@@ -8662,13 +8663,4 @@ initHelpTips();
   if (chatForm) chatForm.addEventListener('submit', function(e){ e.preventDefault(); return false; });
 
   // Auto-Source button (Eversen tab).
-  const autoBtn = document.getElementById('evAutoSourceBtn');
-  if (autoBtn) autoBtn.addEventListener('click', function(e){ e.preventDefault(); if (typeof evAutoSource === 'function') evAutoSource(); });
-
-  // Negotiate vendor dropdown: populate on first load and whenever the Outreach tab is opened.
-  if (typeof loadNegoVendors === 'function') loadNegoVendors();
-})();
-</script>
-
-</body>
-</html>
+  const autoBtn = document.getEl
