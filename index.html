@@ -3502,14 +3502,26 @@ async function saveWantList(who) {
 }
 
 // Pull the latest want lists straight from Redis (used on app open / PWA foreground).
+// One-time migration: if want-list data only exists under the legacy ericWants/khaiWants
+// Redis keys, copy it into the canonical s64_ericW / s64_khaiW keys so old data is not lost.
+async function migrateWantKeys() {
+  try {
+    const [legacyE, legacyK, curE, curK] = await Promise.all([kvGet('ericWants'), kvGet('khaiWants'), kvGet('s64_ericW'), kvGet('s64_khaiW')]);
+    const jobs = [];
+    if (Array.isArray(legacyE) && legacyE.length && !(Array.isArray(curE) && curE.length)) jobs.push(kvSet('s64_ericW', legacyE));
+    if (Array.isArray(legacyK) && legacyK.length && !(Array.isArray(curK) && curK.length)) jobs.push(kvSet('s64_khaiW', legacyK));
+    if (jobs.length) { await Promise.all(jobs); console.log('[wantlist] migrated legacy ericWants/khaiWants → s64_ericW/s64_khaiW'); }
+  } catch (e) { console.error('[wantlist] want-key migration failed:', e); }
+}
+
 async function reloadWantsFromCloud() {
   try {
-    // Want-list data lives in Redis under "ericWants"/"khaiWants".
-    // Read those first, falling back to the legacy "s64_ericW"/"s64_khaiW" keys.
-    let [ew, kw] = await Promise.all([kvGet('ericWants'), kvGet('khaiWants')]);
-    console.log('[wantlist] Redis load → ericWants:', ew, '| khaiWants:', kw);
-    if (ew == null) { ew = await kvGet('s64_ericW'); console.log('[wantlist] fallback s64_ericW:', ew); }
-    if (kw == null) { kw = await kvGet('s64_khaiW'); console.log('[wantlist] fallback s64_khaiW:', kw); }
+    // Canonical want-list keys are s64_ericW / s64_khaiW (where saveWantList writes).
+    // Read those first, falling back to the legacy "ericWants"/"khaiWants" keys only if empty.
+    let [ew, kw] = await Promise.all([kvGet('s64_ericW'), kvGet('s64_khaiW')]);
+    console.log('[wantlist] Redis load → s64_ericW:', ew, '| s64_khaiW:', kw);
+    if (ew == null) { ew = await kvGet('ericWants'); console.log('[wantlist] fallback ericWants:', ew); }
+    if (kw == null) { kw = await kvGet('khaiWants'); console.log('[wantlist] fallback khaiWants:', kw); }
     if (Array.isArray(ew)) ericWants = ew;
     if (Array.isArray(kw)) khaiWants = kw;
     renderWants('eric');
@@ -4015,11 +4027,11 @@ async function fetchAvgSold(query) {
   return s.avg;
 }
 
-function removeFromWatchlist(id) {
+async function removeFromWatchlist(id) {
   auctionWatchlist = auctionWatchlist.filter(w => w.id !== id);
   renderWatchlist();
   renderAuctionSearchResults();
-  saveData();
+  await saveData();   // await so the deletion reaches Redis before any page reload can read stale data
 }
 
 function setAuctionMaxBid(id, val) {
@@ -8200,6 +8212,7 @@ renderScreenshots();
 renderCatalogs();               // show default vendor catalogs immediately (independent of KV load)
 renderEversenChips();           // show quick-add chips immediately (independent of KV load)
 window.addEventListener('load', loadData);
+window.addEventListener('load', async function () { try { await migrateWantKeys(); } catch (e) {} reloadWantsFromCloud(); });
 window.addEventListener('load', function () { loadOutreach(false); });
 window.addEventListener('load', function () { loadPlaybook(); });
 window.addEventListener('load', function () { sqLoad(); });
