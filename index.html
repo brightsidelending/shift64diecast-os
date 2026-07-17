@@ -3671,6 +3671,16 @@ function ebayItemUrl(it) {
   return null;
 }
 
+// Stable eBay item key — numeric item id from the URL, else the query-stripped URL.
+// Prevents duplicate watchlist entries when the same listing returns a slightly different itemWebUrl.
+function auctionKey(u) {
+  const url = (typeof u === 'string') ? u : (u && u.url) || '';
+  if (!url) return '';
+  const path = url.split('?')[0].split('#')[0];
+  const m = path.match(/(\d{9,})/);
+  return m ? m[1] : path.toLowerCase();
+}
+
 // Pull a usable image URL from an eBay item, covering the known field variants
 function ebayImageUrl(it) {
   if (!it) return null;
@@ -3919,7 +3929,8 @@ function renderAuctionSearchResults() {
     const img = a.img ? `<img src="${escAttr(a.img)}" alt="" style="width:46px;height:46px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
     const bids = a.bidCount + ' bid' + (a.bidCount === 1 ? '' : 's');
     const ends = a.endDate ? (' · ' + auctionTimeLeft(a.endDate).label + ' left') : '';
-    const onWatch = auctionWatchlist.find(w => w.url && w.url === a.url);
+    const aKey = auctionKey(a.url);
+    const onWatch = aKey && auctionWatchlist.find(w => auctionKey(w.url) === aKey);
     const btn = onWatch
       ? `<button disabled style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--border);color:var(--gray);border:none;border-radius:7px;white-space:nowrap;">✓ Added</button>`
       : `<button onclick="addToWatchlist(${idx})" style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:7px;cursor:pointer;white-space:nowrap;">+ Watchlist</button>`;
@@ -3932,7 +3943,8 @@ function renderAuctionSearchResults() {
 async function addToWatchlist(idx) {
   const a = auctionSearchResults[idx];
   if (!a) return;
-  if (auctionWatchlist.find(w => w.url && w.url === a.url)) { toast('Already on your watchlist.', 'yellow'); return; }
+  const aKey = auctionKey(a.url);
+  if (aKey && auctionWatchlist.find(w => auctionKey(w.url) === aKey)) { toast('Already on your watchlist.', 'yellow'); return; }
   const item = {
     id: Date.now() + '_' + Math.floor(Math.random() * 1000),
     title: a.title, url: a.url, img: a.img,
