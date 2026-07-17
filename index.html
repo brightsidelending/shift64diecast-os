@@ -793,6 +793,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <!-- ===== AUCTION WATCH ===== -->
 <div id="auction_watch" class="section">
 
+  <!-- OUTBID ALERTS — populated by the outbid watcher while this tab is open -->
+  <div id="outbidAlerts"></div>
+
   <!-- SECTION 1: GLOBAL SETTINGS (collapsed) -->
   <div class="card" style="margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleAuctionSettings()">
@@ -3538,6 +3541,7 @@ async function loadData() {
   applyAuctionSettingsToInputs();
   renderWatchlist();
   startAuctionAutoRefresh();
+  startOutbidWatch();
   if (Array.isArray(whatnot)) {
     whatnotShows = whatnot;
   } else {
@@ -4158,6 +4162,76 @@ function startAuctionAutoRefresh() {
   if (_auctionRefreshTimer) clearInterval(_auctionRefreshTimer);
   _auctionRefreshTimer = setInterval(() => { refreshWatchlist({ silent: true }); }, 5 * 60 * 1000);
 }
+
+// ── Outbid alert watcher — polls the eBay Browse API while the OS tab is open ──
+let _outbidState = {};       // id -> { title, bid }
+let _outbidDismissed = {};   // id -> true (dismissed this session)
+let _outbidPollTimer = null;
+let _outbidStarted = false;
+
+function renderOutbidBanners() {
+  const el = document.getElementById('outbidAlerts');
+  if (!el) return;
+  const ids = Object.keys(_outbidState).filter(id => !_outbidDismissed[id]);
+  el.innerHTML = ids.map(id => {
+    const o = _outbidState[id];
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#2B0D0D;border:1px solid var(--red);border-radius:8px;padding:11px 14px;margin-bottom:8px;">`
+      + `<div style="font-size:13px;color:#FF6B6B;font-weight:600;line-height:1.4;">⚠️ You've been outbid on ${escHtmlA(o.title)} — Current bid: $${o.bid.toFixed(2)}</div>`
+      + `<button onclick="dismissOutbid('${id}')" title="Dismiss" style="background:transparent;border:none;color:var(--gray);font-size:20px;line-height:1;cursor:pointer;padding:0 4px;flex-shrink:0;">×</button>`
+      + `</div>`;
+  }).join('');
+}
+
+function dismissOutbid(id) {
+  _outbidDismissed[id] = true;
+  delete _outbidState[id];
+  renderOutbidBanners();
+}
+
+async function pollOutbids() {
+  try {
+    for (const it of auctionWatchlist.slice()) {
+      const tl = auctionTimeLeft(it.endDate);
+      if (tl.ms <= 0) { delete _outbidState[it.id]; continue; }   // ended → stop tracking
+      let mapped = [];
+      try { mapped = (await fetchEbayItems('ebay_auction', it.title) || []).map(mapAuctionItem); }
+      catch (e) { continue; }
+      const match = mapped.find(m => m.url && it.url && m.url === it.url);
+      if (!match) continue;
+      it.currentBid = match.currentBid;
+      it.bidCount = match.bidCount;
+      if (match.endDate) it.endDate = match.endDate;
+      if (match.shipping != null) it.shipping = match.shipping;
+      if (it.myBid != null && match.currentBid > it.myBid) {
+        _outbidState[it.id] = { title: it.title, bid: match.currentBid };
+      } else {
+        delete _outbidState[it.id];
+      }
+    }
+    renderWatchlist();
+    saveData();
+    renderOutbidBanners();
+  } catch (e) { console.log('[outbid] poll error', e); }
+  scheduleOutbidPoll();
+}
+
+function scheduleOutbidPoll() {
+  if (_outbidPollTimer) clearTimeout(_outbidPollTimer);
+  let soon = false;
+  for (const it of auctionWatchlist) {
+    const tl = auctionTimeLeft(it.endDate);
+    if (tl.ms > 0 && tl.ms <= 10 * 60 * 1000) { soon = true; break; }   // <=10 min left → poll every 1 min
+  }
+  _outbidPollTimer = setTimeout(pollOutbids, soon ? 60 * 1000 : 5 * 60 * 1000);
+}
+
+function startOutbidWatch() {
+  if (_outbidStarted) return;
+  _outbidStarted = true;
+  if (_outbidPollTimer) clearTimeout(_outbidPollTimer);
+  _outbidPollTimer = setTimeout(pollOutbids, 20 * 1000);   // first check ~20s after load, then self-schedules
+}
+
 
 // ============================================================
 // WHATNOT INTEL
