@@ -3434,7 +3434,9 @@ async function kvGet(key) {
   return d.value; // may be null if not stored
 }
 
+let _dataLoaded = false; // true only after the initial Redis load; blocks saves of stale/empty pre-load state
 async function saveData() {
+  if (!_dataLoaded) { console.log('[save] skipped — initial Redis load not complete'); return; }
   // localStorage always written as a fallback
   try {
     localStorage.setItem('s64_items', JSON.stringify(allItems));
@@ -3544,6 +3546,7 @@ async function loadData() {
   if (scrapeMeta && typeof scrapeMeta === 'object' && !Array.isArray(scrapeMeta)) vendorScrapeMeta = scrapeMeta;
   if (Array.isArray(auctWatch)) auctionWatchlist = auctWatch;
   if (auctSettings && typeof auctSettings === 'object' && !Array.isArray(auctSettings)) auctionSettings = Object.assign(auctionSettings, auctSettings);
+  _dataLoaded = true; // core state (incl. auctionWatchlist) loaded from Redis — saves may now persist
   if (allItems.length) renderResults();
   if (ericColl.length) renderCollection('eric');
   if (khaiColl.length) renderCollection('khai');
@@ -4243,7 +4246,7 @@ async function pollOutbids() {
       evaluateOutbid(it);
     }
     renderWatchlist();
-    saveData();
+    if (auctionWatchlist.length) saveData();
     renderOutbidBanners();
   } catch (e) { console.log('[outbid] poll error', e); }
   scheduleOutbidPoll();
