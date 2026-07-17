@@ -325,10 +325,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   #catalogsContainer table th:nth-child(3), #catalogsContainer table td:nth-child(3),
   #catalogsContainer table th:nth-child(6), #catalogsContainer table td:nth-child(6) { display: none !important; }
 
-  /* 5: Auction watchlist — hide Est Tax(7), Avg Sold(9), Max Bid(11) */
-  #auctWatchlist table th:nth-child(7), #auctWatchlist table td:nth-child(7),
-  #auctWatchlist table th:nth-child(9), #auctWatchlist table td:nth-child(9),
-  #auctWatchlist table th:nth-child(11), #auctWatchlist table td:nth-child(11) { display: none !important; }
+  /* 5: Auction watchlist — hide Est Tax(8), Avg Sold(10), Max Bid(12) */
+  #auctWatchlist table th:nth-child(8), #auctWatchlist table td:nth-child(8),
+  #auctWatchlist table th:nth-child(10), #auctWatchlist table td:nth-child(10),
+  #auctWatchlist table th:nth-child(12), #auctWatchlist table td:nth-child(12) { display: none !important; }
 
   /* 9: Eric & Khai collection tables — hide Scale(3) + Notes(14) */
   #eric .tbl-wrap table th:nth-child(3), #eric .tbl-wrap table td:nth-child(3),
@@ -4119,6 +4119,7 @@ function renderWatchlist() {
       <td style="padding:8px;">${img}</td>
       <td style="padding:8px;max-width:220px;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;">${titleCell}</div>${flagsHtml ? `<div style="margin-top:4px;">${flagsHtml}</div>` : ''}</td>
       <td style="padding:8px;white-space:nowrap;">$${d.bid.toFixed(2)}</td>
+      <td style="padding:8px;"><input type="number" step="0.01" value="${it.myBid != null ? it.myBid : ''}" placeholder="—" onchange="setAuctionMyBid('${it.id}', this.value)" style="width:72px;padding:5px;font-size:12px;background:#12151b;border:1px solid var(--border);border-radius:5px;color:inherit;"/></td>
       <td style="padding:8px;white-space:nowrap;">${bidBadge}</td>
       <td style="padding:8px;white-space:nowrap;color:${timeColor};font-weight:600;">${d.tl.label}</td>
       <td style="padding:8px;white-space:nowrap;">${d.shipping ? '$' + d.shipping.toFixed(2) : 'Free'}</td>
@@ -4127,13 +4128,12 @@ function renderWatchlist() {
       <td style="padding:8px;white-space:nowrap;">${avgStr}</td>
       <td style="padding:8px;white-space:nowrap;font-weight:700;color:${marginColor};">${marginStr}</td>
       <td style="padding:8px;"><input type="number" step="0.01" value="${it.maxBid != null ? it.maxBid : ''}" placeholder="—" onchange="setAuctionMaxBid('${it.id}', this.value)" style="width:72px;padding:5px;font-size:12px;background:#12151b;border:1px solid var(--border);border-radius:5px;color:inherit;"/></td>
-      <td style="padding:8px;"><input type="number" step="0.01" value="${it.myBid != null ? it.myBid : ''}" placeholder="—" onchange="setAuctionMyBid('${it.id}', this.value)" style="width:72px;padding:5px;font-size:12px;background:#12151b;border:1px solid var(--border);border-radius:5px;color:inherit;"/></td>
       <td style="padding:8px;"><button onclick="removeFromWatchlist('${it.id}')" class="row-action row-del" title="Remove">🗑️</button></td>
     </tr>`;
   }).join('');
   cont.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
     <thead><tr style="text-align:left;color:var(--gray);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border);">
-      <th style="padding:8px;">Img</th><th style="padding:8px;">Item / Flags</th><th style="padding:8px;">Bid</th><th style="padding:8px;">Bids</th><th style="padding:8px;">Time Left</th><th style="padding:8px;">Ship</th><th style="padding:8px;">Est Tax</th><th style="padding:8px;">True Total</th><th style="padding:8px;">Avg Sold</th><th style="padding:8px;">Flip %</th><th style="padding:8px;">Max Bid</th><th style="padding:8px;">My Bid</th><th style="padding:8px;"></th>
+      <th style="padding:8px;">Img</th><th style="padding:8px;">Item / Flags</th><th style="padding:8px;">Bid</th><th style="padding:8px;">My Bid</th><th style="padding:8px;">Bids</th><th style="padding:8px;">Time Left</th><th style="padding:8px;">Ship</th><th style="padding:8px;">Est Tax</th><th style="padding:8px;">True Total</th><th style="padding:8px;">Avg Sold</th><th style="padding:8px;">Flip %</th><th style="padding:8px;">Max Bid</th><th style="padding:8px;"></th>
     </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
