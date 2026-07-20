@@ -113,14 +113,17 @@ export default async function handler(req, res) {
   if (type === 'ebay_active') {
     try {
       const { query } = req.body;
-      const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=10&filter=buyingOptions:{FIXED_PRICE}`;
       const token = await getEbayToken();
+      if (!token) return res.status(200).json({ error: 'eBay auth failed - check EBAY_APP_ID / EBAY_CLIENT_SECRET', itemSummaries: [] });
+      const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=10&filter=buyingOptions:{FIXED_PRICE}`;
       const r = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' }
       });
       const data = await r.json();
+      if (!Array.isArray(data.itemSummaries)) console.log('[proxy] ebay_active returned no itemSummaries:', JSON.stringify(data).slice(0, 400));
       return res.status(200).json(data);
     } catch(err) {
+      console.error('[proxy] ebay_active error:', err.message);
       return res.status(200).json({ error: err.message, itemSummaries: [] });
     }
   }
@@ -537,7 +540,14 @@ function extractBody(payload) {
   return (text || '').slice(0, 8000);
 }
 
+let _ebayToken = null;
+let _ebayTokenExp = 0;
 async function getEbayToken() {
+  if (_ebayToken && Date.now() < _ebayTokenExp) return _ebayToken;
+  if (!process.env.EBAY_APP_ID || !process.env.EBAY_CLIENT_SECRET) {
+    console.error('[proxy] eBay credentials missing - set EBAY_APP_ID and EBAY_CLIENT_SECRET');
+    return null;
+  }
   const credentials = Buffer.from(`${process.env.EBAY_APP_ID}:${process.env.EBAY_CLIENT_SECRET}`).toString('base64');
   const r = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {
     method: 'POST',
@@ -545,7 +555,14 @@ async function getEbayToken() {
     body: 'grant_type=client_credentials&scope=https://api.ebay.com/oauth/api_scope'
   });
   const data = await r.json();
-  return data.access_token;
+  if (!data.access_token) {
+    console.error('[proxy] eBay token request failed:', JSON.stringify(data).slice(0, 300));
+    _ebayToken = null; _ebayTokenExp = 0;
+    return null;
+  }
+  _ebayToken = data.access_token;
+  _ebayTokenExp = Date.now() + ((data.expires_in || 7200) - 60) * 1000;
+  return _ebayToken;
 }
  
 
