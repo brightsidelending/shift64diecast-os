@@ -8488,7 +8488,7 @@ function kaidoNormNum(str) {
 // Estimated value used for the bid guide: live eBay median first, then hallsguide standard, then chase.
 function kaidoEstValue(entry) {
   const live = kaidoPrices[entry.khmg];
-  if (live && live.median > 0) return { value: live.median, source: 'eBay median · ' + live.count + ' sold' };
+  if (live && live.median > 0) return { value: live.median, source: 'eBay median · ' + live.count + ' sold' + (live.scope === 'casting' ? ' (casting avg)' : '') };
   if (entry.stdValue != null) return { value: entry.stdValue, source: 'hallsguide standard est.' };
   if (entry.chaseValue != null) return { value: entry.chaseValue, source: 'hallsguide chase est.' };
   return { value: null, source: null };
@@ -8580,31 +8580,121 @@ function renderKaido() {
 }
 
 // Weekly eBay sync — median sold price per KHMG model, saved to Redis under s64_kaido_prices.
+// Build eBay sold-search queries for a KHMG entry, MOST SPECIFIC FIRST.
+// The old code used one over-specific query ("Kaido House " + full wiki name) that
+// almost never returned >=3 sold results, so nothing ever updated. We now fall back
+// through progressively broader terms and take the first that returns real data.
+function kaidoSoldVariants(e) {
+  const clean = function (s) { return String(s || '').replace(/[()\/]/g, ' ').replace(/\s+/g, ' ').trim(); };
+  const nameClean = clean(e.name);
+  const castClean = clean(e.casting);
+  // scope: 'model' = specific to this exact release, 'casting' = whole-casting average (flagged in UI).
+  const out = [
+    { q: 'Kaido House ' + nameClean, scope: 'model' },   // full model + variant (most specific)
+    { q: 'Kaidohouse ' + e.khmg, scope: 'model' },       // by KHMG number (collectors put it in titles) — model-specific
+    { q: 'Kaido House ' + e.khmg, scope: 'model' },
+    { q: 'Kaido House ' + castClean, scope: 'casting' }   // last resort: casting-wide avg, flagged as such
+  ];
+  const seen = new Set(), res = [];
+  for (const v of out) { const k = v.q.toLowerCase(); if (v.q && !seen.has(k)) { seen.add(k); res.push(v); } }
+  return res;
+}
+
+// Median eBay SOLD price for ONE query, with outlier filtering. Returns { count, median }.
+// Throws propagate to the caller so real failures are visible (no silent swallow).
+async function kaidoSoldMedian(query) {
+  const raw = await fetchEbayItems('ebay_sold', query);
+  let prices = mapSoldItems(raw || [], query).map(function (m) { return m.price; }).filter(function (p) { return p > 0; }).sort(function (a, b) { return a - b; });
+  if (prices.length < 3) return { count: prices.length, median: null };
+  const md = prices[Math.floor(prices.length / 2)];
+  let use = prices.filter(function (p) { return p >= md * 0.4 && p <= md * 3; }); // trim wrong-item extremes
+  if (use.length < 3) use = prices;
+  use.sort(function (a, b) { return a - b; });
+  const median = use[Math.floor(use.length / 2)];
+  return { count: use.length, median: Math.round(median * 100) / 100 };
+}
+
+// Try each query variant broadest-last; return the first with >=3 sold results.
+async function kaidoBestSold(e) {
+  const variants = kaidoSoldVariants(e);
+  for (const v of variants) {
+    const r = await kaidoSoldMedian(v.q); // may throw -> handled by refreshKaidoPrices
+    if (r.median != null) return { median: r.median, count: r.count, query: v.q, scope: v.scope };
+  }
+  return { median: null, count: 0, query: null, scope: null };
+}
+
+function kaidoProgressHTML(done, total, priced, noData, errors, label) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  return '<div style="font-size:12px;color:var(--white);margin-bottom:6px;">' + (label || 'Refreshing eBay sold prices…') + ' <b>' + done + '/' + total + '</b> (' + pct + '%)</div>' +
+    '<div style="height:9px;background:var(--border);border-radius:6px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);transition:width .2s;"></div></div>' +
+    '<div style="font-size:11px;color:var(--gray);margin-top:6px;">✅ ' + priced + ' priced · ⚪ ' + noData + ' no eBay data · ⚠️ ' + errors + ' errors</div>';
+}
+
+// Weekly eBay sync — median sold price per KHMG model, saved to Redis under s64_kaido_prices.
 async function refreshKaidoPrices() {
   const btn = document.getElementById('kaidoRefreshBtn');
   const status = document.getElementById('kaidoStatus');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Refreshing…'; }
-  let done = 0, updated = 0;
-  for (const e of KHMG_DB) {
-    try {
-      const raw = await fetchEbayItems('ebay_sold', 'Kaido House ' + e.name);
-      let prices = mapSoldItems(raw || [], e.name).map(function (m) { return m.price; }).filter(function (p) { return p > 0; }).sort(function (a, b) { return a - b; });
-      if (prices.length >= 3) {
-        let median = prices[Math.floor(prices.length / 2)];
-        let use = prices.filter(function (p) { return p >= median * 0.4 && p <= median * 3; });
-        if (use.length < 3) use = prices;
-        const med = use[Math.floor(use.length / 2)];
-        kaidoPrices[e.khmg] = { median: Math.round(med * 100) / 100, count: use.length, updatedAt: Date.now() };
-        updated++;
+  const total = KHMG_DB.length;
+  let done = 0, priced = 0, noData = 0, errors = 0;
+  let firstError = null;
+  const render = function () { if (status) status.innerHTML = kaidoProgressHTML(done, total, priced, noData, errors); };
+  render();
+
+  // Concurrency pool: 90+ lookups (each up to a few queries) finish in a reasonable time
+  // while staying gentle on the proxy. JS is single-threaded so kaidoPrices mutation is safe.
+  const queue = KHMG_DB.slice();
+  const CONCURRENCY = 4;
+  async function worker() {
+    while (queue.length) {
+      const e = queue.shift();
+      try {
+        const r = await kaidoBestSold(e);
+        if (r.median != null) {
+          kaidoPrices[e.khmg] = { median: r.median, count: r.count, query: r.query, scope: r.scope, updatedAt: Date.now() };
+          priced++;
+        } else {
+          noData++;
+        }
+      } catch (err) {
+        errors++;
+        if (!firstError) firstError = String((err && err.message) || err);
+        console.warn('[kaido] sold lookup failed for ' + e.khmg + ':', err);
       }
-    } catch (err) { /* skip this model on any error */ }
-    done++;
-    if (status) status.textContent = 'Refreshing eBay sold prices… ' + done + '/' + KHMG_DB.length + ' (' + updated + ' updated)';
+      done++;
+      render();
+    }
   }
-  try { await kvSet('s64_kaido_prices', kaidoPrices); } catch (err) { console.error('[kaido] price save failed:', err); }
+  const workers = [];
+  for (let i = 0; i < CONCURRENCY; i++) workers.push(worker());
+  await Promise.all(workers);
+
+  let saved = true;
+  try { await kvSet('s64_kaido_prices', kaidoPrices); }
+  catch (err) { saved = false; console.error('[kaido] price save failed:', err); }
+
   if (btn) { btn.disabled = false; btn.textContent = '🔄 Refresh Prices'; }
-  if (typeof toast === 'function') toast('✅ Kaido prices updated (' + updated + ' models)', 'green');
-  renderKaido();
+  renderKaido(); // repaint cards with the new medians
+
+  // Final status — always explicit, never a silent finish.
+  if (status) {
+    let msg, col;
+    if (priced === 0 && errors > 0) {
+      col = 'var(--yellow)';
+      msg = '⚠️ No prices updated — every eBay lookup errored (' + errors + '/' + total + '). First error: ' + (firstError || 'unknown') + '. Check the eBay proxy (type=ebay_sold).';
+    } else if (priced === 0) {
+      col = 'var(--yellow)';
+      msg = '⚠️ Finished, but eBay returned no sold data for any of the ' + total + ' models. The proxy may not be returning sold listings.';
+    } else {
+      col = 'var(--green)';
+      msg = '✅ Updated ' + priced + ' of ' + total + ' models from eBay sold medians · ⚪ ' + noData + ' had no data · ⚠️ ' + errors + ' errors' + (saved ? '' : ' · ⚠️ Redis save FAILED (kept in memory only)');
+    }
+    status.innerHTML = '<div style="font-size:12px;color:' + col + ';line-height:1.5;">' + msg + '</div>';
+  }
+  if (typeof toast === 'function') {
+    toast(priced ? ('✅ Kaido prices updated (' + priced + ' models)') : '⚠️ No eBay sold prices found — see the panel', priced ? 'green' : 'yellow');
+  }
 }
 
 async function loadKaidoPrices() {
