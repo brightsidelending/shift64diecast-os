@@ -2,7 +2,7 @@
   "name": "Shift64 Diecast OS",
   "short_name": "Shift64",
   "description": "Shift64 Diecast sourcing and operations platform",
-  "start_url": "/shift64diecast-os/",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#0d0d0d",
   "theme_color": "#C9A84C",
