@@ -3677,7 +3677,7 @@ document.addEventListener('keydown', function(e) {
 // falling back through the id fields if itemWebUrl is absent.
 function ebayItemUrl(it) {
   if (!it) return null;
-  if (it.itemWebUrl) return it.itemWebUrl;
+  if (it.itemWebUrl) return String(it.itemWebUrl).replace(/^http:\/\//i, 'https://');
   if (it.legacyItemId) return 'https://www.ebay.com/itm/' + it.legacyItemId;
   if (it.itemId) {
     const parts = String(it.itemId).split('|');
@@ -3699,11 +3699,12 @@ function auctionKey(u) {
 // Pull a usable image URL from an eBay item, covering the known field variants
 function ebayImageUrl(it) {
   if (!it) return null;
-  return (it.image && it.image.imageUrl) ||
+  const u = (it.image && it.image.imageUrl) ||
          (it.thumbnailImages && it.thumbnailImages[0] && it.thumbnailImages[0].imageUrl) ||
          (it.additionalImages && it.additionalImages[0] && it.additionalImages[0].imageUrl) ||
          (typeof it.image === 'string' ? it.image : null) ||
          it.imageUrl || it.galleryURL || it.galleryUrl || null;
+  return u ? String(u).replace(/^http:\/\//i, 'https://') : null; // force https so images load on an HTTPS host
 }
 
 // ---- Listing card interactions: single click/tap = image preview, double = open on eBay ----
@@ -5330,7 +5331,7 @@ function renderCompetitorPrices() {
     const img = it.image || '';
     const url = compVendorUrl(it.site, it.name);
     const interactive = !!(img || url);
-    const thumb = img ? `<img src="${escAttr(img)}" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
+    const thumb = img ? `<img src="${escAttr(img)}" referrerpolicy="no-referrer" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
     const safeUrl = url ? url.replace(/"/g, '%22').replace(/'/g, '%27') : '';
     const safeImg = img ? String(img).replace(/"/g, '%22').replace(/'/g, '%27') : '';
     const safeTitle = escAttr(it.name || '');
@@ -5933,10 +5934,10 @@ async function runPriceScan() {
     refPriceDefault = ebayActivePrices[0] ? '$' + parseFloat(ebayActivePrices[0].price).toFixed(2) : '';
     refLocked = false;
     const _quickHtml = `
-      ${prodImg ? `<img class="product-hero" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
+      ${prodImg ? `<img class="product-hero" referrerpolicy="no-referrer" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;"><div style="font-size:10px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">⚡ QUICK PRICE · ${query.toUpperCase()}${useRealData ? ' · 🟢 LIVE EBAY' : ' · 🤖 EST.'}</div><div style="font-size:13px;color:var(--gray);">Fast price view — active listings + competitor prices. Turn Quick Price off for full margin analysis.</div></div>
       <div class="listings-wrap">
-        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-price" id="refPhotoPrice">${refPriceDefault}</div><div class="ps-label" id="refPhotoLabel">Reference Photo</div></div>` : ''}
+        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" referrerpolicy="no-referrer" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-price" id="refPhotoPrice">${refPriceDefault}</div><div class="ps-label" id="refPhotoLabel">Reference Photo</div></div>` : ''}
         <div class="mstack listings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-width:0;">
           <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
             <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟡 ACTIVE LISTINGS</div><span style="font-size:11px;color:var(--gold);">${ebayActivePrices.length > 0 ? ebayActivePrices.length + ' live' : '~' + data.listings + ' est.'}</span></div>
@@ -5948,13 +5949,13 @@ async function runPriceScan() {
       <div style="text-align:center;font-size:11px;color:var(--gray);margin:-2px 0 14px;">Single click to preview image · Double click to open on eBay</div>
       ${competitorHtml}`;
     document.getElementById('psResults').innerHTML = psQuickPrice ? _quickHtml : `
-      ${prodImg ? `<img class="product-hero" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
+      ${prodImg ? `<img class="product-hero" referrerpolicy="no-referrer" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">${useRealData?((activeApprox||soldApprox)?'🟢 LIVE EBAY DATA · SIMILAR ITEMS':'🟢 LIVE EBAY DATA'):'🤖 AI ESTIMATE'} · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
         <div style="font-size:14px;line-height:1.6;">${action==='BUY'?`Strong buy. ${data.soldCount} units sold in last 30 days. True landed cost $${landed.toFixed(2)} vs avg sell $${sold.toFixed(2)} = ${marginPct}% net margin.`:action==='WATCH'?`Watch this. ${data.soldCount} sold recently. ${marginPct}% margin is acceptable but negotiate harder on wholesale price.`:`Thin margins at ${marginPct}%. Find a higher demand model or negotiate lower wholesale.`}</div>
       </div>
       <div class="listings-wrap">
-        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-price" id="refPhotoPrice">${refPriceDefault}</div><div class="ps-label" id="refPhotoLabel">Reference Photo</div></div>` : ''}
+        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" referrerpolicy="no-referrer" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-price" id="refPhotoPrice">${refPriceDefault}</div><div class="ps-label" id="refPhotoLabel">Reference Photo</div></div>` : ''}
         <div class="mstack listings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
           <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
             <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟡 ACTIVE LISTINGS</div><span style="font-size:11px;color:var(--gold);">~${data.listings} active</span></div>
@@ -8593,7 +8594,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <div id="imgPreview" onclick="if(event.target===this)closeImagePreview()">
   <div class="imgprev-box">
     <button class="imgprev-close" onclick="closeImagePreview()" aria-label="Close">✕</button>
-    <img id="imgPreviewImg" src="" alt="Listing image"/>
+    <img id="imgPreviewImg" referrerpolicy="no-referrer" src="" alt="Listing image"/>
     <div class="imgprev-title" id="imgPreviewTitle"></div>
   </div>
 </div>
