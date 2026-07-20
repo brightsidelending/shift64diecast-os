@@ -325,19 +325,16 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   #catalogsContainer table th:nth-child(3), #catalogsContainer table td:nth-child(3),
   #catalogsContainer table th:nth-child(6), #catalogsContainer table td:nth-child(6) { display: none !important; }
 
-  /* 5: Auction watchlist — hide Est Tax(8), Avg Sold(10), Max Bid(12) */
-  #auctWatchlist table th:nth-child(8), #auctWatchlist table td:nth-child(8),
-  #auctWatchlist table th:nth-child(10), #auctWatchlist table td:nth-child(10),
-  #auctWatchlist table th:nth-child(12), #auctWatchlist table td:nth-child(12) { display: none !important; }
+  /* 5: Auction watchlist — hide Est Tax(7), Avg Sold(9), Max Bid(11) */
+  #auctWatchlist table th:nth-child(7), #auctWatchlist table td:nth-child(7),
+  #auctWatchlist table th:nth-child(9), #auctWatchlist table td:nth-child(9),
+  #auctWatchlist table th:nth-child(11), #auctWatchlist table td:nth-child(11) { display: none !important; }
 
   /* 9: Eric & Khai collection tables — hide Scale(3) + Notes(14) */
   #eric .tbl-wrap table th:nth-child(3), #eric .tbl-wrap table td:nth-child(3),
   #eric .tbl-wrap table th:nth-child(14), #eric .tbl-wrap table td:nth-child(14),
   #khai .tbl-wrap table th:nth-child(3), #khai .tbl-wrap table td:nth-child(3),
   #khai .tbl-wrap table th:nth-child(14), #khai .tbl-wrap table td:nth-child(14) { display: none !important; }
-
-  /* Auction search results — guarantee the eBay link stays visible + tappable on mobile */
-  #auctSearchResults a.auc-ebay-link { display: inline-flex !important; align-items: center; min-height: 40px; padding: 0 6px; font-size: 13px !important; flex-shrink: 0; white-space: nowrap; }
 }
 /* ===== HELP SYSTEM ===== */
 .help-tip{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;min-width:16px;border-radius:50%;background:var(--border);color:var(--gray);font-size:11px;font-weight:700;line-height:1;cursor:help;margin-left:6px;position:relative;vertical-align:middle;user-select:none;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0}
@@ -411,6 +408,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <button class="nav-tab" onclick="showTab('scanner',this)">🕵️ Competitor Scanner</button>
   <button class="nav-tab" onclick="showTab('wantlist',this)">🎯 Want List</button>
   <button class="nav-tab" onclick="showTab('auction_watch',this)">🎯 Auction Watch</button>
+  <button class="nav-tab" onclick="showTab('kaido_guide',this)">🏆 Kaido Guide</button>
   <button class="nav-tab" onclick="showTab('buy_report',this)">📋 Buy Report</button>
   <button class="nav-tab" onclick="showTab('inventory',this)">📦 Inventory</button>
   <button class="nav-tab" onclick="showTab('suppliers',this)">🤝 Suppliers</button>
@@ -526,56 +524,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div><label style="font-size:10px;color:var(--gray);text-transform:uppercase;display:block;margin-bottom:4px;">Payment Fee %</label><input class="text-input" id="t_payment" type="number" value="3" step="0.25" style="width:100%;"/></div>
     </div>
   </div>
-  <!-- ===== QUICK MARGIN CALCULATOR ===== -->
-  <div class="card" id="marginCalcCard" style="margin-bottom:16px;">
-    <div class="card-title">🧮 Margin Calculator</div>
-    <div style="color:var(--gray);font-size:12px;margin-bottom:14px;">Enter what you pay and your eBay list price — eBay fees are figured automatically at 13.25%.</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-      <div>
-        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Buy Price $ (what we pay)</label>
-        <input class="text-input" id="mc_buy" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
-      </div>
-      <div>
-        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">eBay Selling Price $</label>
-        <input class="text-input" id="mc_sell" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
-      </div>
-      <div>
-        <label style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Shipping Cost $</label>
-        <input class="text-input" id="mc_ship" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;" oninput="mcCalc()"/>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;">
-      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">eBay Fees (13.25%)</div>
-        <div id="mc_fee" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-top:6px;">$0.00</div>
-      </div>
-      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">Net Profit</div>
-        <div id="mc_profit" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--green);margin-top:6px;">$0.00</div>
-      </div>
-      <div style="background:var(--black);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;">Margin %</div>
-        <div id="mc_margin" style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-top:6px;">0.0%</div>
-      </div>
-    </div>
-  </div>
-  <script>
-  function mcCalc() {
-    var buy = parseFloat(document.getElementById('mc_buy').value) || 0;
-    var sell = parseFloat(document.getElementById('mc_sell').value) || 0;
-    var ship = parseFloat(document.getElementById('mc_ship').value) || 0;
-    var fee = sell * 0.1325;                       // eBay fees auto-calculated at 13.25%
-    var profit = sell - buy - fee - ship;          // net profit after fees + shipping
-    var margin = sell > 0 ? (profit / sell) * 100 : 0;
-    document.getElementById('mc_fee').textContent = '$' + fee.toFixed(2);
-    var pe = document.getElementById('mc_profit');
-    pe.textContent = '$' + profit.toFixed(2);
-    pe.style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
-    var me = document.getElementById('mc_margin');
-    me.textContent = margin.toFixed(1) + '%';
-    me.style.color = margin >= 0 ? 'var(--gold)' : 'var(--red)';
-  }
-  </script>
   <div class="card">
     <div style="font-family:Rajdhani,sans-serif;font-size:22px;font-weight:700;margin-bottom:4px;">MARKET PRICE SCANNER + TRUE MARGIN CALCULATOR</div>
     <div style="color:var(--gray);font-size:13px;margin-bottom:20px;">Type any diecast model. Get price estimates, true landed cost, and real margin after ALL fees.</div>
@@ -793,9 +741,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <!-- ===== AUCTION WATCH ===== -->
 <div id="auction_watch" class="section">
 
-  <!-- OUTBID ALERTS — populated by the outbid watcher while this tab is open -->
-  <div id="outbidAlerts"></div>
-
   <!-- SECTION 1: GLOBAL SETTINGS (collapsed) -->
   <div class="card" style="margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleAuctionSettings()">
@@ -844,6 +789,28 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div id="auctWatchlist"></div>
   </div>
 
+</div>
+
+<!-- ===== KAIDO BID GUIDE ===== -->
+<style>
+#kaido_guide .kaido-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
+#kaido_guide .kaido-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
+#kaido_guide .kaido-thumb{width:100%;height:170px;object-fit:cover;background:#0E1015;border-bottom:1px solid var(--border);display:block;}
+#kaido_guide .kaido-badge{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;color:#000;background:var(--gold);padding:2px 9px;border-radius:6px;}
+#kaido_guide .bid-row{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:7px;font-size:13px;font-weight:600;margin-bottom:5px;}
+#kaido_guide .chip-limited{background:rgba(224,43,43,.15);color:#F0A8A8;border:1px solid rgba(224,43,43,.4);font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;letter-spacing:.5px;vertical-align:middle;}
+</style>
+<div id="kaido_guide" class="section">
+  <div class="card" style="margin-bottom:14px;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;margin-bottom:4px;">🏆 Kaido Bid Guide</div>
+    <div style="color:var(--gray);font-size:13px;margin-bottom:14px;">Kaido House × Mini GT price &amp; bid reference. Search by number, model, casting, or color. Bid thresholds auto-calculate from the estimated value (live eBay median when available, else hallsguide estimate).</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <input class="text-input" id="kaidoSearchInput" placeholder="Search KHMG number, model, casting, color, or keyword" style="flex:1;min-width:220px;" oninput="renderKaido()" onkeydown="if(event.key==='Enter')renderKaido()"/>
+      <button class="btn-red" onclick="refreshKaidoPrices()" id="kaidoRefreshBtn" style="padding:12px 20px;font-size:13px;white-space:nowrap;">🔄 Refresh Prices</button>
+    </div>
+    <div id="kaidoStatus" style="margin-top:10px;font-size:12px;color:var(--gray);"></div>
+  </div>
+  <div id="kaidoResults" class="kaido-grid"></div>
 </div>
 
 <!-- ===== COMPETITOR SCANNER ===== -->
@@ -1207,7 +1174,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button type="button" onclick="evQuickFill('email')" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">📧 Write Cold Email</button>
       <button type="button" onclick="evQuickFill('research')" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">🔍 Research Brand</button>
       <button type="button" onclick="evQuickFill('wechat')" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">📱 WeChat Script</button>
-      <button type="button" onclick="evLoadStatus()" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">📊 Load Status</button>
     </div>
     <form onsubmit="return false;" style="display:flex;gap:8px;">
       <input class="text-input" id="evChatInput" placeholder="Ask Eversen about sourcing, brands, pricing…" style="flex:1;min-width:180px;" onkeydown="if(event.key==='Enter'){event.preventDefault();evChatSend();}"/>
@@ -2005,6 +1971,7 @@ function showTab(id, el) {
   if (id === 'wantlist' && typeof renderAlerts === 'function') renderAlerts();
   // Always pull the freshest want lists from Redis when the tab is opened (not just on page load).
   if (id === 'wantlist' && typeof reloadWantsFromCloud === 'function') reloadWantsFromCloud();
+  if (id === 'kaido_guide' && typeof renderKaido === 'function') renderKaido();
 }
 
 // ============================================================
@@ -3434,9 +3401,7 @@ async function kvGet(key) {
   return d.value; // may be null if not stored
 }
 
-let _dataLoaded = false; // true only after the initial Redis load; blocks saves of stale/empty pre-load state
 async function saveData() {
-  if (!_dataLoaded) { console.log('[save] skipped — initial Redis load not complete'); return; }
   // localStorage always written as a fallback
   try {
     localStorage.setItem('s64_items', JSON.stringify(allItems));
@@ -3504,26 +3469,14 @@ async function saveWantList(who) {
 }
 
 // Pull the latest want lists straight from Redis (used on app open / PWA foreground).
-// One-time migration: if want-list data only exists under the legacy ericWants/khaiWants
-// Redis keys, copy it into the canonical s64_ericW / s64_khaiW keys so old data is not lost.
-async function migrateWantKeys() {
-  try {
-    const [legacyE, legacyK, curE, curK] = await Promise.all([kvGet('ericWants'), kvGet('khaiWants'), kvGet('s64_ericW'), kvGet('s64_khaiW')]);
-    const jobs = [];
-    if (Array.isArray(legacyE) && legacyE.length && !(Array.isArray(curE) && curE.length)) jobs.push(kvSet('s64_ericW', legacyE));
-    if (Array.isArray(legacyK) && legacyK.length && !(Array.isArray(curK) && curK.length)) jobs.push(kvSet('s64_khaiW', legacyK));
-    if (jobs.length) { await Promise.all(jobs); console.log('[wantlist] migrated legacy ericWants/khaiWants → s64_ericW/s64_khaiW'); }
-  } catch (e) { console.error('[wantlist] want-key migration failed:', e); }
-}
-
 async function reloadWantsFromCloud() {
   try {
-    // Canonical want-list keys are s64_ericW / s64_khaiW (where saveWantList writes).
-    // Read those first, falling back to the legacy "ericWants"/"khaiWants" keys only if empty.
-    let [ew, kw] = await Promise.all([kvGet('s64_ericW'), kvGet('s64_khaiW')]);
-    console.log('[wantlist] Redis load → s64_ericW:', ew, '| s64_khaiW:', kw);
-    if (ew == null) { ew = await kvGet('ericWants'); console.log('[wantlist] fallback ericWants:', ew); }
-    if (kw == null) { kw = await kvGet('khaiWants'); console.log('[wantlist] fallback khaiWants:', kw); }
+    // Want-list data lives in Redis under "ericWants"/"khaiWants".
+    // Read those first, falling back to the legacy "s64_ericW"/"s64_khaiW" keys.
+    let [ew, kw] = await Promise.all([kvGet('ericWants'), kvGet('khaiWants')]);
+    console.log('[wantlist] Redis load → ericWants:', ew, '| khaiWants:', kw);
+    if (ew == null) { ew = await kvGet('s64_ericW'); console.log('[wantlist] fallback s64_ericW:', ew); }
+    if (kw == null) { kw = await kvGet('s64_khaiW'); console.log('[wantlist] fallback s64_khaiW:', kw); }
     if (Array.isArray(ew)) ericWants = ew;
     if (Array.isArray(kw)) khaiWants = kw;
     renderWants('eric');
@@ -3546,7 +3499,6 @@ async function loadData() {
   if (scrapeMeta && typeof scrapeMeta === 'object' && !Array.isArray(scrapeMeta)) vendorScrapeMeta = scrapeMeta;
   if (Array.isArray(auctWatch)) auctionWatchlist = auctWatch;
   if (auctSettings && typeof auctSettings === 'object' && !Array.isArray(auctSettings)) auctionSettings = Object.assign(auctionSettings, auctSettings);
-  _dataLoaded = true; // core state (incl. auctionWatchlist) loaded from Redis — saves may now persist
   if (allItems.length) renderResults();
   if (ericColl.length) renderCollection('eric');
   if (khaiColl.length) renderCollection('khai');
@@ -3556,7 +3508,6 @@ async function loadData() {
   applyAuctionSettingsToInputs();
   renderWatchlist();
   startAuctionAutoRefresh();
-  startOutbidWatch();
   if (Array.isArray(whatnot)) {
     whatnotShows = whatnot;
   } else {
@@ -3677,7 +3628,7 @@ document.addEventListener('keydown', function(e) {
 // falling back through the id fields if itemWebUrl is absent.
 function ebayItemUrl(it) {
   if (!it) return null;
-  if (it.itemWebUrl) return String(it.itemWebUrl).replace(/^http:\/\//i, 'https://');
+  if (it.itemWebUrl) return it.itemWebUrl;
   if (it.legacyItemId) return 'https://www.ebay.com/itm/' + it.legacyItemId;
   if (it.itemId) {
     const parts = String(it.itemId).split('|');
@@ -3686,25 +3637,14 @@ function ebayItemUrl(it) {
   return null;
 }
 
-// Stable eBay item key — numeric item id from the URL, else the query-stripped URL.
-// Prevents duplicate watchlist entries when the same listing returns a slightly different itemWebUrl.
-function auctionKey(u) {
-  const url = (typeof u === 'string') ? u : (u && u.url) || '';
-  if (!url) return '';
-  const path = url.split('?')[0].split('#')[0];
-  const m = path.match(/(\d{9,})/);
-  return m ? m[1] : path.toLowerCase();
-}
-
 // Pull a usable image URL from an eBay item, covering the known field variants
 function ebayImageUrl(it) {
   if (!it) return null;
-  const u = (it.image && it.image.imageUrl) ||
+  return (it.image && it.image.imageUrl) ||
          (it.thumbnailImages && it.thumbnailImages[0] && it.thumbnailImages[0].imageUrl) ||
          (it.additionalImages && it.additionalImages[0] && it.additionalImages[0].imageUrl) ||
          (typeof it.image === 'string' ? it.image : null) ||
          it.imageUrl || it.galleryURL || it.galleryUrl || null;
-  return u ? String(u).replace(/^http:\/\//i, 'https://') : null; // force https so images load on an HTTPS host
 }
 
 // ---- Listing card interactions: single click/tap = image preview, double = open on eBay ----
@@ -3945,27 +3885,23 @@ function renderAuctionSearchResults() {
     const img = a.img ? `<img src="${escAttr(a.img)}" alt="" style="width:46px;height:46px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
     const bids = a.bidCount + ' bid' + (a.bidCount === 1 ? '' : 's');
     const ends = a.endDate ? (' · ' + auctionTimeLeft(a.endDate).label + ' left') : '';
-    const aKey = auctionKey(a.url);
-    const onWatch = aKey && auctionWatchlist.find(w => auctionKey(w.url) === aKey);
+    const onWatch = auctionWatchlist.find(w => w.url && w.url === a.url);
     const btn = onWatch
       ? `<button disabled style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--border);color:var(--gray);border:none;border-radius:7px;white-space:nowrap;">✓ Added</button>`
       : `<button onclick="addToWatchlist(${idx})" style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:7px;cursor:pointer;white-space:nowrap;">+ Watchlist</button>`;
-    const viewUrl = a.url ? a.url : ('https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(a.title || ''));
-    const viewLink = `<a href="${escAttr(viewUrl)}" class="auc-ebay-link" target="_blank" rel="noopener noreferrer" title="View this auction on eBay" style="font-size:11px;color:var(--gray);text-decoration:none;white-space:nowrap;flex-shrink:0;margin-right:2px;">eBay ↗</a>`;
-    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">${img}<div style="flex:1;min-width:0;"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(a.title)}</div><div style="font-size:11px;color:var(--gray);">$${a.currentBid.toFixed(2)} · ${bids}${ends}${a.shipping != null ? ' · +$' + a.shipping.toFixed(2) + ' ship' : ''}</div></div>${viewLink}${btn}</div>`;
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">${img}<div style="flex:1;min-width:0;"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(a.title)}</div><div style="font-size:11px;color:var(--gray);">$${a.currentBid.toFixed(2)} · ${bids}${ends}${a.shipping != null ? ' · +$' + a.shipping.toFixed(2) + ' ship' : ''}</div></div>${btn}</div>`;
   }).join('') + '</div>';
 }
 
 async function addToWatchlist(idx) {
   const a = auctionSearchResults[idx];
   if (!a) return;
-  const aKey = auctionKey(a.url);
-  if (aKey && auctionWatchlist.find(w => auctionKey(w.url) === aKey)) { toast('Already on your watchlist.', 'yellow'); return; }
+  if (auctionWatchlist.find(w => w.url && w.url === a.url)) { toast('Already on your watchlist.', 'yellow'); return; }
   const item = {
     id: Date.now() + '_' + Math.floor(Math.random() * 1000),
     title: a.title, url: a.url, img: a.img,
     currentBid: a.currentBid, bidCount: a.bidCount, endDate: a.endDate, shipping: a.shipping,
-    avgSold: null, maxBid: null, myBid: null
+    avgSold: null, maxBid: null
   };
   auctionWatchlist.push(item);
   renderWatchlist();
@@ -4031,11 +3967,11 @@ async function fetchAvgSold(query) {
   return s.avg;
 }
 
-async function removeFromWatchlist(id) {
+function removeFromWatchlist(id) {
   auctionWatchlist = auctionWatchlist.filter(w => w.id !== id);
   renderWatchlist();
   renderAuctionSearchResults();
-  await saveData();   // await so the deletion reaches Redis before any page reload can read stale data
+  saveData();
 }
 
 function setAuctionMaxBid(id, val) {
@@ -4043,17 +3979,6 @@ function setAuctionMaxBid(id, val) {
   if (!it) return;
   const v = parseFloat(val);
   it.maxBid = isNaN(v) ? null : v;
-  renderWatchlist();
-  saveData();
-}
-
-function setAuctionMyBid(id, val) {
-  const it = auctionWatchlist.find(w => w.id === id);
-  if (!it) return;
-  const v = parseFloat(val);
-  it.myBid = isNaN(v) ? null : v;
-  delete _outbidDismissed[id];   // re-typing MY BID is a fresh decision — let the alert show again
-  if (typeof evaluateOutbid === 'function') { evaluateOutbid(it); renderOutbidBanners(); }   // instant outbid check vs current bid
   renderWatchlist();
   saveData();
 }
@@ -4147,7 +4072,6 @@ function renderWatchlist() {
       <td style="padding:8px;">${img}</td>
       <td style="padding:8px;max-width:220px;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;">${titleCell}</div>${flagsHtml ? `<div style="margin-top:4px;">${flagsHtml}</div>` : ''}</td>
       <td style="padding:8px;white-space:nowrap;">$${d.bid.toFixed(2)}</td>
-      <td style="padding:8px;"><input type="number" step="0.01" value="${it.myBid != null ? it.myBid : ''}" placeholder="—" onchange="setAuctionMyBid('${it.id}', this.value)" style="width:72px;padding:5px;font-size:12px;background:#12151b;border:1px solid var(--border);border-radius:5px;color:inherit;"/></td>
       <td style="padding:8px;white-space:nowrap;">${bidBadge}</td>
       <td style="padding:8px;white-space:nowrap;color:${timeColor};font-weight:600;">${d.tl.label}</td>
       <td style="padding:8px;white-space:nowrap;">${d.shipping ? '$' + d.shipping.toFixed(2) : 'Free'}</td>
@@ -4161,7 +4085,7 @@ function renderWatchlist() {
   }).join('');
   cont.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
     <thead><tr style="text-align:left;color:var(--gray);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border);">
-      <th style="padding:8px;">Img</th><th style="padding:8px;">Item / Flags</th><th style="padding:8px;">Bid</th><th style="padding:8px;">My Bid</th><th style="padding:8px;">Bids</th><th style="padding:8px;">Time Left</th><th style="padding:8px;">Ship</th><th style="padding:8px;">Est Tax</th><th style="padding:8px;">True Total</th><th style="padding:8px;">Avg Sold</th><th style="padding:8px;">Flip %</th><th style="padding:8px;">Max Bid</th><th style="padding:8px;"></th>
+      <th style="padding:8px;">Img</th><th style="padding:8px;">Item / Flags</th><th style="padding:8px;">Bid</th><th style="padding:8px;">Bids</th><th style="padding:8px;">Time Left</th><th style="padding:8px;">Ship</th><th style="padding:8px;">Est Tax</th><th style="padding:8px;">True Total</th><th style="padding:8px;">Avg Sold</th><th style="padding:8px;">Flip %</th><th style="padding:8px;">Max Bid</th><th style="padding:8px;"></th>
     </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
@@ -4192,84 +4116,6 @@ function startAuctionAutoRefresh() {
   if (_auctionRefreshTimer) clearInterval(_auctionRefreshTimer);
   _auctionRefreshTimer = setInterval(() => { refreshWatchlist({ silent: true }); }, 5 * 60 * 1000);
 }
-
-// ── Outbid alert watcher — polls the eBay Browse API while the OS tab is open ──
-let _outbidState = {};       // id -> { title, bid }
-let _outbidDismissed = {};   // id -> true (dismissed this session)
-let _outbidPollTimer = null;
-let _outbidStarted = false;
-
-function renderOutbidBanners() {
-  const el = document.getElementById('outbidAlerts');
-  if (!el) return;
-  const ids = Object.keys(_outbidState).filter(id => !_outbidDismissed[id]);
-  el.innerHTML = ids.map(id => {
-    const o = _outbidState[id];
-    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#2B0D0D;border:1px solid var(--red);border-radius:8px;padding:11px 14px;margin-bottom:8px;">`
-      + `<div style="font-size:13px;color:#FF6B6B;font-weight:600;line-height:1.4;">⚠️ You've been outbid on ${escHtmlA(o.title)} — Current bid: $${o.bid.toFixed(2)}</div>`
-      + `<button onclick="dismissOutbid('${id}')" title="Dismiss" style="background:transparent;border:none;color:var(--gray);font-size:20px;line-height:1;cursor:pointer;padding:0 4px;flex-shrink:0;">×</button>`
-      + `</div>`;
-  }).join('');
-}
-
-function dismissOutbid(id) {
-  _outbidDismissed[id] = true;
-  delete _outbidState[id];
-  renderOutbidBanners();
-}
-
-function evaluateOutbid(it) {
-  const tl = auctionTimeLeft(it.endDate);
-  if (it.myBid != null && it.currentBid != null && it.currentBid > it.myBid && tl.ms > 0) {
-    _outbidState[it.id] = { title: it.title, bid: it.currentBid };
-  } else {
-    delete _outbidState[it.id];
-  }
-}
-
-async function pollOutbids() {
-  try {
-    for (const it of auctionWatchlist.slice()) {
-      const tl = auctionTimeLeft(it.endDate);
-      if (tl.ms <= 0) { delete _outbidState[it.id]; continue; }   // ended → stop tracking
-      // Best-effort refresh of the current bid from a fresh eBay search (updates it.currentBid when the listing is found)
-      try {
-        const mapped = (await fetchEbayItems('ebay_auction', it.title) || []).map(mapAuctionItem);
-        const match = mapped.find(m => m.url && it.url && m.url === it.url);
-        if (match) {
-          it.currentBid = match.currentBid;
-          it.bidCount = match.bidCount;
-          if (match.endDate) it.endDate = match.endDate;
-          if (match.shipping != null) it.shipping = match.shipping;
-        }
-      } catch (e) { /* keep existing values on failure */ }
-      // Outbid check now uses the current bid already on the item (fix: not gated on a fresh URL match)
-      evaluateOutbid(it);
-    }
-    renderWatchlist();
-    if (auctionWatchlist.length) saveData();
-    renderOutbidBanners();
-  } catch (e) { console.log('[outbid] poll error', e); }
-  scheduleOutbidPoll();
-}
-
-function scheduleOutbidPoll() {
-  if (_outbidPollTimer) clearTimeout(_outbidPollTimer);
-  let soon = false;
-  for (const it of auctionWatchlist) {
-    const tl = auctionTimeLeft(it.endDate);
-    if (tl.ms > 0 && tl.ms <= 10 * 60 * 1000) { soon = true; break; }   // <=10 min left → poll every 1 min
-  }
-  _outbidPollTimer = setTimeout(pollOutbids, soon ? 60 * 1000 : 5 * 60 * 1000);
-}
-
-function startOutbidWatch() {
-  if (_outbidStarted) return;
-  _outbidStarted = true;
-  if (_outbidPollTimer) clearTimeout(_outbidPollTimer);
-  _outbidPollTimer = setTimeout(pollOutbids, 20 * 1000);   // first check ~20s after load, then self-schedules
-}
-
 
 // ============================================================
 // WHATNOT INTEL
@@ -5331,7 +5177,7 @@ function renderCompetitorPrices() {
     const img = it.image || '';
     const url = compVendorUrl(it.site, it.name);
     const interactive = !!(img || url);
-    const thumb = img ? `<img src="${escAttr(img)}" referrerpolicy="no-referrer" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
+    const thumb = img ? `<img src="${escAttr(img)}" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'"/>` : '';
     const safeUrl = url ? url.replace(/"/g, '%22').replace(/'/g, '%27') : '';
     const safeImg = img ? String(img).replace(/"/g, '%22').replace(/'/g, '%27') : '';
     const safeTitle = escAttr(it.name || '');
@@ -5894,8 +5740,7 @@ async function runPriceScan() {
       // Active listings get a drill-in checkbox: search this exact listing title
       const drill = !isSold ? `<input type="checkbox" class="drill-check" title="Search this exact listing title" onclick="event.stopPropagation();drillInto(this.dataset.title)" ondblclick="event.stopPropagation()" data-title="${encodeURIComponent(i.title || '')}" style="cursor:pointer;flex-shrink:0;"/>` : '';
       const wantBtn = `<button class="scan-want-btn" onclick="event.stopPropagation();addScanToWant(this)" ondblclick="event.stopPropagation()" title="Add to your Want List" style="padding:5px 9px;font-size:11px;font-weight:700;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ Want</button>`;
-      const ebayLink = `<a href="https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(i.title||'')}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" title="Search this title on eBay" style="font-size:11px;color:var(--gray);text-decoration:none;white-space:nowrap;flex-shrink:0;">eBay ↗</a>`;
-      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}${drill}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div>${ebayLink}${wantBtn}</div>`;
+      return `<div ${attrs} style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center;">${pin}${drill}<div style="flex:1;min-width:0;"><div style="font-size:13px;">${i.title}</div><div style="font-size:11px;color:var(--gray);">${i.meta}</div></div><div style="font-family:Rajdhani,sans-serif;font-size:18px;font-weight:700;color:${isSold?'var(--green)':'var(--gold)'};white-space:nowrap;">${priceStr}</div>${wantBtn}</div>`;
     }).join('');
     const renderColumn = (items, isSold, colId) => {
       const first = items.slice(0, 4);
@@ -5934,10 +5779,10 @@ async function runPriceScan() {
     refPriceDefault = ebayActivePrices[0] ? '$' + parseFloat(ebayActivePrices[0].price).toFixed(2) : '';
     refLocked = false;
     const _quickHtml = `
-      ${prodImg ? `<img class="product-hero" referrerpolicy="no-referrer" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
+      ${prodImg ? `<img class="product-hero" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;"><div style="font-size:10px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">⚡ QUICK PRICE · ${query.toUpperCase()}${useRealData ? ' · 🟢 LIVE EBAY' : ' · 🤖 EST.'}</div><div style="font-size:13px;color:var(--gray);">Fast price view — active listings + competitor prices. Turn Quick Price off for full margin analysis.</div></div>
       <div class="listings-wrap">
-        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" referrerpolicy="no-referrer" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-price" id="refPhotoPrice">${refPriceDefault}</div><div class="ps-label" id="refPhotoLabel">Reference Photo</div></div>` : ''}
+        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-price" id="refPhotoPrice">${refPriceDefault}</div><div class="ps-label" id="refPhotoLabel">Reference Photo</div></div>` : ''}
         <div class="mstack listings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-width:0;">
           <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
             <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟡 ACTIVE LISTINGS</div><span style="font-size:11px;color:var(--gold);">${ebayActivePrices.length > 0 ? ebayActivePrices.length + ' live' : '~' + data.listings + ' est.'}</span></div>
@@ -5949,13 +5794,13 @@ async function runPriceScan() {
       <div style="text-align:center;font-size:11px;color:var(--gray);margin:-2px 0 14px;">Single click to preview image · Double click to open on eBay</div>
       ${competitorHtml}`;
     document.getElementById('psResults').innerHTML = psQuickPrice ? _quickHtml : `
-      ${prodImg ? `<img class="product-hero" referrerpolicy="no-referrer" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
+      ${prodImg ? `<img class="product-hero" id="refHeroImg" src="${prodImg}" alt="Product photo" onerror="this.style.display='none'"/>` : ''}
       <div style="background:#0D1520;border:1px solid #1A3A5C;border-radius:10px;padding:14px 18px;margin-bottom:14px;">
         <div style="font-size:10px;color:var(--blue);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600;">${useRealData?((activeApprox||soldApprox)?'🟢 LIVE EBAY DATA · SIMILAR ITEMS':'🟢 LIVE EBAY DATA'):'🤖 AI ESTIMATE'} · ${query.toUpperCase()} · Demand: <span style="color:${['HIGH','VERY HIGH'].includes(data.demand)?'var(--green)':'var(--yellow)'};">${data.demand}</span></div>
         <div style="font-size:14px;line-height:1.6;">${action==='BUY'?`Strong buy. ${data.soldCount} units sold in last 30 days. True landed cost $${landed.toFixed(2)} vs avg sell $${sold.toFixed(2)} = ${marginPct}% net margin.`:action==='WATCH'?`Watch this. ${data.soldCount} sold recently. ${marginPct}% margin is acceptable but negotiate harder on wholesale price.`:`Thin margins at ${marginPct}%. Find a higher demand model or negotiate lower wholesale.`}</div>
       </div>
       <div class="listings-wrap">
-        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" referrerpolicy="no-referrer" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-price" id="refPhotoPrice">${refPriceDefault}</div><div class="ps-label" id="refPhotoLabel">Reference Photo</div></div>` : ''}
+        ${prodImg ? `<div class="product-showcase"><img id="refPhotoImg" src="${prodImg}" alt="Product photo" onerror="this.closest('.product-showcase').style.display='none'"/><div class="ps-price" id="refPhotoPrice">${refPriceDefault}</div><div class="ps-label" id="refPhotoLabel">Reference Photo</div></div>` : ''}
         <div class="mstack listings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
           <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
             <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:700;">🟡 ACTIVE LISTINGS</div><span style="font-size:11px;color:var(--gold);">~${data.listings} active</span></div>
@@ -8216,7 +8061,6 @@ renderScreenshots();
 renderCatalogs();               // show default vendor catalogs immediately (independent of KV load)
 renderEversenChips();           // show quick-add chips immediately (independent of KV load)
 window.addEventListener('load', loadData);
-window.addEventListener('load', async function () { try { await migrateWantKeys(); } catch (e) {} reloadWantsFromCloud(); });
 window.addEventListener('load', function () { loadOutreach(false); });
 window.addEventListener('load', function () { loadPlaybook(); });
 window.addEventListener('load', function () { sqLoad(); });
@@ -8426,9 +8270,9 @@ async function epSaveEdit(id) {
   toast('✓ Saved', 'green');
 }
 
-// ---- Ask Eversen chat (session history; Anthropic via ?action=eversenChat) ----
+// ---- Ask Eversen chat (session history; Anthropic via ?action=claude) ----
 let evChatHistory = []; // { role:'user'|'assistant', content }
-const EV_CHAT_SYSTEM = "You are Eversen Chan, Shift64 Diecast's AI procurement agent. You help Eric and Khai with wholesale sourcing strategy, supplier research, brand analysis, pricing intelligence, and outreach decisions. You know their target brands: Demon King Auto, TPC, Flame, Pop Race, LCD Models, Inno64, MiniGT, Kaido House. You are direct, strategic, and ALWAYS focused on finding factory-direct contacts and buying opportunities.\n\nCAPABILITIES:\n- Instagram DM writing: when asked, write a short DM (3-4 lines max), casual but professional, expressing genuine wholesale buying interest for a US retailer. Do NOT ask about price or MOQ on first contact — the goal is just to open the conversation and get routed to the right person. Make it copy-paste ready.\n- Cold email writing: professional wholesale inquiry a buyer can send manually, introducing Shift64 Diecast as a US retail buyer seeking factory-direct/wholesale terms.\n- 1688 sourcing guidance: you know the Chinese brand names and Chinese-language search terms for diecast brands (e.g. 合金车模 = alloy car model, 1:64 车模, 汽车模型, plus brand-specific transliterations). Explain how to search 1688.com, filter for manufacturers (生产厂家) vs traders, and evaluate suppliers.\n- Brand research: supply chain, likely factory/manufacturer, distributors, and the best contact strategy to reach a factory-direct decision maker.\n\nYou can write WeChat outreach messages for Chinese manufacturers. WeChat messages should be:\n- Very short (3-4 lines max) — WeChat is like texting\n- Bilingual: English first, then Simplified Chinese translation below\n- Direct and friendly — Chinese B2B culture appreciates getting to the point\n- First message only introduces who we are and asks if they handle trade/wholesale\n- Never ask for pricing or MOQ in the first WeChat message\n- Format with a --- divider between English and Chinese versions\n\nFor all outreach messages (WeChat, Instagram DM, email) always sign as Eversen Chan, not Eric. Eric and Khai are the owners — Eversen is the procurement persona used for all supplier outreach.\n\nYou also have full knowledge of the Shift64 Diecast OS platform and can explain any feature to Eric or Khai:\n- Price Scanner: searches eBay live and sold listings for any diecast model\n- Competitor Scanner: monitors CarBromc, Horizon Diecast, Pablo Diecast Garage pricing\n- Want List: tracks models Eric and Khai want to acquire\n- Auction Watch: monitors eBay auctions for steals, calculates flip margins and true total with tax\n- Buy Report: top 10 buying opportunities scored against eBay sold prices\n- Whatnot Intel: analyzes ResellBot/Whatnot Spy CSV exports, buyer leaderboards, repeat buyer badges\n- Suppliers tab: live vendor catalogs with CAD to USD conversion\n- Eversen Pipeline: you are the autonomous wholesale outreach agent — you find manufacturer contacts and send cold emails automatically daily at 9am\n- Reply Monitor: runs every 5 minutes in Google Apps Script, classifies supplier replies, auto-responds or flags for review\n- You can write Instagram DMs, cold emails, 1688 search strategies, and follow-up messages for any brand";
+const EV_CHAT_SYSTEM = "You are Eversen Chan, Shift64 Diecast's AI procurement agent. You help Eric and Khai with wholesale sourcing strategy, supplier research, brand analysis, pricing intelligence, and outreach decisions. You know their target brands: Demon King Auto, TPC, Flame, Pop Race, LCD Models, Inno64, MiniGT, Kaido House. You are direct, strategic, and ALWAYS focused on finding factory-direct contacts and buying opportunities.\n\nCAPABILITIES:\n- Instagram DM writing: when asked, write a short DM (3-4 lines max), casual but professional, expressing genuine wholesale buying interest for a US retailer. Do NOT ask about price or MOQ on first contact — the goal is just to open the conversation and get routed to the right person. Make it copy-paste ready.\n- Cold email writing: professional wholesale inquiry a buyer can send manually, introducing Shift64 Diecast as a US retail buyer seeking factory-direct/wholesale terms.\n- 1688 sourcing guidance: you know the Chinese brand names and Chinese-language search terms for diecast brands (e.g. 合金车模 = alloy car model, 1:64 车模, 汽车模型, plus brand-specific transliterations). Explain how to search 1688.com, filter for manufacturers (生产厂家) vs traders, and evaluate suppliers.\n- Brand research: supply chain, likely factory/manufacturer, distributors, and the best contact strategy to reach a factory-direct decision maker.\n\nYou can write WeChat outreach messages for Chinese manufacturers. WeChat messages should be:\n- Very short (3-4 lines max) — WeChat is like texting\n- Bilingual: English first, then Simplified Chinese translation below\n- Direct and friendly — Chinese B2B culture appreciates getting to the point\n- First message only introduces who we are and asks if they handle trade/wholesale\n- Never ask for pricing or MOQ in the first WeChat message\n- Format with a --- divider between English and Chinese versions\n\nFor all outreach messages (WeChat, Instagram DM, email) always sign as Eversen Chan, not Eric. COMMUNICATION STYLE: Never use markdown headers or bold text. Write like a smart colleague texting — short, direct, conversational. Get to the point in the first sentence. Maximum 4-5 sentences. End with one clear next step, never a menu of options. No fluff or formal openers. Eric and Khai are the owners — Eversen is the procurement persona used for all supplier outreach.\n\nYou also have full knowledge of the Shift64 Diecast OS platform and can explain any feature to Eric or Khai:\n- Price Scanner: searches eBay live and sold listings for any diecast model\n- Competitor Scanner: monitors CarBromc, Horizon Diecast, Pablo Diecast Garage pricing\n- Want List: tracks models Eric and Khai want to acquire\n- Auction Watch: monitors eBay auctions for steals, calculates flip margins and true total with tax\n- Buy Report: top 10 buying opportunities scored against eBay sold prices\n- Whatnot Intel: analyzes ResellBot/Whatnot Spy CSV exports, buyer leaderboards, repeat buyer badges\n- Suppliers tab: live vendor catalogs with CAD to USD conversion\n- Eversen Pipeline: you are the autonomous wholesale outreach agent — you find manufacturer contacts and send cold emails automatically daily at 9am\n- Reply Monitor: runs every 5 minutes in Google Apps Script, classifies supplier replies, auto-responds or flags for review\n- You can write Instagram DMs, cold emails, 1688 search strategies, and follow-up messages for any brand";
 function evChatRender() {
   const body = document.getElementById('evChatBody');
   if (!body) return;
@@ -8464,25 +8308,6 @@ function evQuickFill(kind) {
   const input = document.getElementById('evChatInput');
   if (input) { input.value = tpl.replace('[brand]', brand); input.focus(); }
 }
-// Load Status — pull the Eversen pipeline from Redis and inject it into the chat as context.
-async function evLoadStatus() {
-  let pipeline = [];
-  try {
-    const res = await fetch(PROXY_URL + '?action=getEversenPipeline', { cache: 'no-store' });
-    if (res.ok) { const arr = await res.json(); if (Array.isArray(arr)) pipeline = arr; }
-  } catch (e) { console.log('[loadstatus] Redis fetch failed:', e); }
-  if (!pipeline.length && typeof epPipeline !== 'undefined' && Array.isArray(epPipeline)) pipeline = epPipeline;
-  if (!pipeline.length) { if (typeof toast === 'function') toast('⚠️ No pipeline data found.', 'yellow'); return; }
-  const summary = pipeline.map(function (b, i) {
-    return (i + 1) + '. ' + (b.brand || 'Unknown') + ' — status: ' + (b.status || 'Queued')
-      + (b.contactEmail ? ', contact: ' + b.contactEmail : '')
-      + (b.lastActivity ? ', last activity: ' + b.lastActivity : '')
-      + (b.notes ? ', notes: ' + b.notes : '');
-  }).join('\n');
-  evChatHistory.push({ role: 'user', content: 'Here is the current pipeline status:\n' + summary });
-  evChatHistory.push({ role: 'assistant', content: 'Pipeline loaded — ' + pipeline.length + ' brand' + (pipeline.length === 1 ? '' : 's') + ' tracked.' });
-  evChatRender();
-}
 async function evChatSend() {
   const input = document.getElementById('evChatInput');
   const q = (input.value || '').trim();
@@ -8495,12 +8320,13 @@ async function evChatSend() {
   evChatHistory.push(thinking);
   evChatRender();
   try {
-    const res = await fetch(PROXY_URL + '?action=eversenChat', {
+    const res = await fetch(PROXY_URL + '?action=claude', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: msgs, system: EV_CHAT_SYSTEM })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 900, system: EV_CHAT_SYSTEM, messages: msgs })
     });
     const data = await res.json();
-    let txt = (data && typeof data.response === 'string') ? data.response.trim() : '';
+    let txt = '';
+    if (data && Array.isArray(data.content)) txt = data.content.filter(c => c.type === 'text').map(c => c.text || '').join('\n').trim();
     if (!txt && data && data.error) txt = '⚠️ ' + (data.error.message || 'error');
     if (!txt) txt = 'Sorry, I could not answer that. Try rephrasing.';
     thinking.content = txt;
@@ -8520,6 +8346,376 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   renderCatalogs();             // belt-and-suspenders: ensure catalogs render once DOM is ready
 });
+
+// ============================================================
+// KAIDO BID GUIDE
+// Seeded from kaido-house-garage.fandom.com (KHMG001–063) +
+// hallsguide.com estimated values (KHMG001–050). Live eBay sold
+// medians (refreshKaidoPrices) override the seed when available.
+// ============================================================
+const KHMG_BASE_IMG = 'https://static.wikia.nocookie.net/kaido-house-garage/images/';
+function _k(num, name, description, casting, releaseDate, quantity, imgPath, stdValue, chaseValue) {
+  return {
+    khmg: 'KHMG' + String(num).padStart(3, '0'),
+    numericId: num,
+    name: name,
+    description: description,
+    casting: casting,
+    releaseDate: releaseDate,
+    quantity: quantity || '',
+    imageUrl: KHMG_BASE_IMG + imgPath,
+    stdValue: (stdValue == null ? null : stdValue),
+    chaseValue: (chaseValue == null ? null : chaseValue)
+  };
+}
+const KHMG_DB = [
+  _k(1,'Datsun 510 Pro Street OG Green','OG Green','Datsun 510 Pro Street','July 2021','','c/c1/KHMG001.jpg',40,130),
+  _k(2,'Datsun 510 Pro Street OG Purple','OG Purple','Datsun 510 Pro Street','July 2021','','6/60/KHMG002.jpg',50,100),
+  _k(3,'Datsun 510 Pro Street SK510 Red','Red / Black','Datsun 510 Pro Street','December 2021','','1/10/KHMG003.jpg',25,null),
+  _k(4,'Datsun 510 Pro Street SK510 Orange','Orange / Black','Datsun 510 Pro Street','December 2021','','c/c2/KHMG004.jpg',25,90),
+  _k(5,'Datsun 510 Pro Street BRE510 V1','Orange / White','Datsun 510 Pro Street','April 2022','','0/0e/KHMG005.jpg',25,100),
+  _k(6,'Datsun 510 Pro Street BRE510 V2','Red / White','Datsun 510 Pro Street','April 2022','','f/f6/KHMG006.jpg',30,95),
+  _k(7,'Datsun 510 Pro Street KaidoHouse.com Exclusive','Dark Blue (IMAI BLUE LTD)','Datsun 510 Pro Street','April 2022','300','a/a4/KHMG007.jpg',1000,null),
+  _k(8,'Datsun 510 Pro Street KDO510 - MJ Exclusive','Green','Datsun 510 Pro Street','January 2022','','d/d4/KHMG008.jpg',35,175),
+  _k(9,'Datsun 510 Pro Street OG Black KaidoHouse Exclusive','Black (510 BLACK LIMITED)','Datsun 510 Pro Street','October 2021','150 & 5','0/0a/KHMG009.jpg',30,null),
+  _k(10,'Datsun KAIDO 510 Wagon Green','Olive Green','Datsun KAIDO 510 Wagon','May 2022','','2/20/KHMG010.jpg',30,50),
+  _k(11,'Datsun KAIDO 510 Wagon Blue','Blue','Datsun KAIDO 510 Wagon','May 2022','','d/d4/KHMG011.jpg',50,150),
+  _k(12,'Datsun KAIDO 510 Wagon Hanami V1','Pink','Datsun KAIDO 510 Wagon','June 2022','','7/78/KHMG012.jpg',75,250),
+  _k(13,'Datsun KAIDO 510 Wagon Hanami V2','Green','Datsun KAIDO 510 Wagon','June 2022','','8/88/KHMG013.jpg',50,200),
+  _k(14,'Datsun 510 Pro Street SK Black Limited KaidoHouse Exclusive','Black (510 BLACK LIMITED)','Datsun 510 Pro Street','February 2022','150','5/51/KHMG014.jpg',600,null),
+  _k(15,'Datsun KAIDO 510 Wagon Hanami Black Limited','Black (BLKLTD & JDM)','Datsun KAIDO 510 Wagon','August 2022','250 & 35','0/06/KHMG015.jpg',600,null),
+  _k(16,'Datsun 510 Pro Street GREDDY Pearl White','White','Datsun 510 Pro Street','July 2022','','8/83/KHMG016.jpg',40,170),
+  _k(17,'Datsun 510 Pro Street GReddy Gun Metal Grey','Dark Grey','Datsun 510 Pro Street','July 2022','','7/72/KHMG017.jpg',40,120),
+  _k(18,'Datsun 510 Pro Street BRE510 Black Limited','Black / White (BRE BLKLTD)','Datsun 510 Pro Street','September 2022','300','d/d0/KHMG018.jpg',400,null),
+  _k(19,'Datsun KAIDO 510 Wagon Black Limited','Black (BLKLTD4)','Datsun KAIDO 510 Wagon','June 2022','250 & 100','8/83/KHMG019.jpg',700,null),
+  _k(20,'Datsun KAIDO 510 Wagon FIRE V1','Red','Datsun KAIDO 510 Wagon','April 2023','','3/3b/KHMG020.jpg',100,250),
+  _k(22,'Datsun KAIDO 510 Wagon FIRE Black Limited','Black (BLKLTD & SHIZUOKA)','Datsun KAIDO 510 Wagon','May 2023','200 & non-numbered','3/30/KHMG022.jpg',500,null),
+  _k(23,'Datsun KAIDO Fairlady Z Dark Red','Dark Red','Datsun KAIDO Fairlady Z','November 2022','','0/02/KHMG023.jpg',45,null),
+  _k(24,'Datsun KAIDO Fairlady Z Blue','Dark Blue','Datsun KAIDO Fairlady Z','November 2022','','6/6e/KHMG024.jpg',50,200),
+  _k(25,'Datsun KAIDO Fairlady Z Black Limited','Black (BLKLTD & JDM SUBLTD7)','Datsun KAIDO Fairlady Z','November 2022','250 & 60','3/30/KHMG025.jpg',null,null),
+  _k(26,'Datsun KAIDO 510 Wagon BRE V1','Red / White','Datsun KAIDO 510 Wagon','September 2022','','0/06/KHMG026.jpg',35,100),
+  _k(27,'Datsun KAIDO 510 Wagon BRE V2','White','Datsun KAIDO 510 Wagon','September 2022','','9/95/KHMG027.jpg',40,100),
+  _k(28,'Datsun KAIDO 510 Wagon BRE Black Limited','Black / White (BRE BLKLTD)','Datsun KAIDO 510 Wagon','January 2023','300','5/5f/KHMG028.jpg',500,null),
+  _k(29,'Datsun KAIDO Fairlady Z Kaido GT V1','White / Red / Yellow','Datsun KAIDO Fairlady Z','June 2023','','b/b1/KHMG029.jpg',30,130),
+  _k(30,'Datsun KAIDO Fairlady Z Kaido GT V2','Green / White / Red','Datsun KAIDO Fairlady Z','June 2023','','f/f1/KHMG030.jpg',30,100),
+  _k(31,'Datsun KAIDO Fairlady Z Kaido GT Black Limited','Matte Grey / Red / Yellow (BLKLTD)','Datsun KAIDO Fairlady Z','July 2023','200','8/80/KHMG031.jpg',350,null),
+  _k(32,'Datsun 510 Pro Street ADVAN','Black / Red','Datsun 510 Pro Street','December 2022','','0/04/KHMG032.jpg',30,250),
+  _k(33,'Datsun KAIDO 510 Wagon ADVAN','Black / Red','Datsun KAIDO 510 Wagon','December 2022','','1/10/KHMG033.jpg',75,230),
+  _k(34,'Datsun 510 Pro Street ADVAN Black Limited','Matte Black / Red (BLKLTD)','Datsun 510 Pro Street','March 2023','200','a/a6/KHMG034.jpg',600,null),
+  _k(35,'Datsun KAIDO Fairlady Z MOTUL V1','Dark Grey','Datsun KAIDO Fairlady Z','April 2023','','c/ca/KHMG035.jpg',60,160),
+  _k(36,'Datsun KAIDO Fairlady Z MOTUL V2','Red','Datsun KAIDO Fairlady Z','June 2023','','4/42/KHMG036.jpg',75,250),
+  _k(38,'Datsun KAIDO 510 Wagon ADVAN Black Limited','Matte Black / Red (BLKLTD)','Datsun KAIDO 510 Wagon','June 2024','100','a/a5/KHMG038.jpg',500,null),
+  _k(39,'Datsun 510 Pro Street GReddy Black Limited','Dark Red (BLACK LIMITED SPECIAL DROP & 2023 JAPAN EVENT)','Datsun 510 Pro Street','December 2022','50 & 100','e/ef/KHMG039.jpg',800,null),
+  _k(40,'Datsun 510 Pro Street GReddy Blue GReddy Exclusive','Blue (GPP Exclusive)','Datsun 510 Pro Street','September 2022','','5/51/KHMG040.jpg',null,null),
+  _k(41,'Datsun 510 Street Tanto V1','White','Datsun 510 Street','December 2022','','1/1d/KHMG041.jpg',75,null),
+  _k(42,'Datsun 510 Street Tanto V2','Sky Blue','Datsun 510 Street','December 2022','','a/ac/KHMG042.jpg',75,null),
+  _k(43,'Datsun 510 Street Tanto Black Limited','Black (FUKUBUKURO 2023 & 2023 JAPAN EVENT)','Datsun 510 Street','December 2022','150 & 100','0/0b/KHMG043.jpg',750,null),
+  _k(44,'Datsun KAIDO 510 Wagon Kaido GT Surf Safari RS','White / Blue / Red','Datsun KAIDO 510 Surf Safari Wagon','March 2023','','f/f9/KHMG044.jpg',75,225),
+  _k(45,'Datsun KAIDO 510 Wagon Kaido GT Surf Safari RS KaidoHouse Black Limited','White / Black / Red (4X4 BLKLTD & SHIZUOKA)','Datsun KAIDO 510 Surf Safari Wagon','April 2023','250 & non-numbered','0/05/KHMG045.jpg',600,null),
+  _k(46,'Nissan Fairlady Z Kaido GT Omori Works','White / Red','Datsun KAIDO Fairlady Z','March 2023','','1/1a/KHMG046.jpg',30,150),
+  _k(48,'Nissan Skyline GT-R (R34) Kaido Works Purple','Purple','Nissan Skyline GT-R (R34)','May 2023','','f/f3/KHMG048.jpg',100,250),
+  _k(49,'Nissan Skyline GT-R (R34) Kaido Works White','White','Nissan Skyline GT-R (R34)','May 2023','','7/79/KHMG049.jpg',100,300),
+  _k(50,'Nissan Skyline GT-R (R34) Kaido Works Black Limited','Black (BLKLTD)','Nissan Skyline GT-R (R34)','May 2023','200 & 200 & 24 & 44','5/59/KHMG050.jpg',2000,null),
+  _k(51,'KaidoHouse 1/64 Figurine: Kaido & Sons','4 diecast figurines','Accessories','April 2023','','3/38/KHMG051.jpg',null,null),
+  _k(52,'Datsun 510 Street BRE510 V3','Gold / White','Datsun 510 Street','June 2023','','2/23/KHMG052.jpg',null,null),
+  _k(53,'Datsun 510 Street BRE510 V3 Black Limited','Matte Grey / White (BLKLTD)','Datsun 510 Street','August 2023','150','0/09/KHMG053.jpg',null,null),
+  _k(54,'Datsun KAIDO 510 Wagon Kaido GT Surf Safari RS V2','Red / Black','Datsun KAIDO 510 Surf Safari Wagon','July 2023','','2/26/KHMG054.jpg',null,null),
+  _k(55,'Nissan Skyline GT-R (R34) Kaido Works V3','Blue','Nissan Skyline GT-R (R34)','July 2023','','1/12/KHMG055.jpg',null,null),
+  _k(56,'Nissan Skyline GT-R (R34) Kaido Works V3 KaidoHouse Exclusive','Frozen Gray (LTD EDN 4)','Nissan Skyline GT-R (R34)','December 2023','499','d/de/KHMG056.jpg',null,null),
+  _k(57,'Nissan Skyline GT-R (R34) Kaido Works Red 2023 Shizuoka Hobby Show Exclusive','Red (JAPAN)','Nissan Skyline GT-R (R34)','May 2023','600','a/ab/KHMG057.jpg',null,null),
+  _k(58,'Nissan Skyline GT-R (R34) Kaido Works Millennium Jade 2023 MDX','Millennium Jade w/ Silver Wheels (MALAYSIA)','Nissan Skyline GT-R (R34)','May 2023','1200','d/da/KHMG058.jpg',null,null),
+  _k(59,'Nissan Skyline GT-R (R34) Kaido Works Millennium Jade One Night in Malaysia','Millennium Jade w/ Golden Wheels (MALAYSIA DINNER)','Nissan Skyline GT-R (R34)','May 2023','300','e/e6/KHMG059.jpg',null,null),
+  _k(60,'KaidoHouse 1/64 Figurine: Kaido & Sons 2023 MDX Special','4 diecast figurines (MALAYSIA)','Accessories','May 2023','1200','d/d7/KHMG060.jpg',null,null),
+  _k(61,'Kaido House Tent V1','','Accessories','August 2023','','2/29/KHMG061.jpg',null,null),
+  _k(62,'Datsun KAIDO 510 Wagon CARBON FIBER V1','Purple','Datsun KAIDO 510 Wagon','August 2023','','3/37/KHMG062.jpg',null,null),
+  _k(63,'Datsun KAIDO 510 Wagon CARBON FIBER V2','Red','Datsun KAIDO 510 Wagon','August 2023','','3/37/KHMG063.jpg',null,null),
+  _k(74,'Nissan Skyline GT-R (R34) Kaido Works GReddy V1','Green','Nissan Skyline GT-R (R34)','October 2023','','b/be/KHMG074.jpg',null,null),
+  _k(93,'Nissan Skyline GT-R (R34) TAMIYA x KAIDO HOUSE "The Hornet"','Black','Nissan Skyline GT-R (R34)','January 2024','','9/9e/KHMG093.jpg',null,null),
+  _k(94,'Honda NSX Evasive V1','Metallic Red / Carbon','Honda NSX','March 2024','','f/ff/KHMG094.jpg',null,null),
+  _k(96,'Honda NSX (NA1) Kaido Works V1 Black Limited','Black (BLKLTD)','Honda NSX','May 2024','600','f/fe/KHMG096.jpg',null,null),
+  _k(98,'Nissan Skyline GT-R (R34) Kaido Works (Greddy) Chrome plated','Chrome (LTD EDN 3)','Nissan Skyline GT-R (R34)','November 2023','25','e/ec/KHMG098.jpg',null,null),
+  _k(103,'Nissan Skyline GT-R (R34) Kaido Works V4','Millennium Jade','Nissan Skyline GT-R (R34)','March 2024','','1/10/KHMG103.jpg',null,null),
+  _k(104,'Nissan Skyline GT-R (R34) TAMIYA x KAIDO HOUSE "The Hornet" Black Limited','Metallic Blue (BLKLTD)','Nissan Skyline GT-R (R34)','April 2024','280','d/de/KHMG104.jpg',null,null),
+  _k(105,'Nissan Skyline GT-R (R34) Kaido Works BLKLTD','Black (BLKLTD)','Nissan Skyline GT-R (R34)','December 2024','280','7/7d/KHMG105.jpg',null,null),
+  _k(108,'Honda NSX Kaido WORKS V1','Pearl Yellow / Carbon','Honda NSX','May 2024','','5/54/KHMG108.jpg',null,null),
+  _k(109,'Honda NSX (NA1) Kaido Street LTDEDN','Kaido Racing Green (LTD EDN)','Honda NSX','June 2024','500','b/b1/KHMG109.jpg',null,null),
+  _k(119,'Honda NSX Kaido Racing V1','Orange','Honda NSX','August 2024','','9/91/KHMG119.jpg',null,null),
+  _k(123,'Honda NSX Kaido Works V2 Red Pearl 2024 Malaysia Diecast Expo Exclusive','Pearl Red','Honda NSX','May 2024','1,500','b/b4/KHMG123.jpg',null,null),
+  _k(124,'Honda NSX Kaido Works V2 Red Pearl 2024 "One Night in Malaysia" Exclusive','Pearl Red','Honda NSX','May 2024','300','6/60/KHMG124.jpg',null,null),
+  _k(125,'Nissan Skyline GT-R (R34) Kaido Works Katsura Orange KaidoHouse Exclusive','Katsura Orange (MALAYSIA LTD EDN 6)','Nissan Skyline GT-R (R34)','May 2024','600','9/9f/KHMG125.jpg',null,null),
+  _k(137,'Honda NSX Evasive V2','Metallic Blue','Honda NSX','November 2024','','e/e0/KHMG137.jpg',null,null),
+  _k(140,'Nissan Skyline GT-R (R34) Kaido House X DGK V1','Purple','Nissan Skyline GT-R (R34)','November 2024','','f/f7/KHMG140.jpg',null,null),
+  _k(148,'Honda NSX (NA1) Kaido Works V2','White','Honda NSX','January 2025','','3/35/KHMG148.jpg',null,null),
+  _k(154,'BMW M3 (E30) Kaido Works V1','Dark Grey','BMW M3 (E30)','January 2025','','5/5e/KHMG154.jpg',null,null),
+  _k(155,'BMW M3 (E30) Kaido Works BLKLTD','Black (BLKLTD)','BMW M3 (E30)','March 2025','300','1/1e/KHMG155.jpg',null,null),
+  _k(162,'BMW M3 (E30) Kaido GT V1','Dark Red','BMW M3 (E30)','March 2025','','c/c1/KHMG162.jpg',null,null),
+  _k(167,'Nissan Skyline GT-R (R34) TAMIYA x KAIDO HOUSE "The Grasshopper" V1','White','Nissan Skyline GT-R (R34)','August 2025','','8/87/KHMG167.jpg',null,null),
+  _k(173,'Honda NSX Kaido Racing V2','Midnight Purple','Honda NSX','July 2025','','8/86/KHMG173.jpg',null,null),
+  _k(177,'BMW M3 (E30) Kaidohaus V1','Orange','BMW M3 (E30)','June 2025','','3/3f/KHMG177.jpg',null,null),
+  _k(181,'Honda NSX Kaido Motorsports 2025 Hobby Expo China Exclusive','White / Red / Carbon','Honda NSX','April 2025','3,500','d/d3/KHMG181.jpg',null,null),
+  _k(182,'Honda NSX Kaido Motorsports 2025 "One Night in China" Exclusive','White / Gold / Carbon','Honda NSX','April 2025','300','c/c2/KHMG182.jpg',null,null),
+  _k(183,'Honda NSX Kaido Motorsports LTDEDN 2025 Hobby Expo China Exclusive','Chrome / Purple / Carbon (LTD EDN)','Honda NSX','April 2025','400','4/46/KHMG183.jpg',null,null),
+  _k(184,'Honda NSX Kaido Works Makuhari LTDEDN','Chrome (LTD EDN)','Honda NSX','April 2025','','d/d0/KHMG184.jpg',null,null),
+  _k(189,'BMW M3 (E30) Kaidohaus LTDEDN (Kaidohouse Exclusive)','Pearl Pink (LTD EDN)','BMW M3 (E30)','August 2025','','9/9f/KHMG189.jpg',null,null),
+  _k(190,'Honda NSX Kaido Test Car Spec V1 (DAI NSX)','Matte Grey w/ Carbon','Honda NSX','March 2026','','f/f4/KHMG190.jpg',null,null),
+  _k(194,'BMW M3 (E30) Kaido KW V1','Purple','BMW M3 (E30)','October 2025','','7/7c/KHMG194.jpg',null,null),
+  _k(197,'Nissan Skyline GT-R (R34) Kaido Star Racing V1','Silver / Black','Nissan Skyline GT-R (R34)','Pre-Order','','7/74/KHMG197.jpg',null,null),
+  _k(200,'BMW M3 (E30) Kaido Works Venezia Launch Edition','Flat Black (BLKLTD)','BMW M3 (E30)','April 2026','200','4/4d/KHMG200.jpg',null,null),
+  _k(206,'Nissan Skyline GT-R (R34) Anti Social Social Club X Kaido House','Black / Pink','Nissan Skyline GT-R (R34)','January 2026','','0/06/KHMG206.jpg',null,null),
+  _k(216,'BMW M3 (E30) Kaido GT V2','Midnight Blue','BMW M3 (E30)','December 2025','','d/d2/KHMG216.jpg',null,null),
+  _k(217,'BMW M3 (E30) Kaido Works Larry Chen V1','White / Dark Green 7-Eleven Livery','BMW M3 (E30)','June 2026','','d/dd/KHMG217.jpg',null,null),
+  _k(222,'Nissan Skyline GT-R (R34) Kaido Works GReddy V2','Gun Metal and Carbon','Nissan Skyline GT-R (R34)','June 2026','','6/6f/KHMG222.jpg',null,null),
+  _k(223,'BMW M3 (E30) Kaido Touring Champ V1','Light Blue / White','BMW M3 (E30)','May 2026','','2/2a/KHMG223.jpg',null,null),
+  _k(224,'BMW M3 (E30) Kaido Touring Champ 2025 Essen Motor Show Exclusive','Black / Red / Yellow','BMW M3 (E30)','November 2025','2,000','c/c7/KHMG224.jpg',null,null),
+  _k(225,'BMW M3 (E30) Kaido Touring Champ BBS X Kaido House Garage Exclusive','Gold w/ Black Stripes (LTD EDN)','BMW M3 (E30)','December 2025','','9/9b/KHMG225.jpg',null,null),
+  _k(241,'Nissan Skyline GT-R (R34) Kaido Works V4 Yellow','Flo Yellow','Nissan Skyline GT-R (R34)','Pre-Order','','7/7c/KHMG241.jpg',null,null),
+  _k(242,'BMW M3 (E30) Kaido Works V2','Green','BMW M3 (E30)','Pre-Order','','6/6f/KHMG242.jpg',null,null),
+  _k(253,'Nissan Skyline GT-R (R34) Kaido Works GReddy LTDEDN Osaka Debut','Chrome Blue (LTD EDN)','Nissan Skyline GT-R (R34)','March 2026','','4/42/KHMG253.jpg',null,null),
+  _k(257,'Nissan Skyline GT-R (R34) Kaido Works LTDEDN Exclusive','Chrome Flo Yellow (LTD EDN)','Nissan Skyline GT-R (R34)','April 2026','504','4/45/KHMG257.jpg',null,null),
+  _k(266,'BMW M3 (E30) Kaido Works ADVAN','Black / Red','BMW M3 (E30)','Pre-Order','','6/69/KHMG266.jpg',null,null),
+  _k(270,'Nissan Skyline GT-R (R34) Kaido Works MATSURI KAIDOHOUSE Exclusive','Black Sakura','Nissan Skyline GT-R (R34)','June 2026','','c/ca/KHMG270.jpg',null,null),
+  _k(271,'Nissan Skyline GT-R (R34) Kaido Works 2026 Hobby Expo China Exclusive','Black / Red Stripes','Nissan Skyline GT-R (R34)','April 2026','3,500','0/0f/KHMG271272.jpg',null,null),
+  _k(272,'Nissan Skyline GT-R (R34) Kaido Works 2026 "One Night in China" Exclusive','Black / Purple Stripes','Nissan Skyline GT-R (R34)','April 2026','300','b/b6/KHMG272.jpg',null,null)
+];
+// Flag limited editions (BLKLTD / LTD EDN / LIMITED / LTD / Exclusive) and mark chase as separately tracked.
+KHMG_DB.forEach(function (e) {
+  e.isLimited = /BLKLTD|LTD EDN|LIMITED|\bLTD\b|Exclusive/i.test((e.description || '') + ' ' + (e.name || ''));
+  e.isChase = false;
+});
+
+// Live eBay sold medians, keyed by KHMG id: { KHMG050: { median, count, updatedAt } }
+let kaidoPrices = {};
+
+function kEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+// Pull a numeric id out of "23", "023", "#023", "KHMG023", "KHMG 023", "Kaido 023", etc.
+function kaidoNormNum(str) {
+  const cleaned = String(str || '').replace(/kaido\s*house|kaido|khmg|#/gi, ' ');
+  const m = cleaned.match(/\d{1,4}/);
+  return m ? parseInt(m[0], 10) : null;
+}
+
+// Estimated value used for the bid guide: live eBay median first, then hallsguide standard, then chase.
+function kaidoEstValue(entry) {
+  const live = kaidoPrices[entry.khmg];
+  if (live && live.median > 0) return { value: live.median, source: 'eBay median · ' + live.count + ' sold' + (live.scope === 'casting' ? ' (casting avg)' : '') };
+  if (entry.stdValue != null) return { value: entry.stdValue, source: 'hallsguide standard est.' };
+  if (entry.chaseValue != null) return { value: entry.chaseValue, source: 'hallsguide chase est.' };
+  return { value: null, source: null };
+}
+
+function kaidoEbayUrl(entry, soldOnly) {
+  const q = 'Kaido House ' + entry.khmg;
+  let u = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(q);
+  if (soldOnly) u += '&LH_Complete=1&LH_Sold=1';
+  return u;
+}
+
+// Fuzzy search across khmg, model, casting, description. Pure-number queries match numericId exactly.
+function kaidoSearch(q) {
+  if (!q || !q.trim()) return KHMG_DB.slice();
+  const num = kaidoNormNum(q);
+  const terms = String(q).toLowerCase().replace(/[#]/g, ' ').split(/\s+/).filter(function (t) { return t && !/^\d+$/.test(t); });
+  return KHMG_DB.map(function (e) {
+    const hay = (e.khmg + ' ' + e.name + ' ' + e.casting + ' ' + e.description).toLowerCase();
+    let score = 0;
+    if (num != null && e.numericId === num) score += 100;
+    terms.forEach(function (t) { if (hay.indexOf(t) !== -1) score += (e.name.toLowerCase().indexOf(t) !== -1 ? 3 : 2); });
+    return { e: e, score: score };
+  }).filter(function (x) { return x.score > 0; })
+    .sort(function (a, b) { return b.score - a.score || a.e.numericId - b.e.numericId; })
+    .map(function (x) { return x.e; });
+}
+
+function kaidoBidRow(label, amount, color, note) {
+  return '<div class="bid-row" style="background:' + color.bg + ';color:' + color.fg + ';"><span>' + label +
+    (note ? ' <span style="opacity:.65;font-weight:500;">' + note + '</span>' : '') + '</span><span>' +
+    (amount == null ? '—' : '$' + amount.toFixed(0)) + '</span></div>';
+}
+
+function kaidoCard(e) {
+  const est = kaidoEstValue(e);
+  const V = est.value;
+  const green = { bg: 'rgba(46,204,113,.14)', fg: '#69E29B' };
+  const yellow = { bg: 'rgba(241,196,15,.14)', fg: '#F1C40F' };
+  const orange = { bg: 'rgba(230,126,34,.14)', fg: '#E8935A' };
+  const red = { bg: 'rgba(224,43,43,.14)', fg: '#F0A8A8' };
+  const img = e.imageUrl ? '<img class="kaido-thumb" src="' + kEsc(e.imageUrl) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'"/>' : '';
+  const lim = e.isLimited ? ' <span class="chip-limited">LIMITED</span>' : '';
+  let bidGuide;
+  if (V != null && V > 0) {
+    bidGuide =
+      kaidoBidRow('🟢 Strong Buy', V * 0.70, green, '≤70%') +
+      kaidoBidRow('🟢 Good Buy', V * 0.85, green, '≤85%') +
+      kaidoBidRow('🟡 Fair Price', V * 1.00, yellow, '100%') +
+      kaidoBidRow('🟠 Max Bid', V * 1.10, orange, '110%') +
+      kaidoBidRow('🔴 Overpriced', V * 1.20, red, '>120%');
+  } else {
+    bidGuide = '<div style="font-size:12px;color:var(--gray);padding:6px 0;">No estimated value yet — hit <b>Refresh Prices</b> or check eBay sold.</div>';
+  }
+  const std = e.stdValue != null ? '$' + e.stdValue : '—';
+  const chase = e.chaseValue != null ? '$' + e.chaseValue : '—';
+  return '<div class="kaido-card">' + img +
+    '<div style="padding:14px;display:flex;flex-direction:column;gap:8px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span class="kaido-badge">' + kEsc(e.khmg) + '</span><span style="font-size:11px;color:var(--gray);">' + kEsc(e.releaseDate || '') + '</span></div>' +
+      '<div style="font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;line-height:1.2;">' + kEsc(e.name) + lim + '</div>' +
+      '<div style="font-size:12px;color:var(--gray);">' + kEsc(e.casting) + (e.description ? ' · ' + kEsc(e.description) : '') + (e.quantity ? ' · qty ' + kEsc(e.quantity) : '') + '</div>' +
+      '<div style="display:flex;gap:18px;font-size:12px;padding:6px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);">' +
+        '<div><span style="color:var(--gray);">Standard</span><br><b style="font-size:15px;">' + std + '</b></div>' +
+        '<div><span style="color:var(--gray);">Chase</span><br><b style="font-size:15px;color:var(--gold);">' + chase + '</b></div>' +
+        '<div><span style="color:var(--gray);">Est. basis</span><br><b style="font-size:15px;">' + (V != null ? '$' + Math.round(V) : '—') + '</b></div>' +
+      '</div>' +
+      (est.source ? '<div style="font-size:10px;color:var(--gray);margin-top:-3px;">Bid guide based on ' + kEsc(est.source) + '</div>' : '') +
+      '<div style="margin-top:2px;">' + bidGuide + '</div>' +
+      '<a href="' + kaidoEbayUrl(e, true) + '" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;background:var(--gold);color:#000;padding:9px;border-radius:7px;text-decoration:none;font-weight:700;font-size:13px;margin-top:4px;">🔗 Check eBay Sold</a>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderKaido() {
+  const box = document.getElementById('kaidoResults');
+  if (!box) return;
+  const q = (document.getElementById('kaidoSearchInput') || {}).value || '';
+  const list = kaidoSearch(q);
+  const status = document.getElementById('kaidoStatus');
+  if (status) {
+    const priced = Object.keys(kaidoPrices).length;
+    status.textContent = list.length + ' of ' + KHMG_DB.length + ' models' + (priced ? ' · ' + priced + ' with live eBay prices' : '');
+  }
+  if (!list.length) {
+    box.innerHTML = '<div style="grid-column:1/-1;padding:20px;color:var(--gray);font-size:13px;">No matches. Try a KHMG number, model, casting, or color.</div>';
+    return;
+  }
+  box.innerHTML = list.map(kaidoCard).join('');
+}
+
+// Weekly eBay sync — median sold price per KHMG model, saved to Redis under s64_kaido_prices.
+// Build eBay sold-search queries for a KHMG entry, MOST SPECIFIC FIRST.
+// The old code used one over-specific query ("Kaido House " + full wiki name) that
+// almost never returned >=3 sold results, so nothing ever updated. We now fall back
+// through progressively broader terms and take the first that returns real data.
+function kaidoSoldVariants(e) {
+  const clean = function (s) { return String(s || '').replace(/[()\/]/g, ' ').replace(/\s+/g, ' ').trim(); };
+  const nameClean = clean(e.name);
+  const castClean = clean(e.casting);
+  // scope: 'model' = specific to this exact release, 'casting' = whole-casting average (flagged in UI).
+  const out = [
+    { q: 'Kaido House ' + nameClean, scope: 'model' },   // full model + variant (most specific)
+    { q: 'Kaidohouse ' + e.khmg, scope: 'model' },       // by KHMG number (collectors put it in titles) — model-specific
+    { q: 'Kaido House ' + e.khmg, scope: 'model' },
+    { q: 'Kaido House ' + castClean, scope: 'casting' }   // last resort: casting-wide avg, flagged as such
+  ];
+  const seen = new Set(), res = [];
+  for (const v of out) { const k = v.q.toLowerCase(); if (v.q && !seen.has(k)) { seen.add(k); res.push(v); } }
+  return res;
+}
+
+// Median eBay SOLD price for ONE query, with outlier filtering. Returns { count, median }.
+// Throws propagate to the caller so real failures are visible (no silent swallow).
+async function kaidoSoldMedian(query) {
+  const raw = await fetchEbayItems('ebay_sold', query);
+  let prices = mapSoldItems(raw || [], query).map(function (m) { return m.price; }).filter(function (p) { return p > 0; }).sort(function (a, b) { return a - b; });
+  if (prices.length < 3) return { count: prices.length, median: null };
+  const md = prices[Math.floor(prices.length / 2)];
+  let use = prices.filter(function (p) { return p >= md * 0.4 && p <= md * 3; }); // trim wrong-item extremes
+  if (use.length < 3) use = prices;
+  use.sort(function (a, b) { return a - b; });
+  const median = use[Math.floor(use.length / 2)];
+  return { count: use.length, median: Math.round(median * 100) / 100 };
+}
+
+// Try each query variant broadest-last; return the first with >=3 sold results.
+async function kaidoBestSold(e) {
+  const variants = kaidoSoldVariants(e);
+  for (const v of variants) {
+    const r = await kaidoSoldMedian(v.q); // may throw -> handled by refreshKaidoPrices
+    if (r.median != null) return { median: r.median, count: r.count, query: v.q, scope: v.scope };
+  }
+  return { median: null, count: 0, query: null, scope: null };
+}
+
+function kaidoProgressHTML(done, total, priced, noData, errors, label) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  return '<div style="font-size:12px;color:var(--white);margin-bottom:6px;">' + (label || 'Refreshing eBay sold prices…') + ' <b>' + done + '/' + total + '</b> (' + pct + '%)</div>' +
+    '<div style="height:9px;background:var(--border);border-radius:6px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);transition:width .2s;"></div></div>' +
+    '<div style="font-size:11px;color:var(--gray);margin-top:6px;">✅ ' + priced + ' priced · ⚪ ' + noData + ' no eBay data · ⚠️ ' + errors + ' errors</div>';
+}
+
+// Weekly eBay sync — median sold price per KHMG model, saved to Redis under s64_kaido_prices.
+async function refreshKaidoPrices() {
+  const btn = document.getElementById('kaidoRefreshBtn');
+  const status = document.getElementById('kaidoStatus');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Refreshing…'; }
+  const total = KHMG_DB.length;
+  let done = 0, priced = 0, noData = 0, errors = 0;
+  let firstError = null;
+  const render = function () { if (status) status.innerHTML = kaidoProgressHTML(done, total, priced, noData, errors); };
+  render();
+
+  // Concurrency pool: 90+ lookups (each up to a few queries) finish in a reasonable time
+  // while staying gentle on the proxy. JS is single-threaded so kaidoPrices mutation is safe.
+  const queue = KHMG_DB.slice();
+  const CONCURRENCY = 4;
+  async function worker() {
+    while (queue.length) {
+      const e = queue.shift();
+      try {
+        const r = await kaidoBestSold(e);
+        if (r.median != null) {
+          kaidoPrices[e.khmg] = { median: r.median, count: r.count, query: r.query, scope: r.scope, updatedAt: Date.now() };
+          priced++;
+        } else {
+          noData++;
+        }
+      } catch (err) {
+        errors++;
+        if (!firstError) firstError = String((err && err.message) || err);
+        console.warn('[kaido] sold lookup failed for ' + e.khmg + ':', err);
+      }
+      done++;
+      render();
+    }
+  }
+  const workers = [];
+  for (let i = 0; i < CONCURRENCY; i++) workers.push(worker());
+  await Promise.all(workers);
+
+  let saved = true;
+  try { await kvSet('s64_kaido_prices', kaidoPrices); }
+  catch (err) { saved = false; console.error('[kaido] price save failed:', err); }
+
+  if (btn) { btn.disabled = false; btn.textContent = '🔄 Refresh Prices'; }
+  renderKaido(); // repaint cards with the new medians
+
+  // Final status — always explicit, never a silent finish.
+  if (status) {
+    let msg, col;
+    if (priced === 0 && errors > 0) {
+      col = 'var(--yellow)';
+      msg = '⚠️ No prices updated — every eBay lookup errored (' + errors + '/' + total + '). First error: ' + (firstError || 'unknown') + '. Check the eBay proxy (type=ebay_sold).';
+    } else if (priced === 0) {
+      col = 'var(--yellow)';
+      msg = '⚠️ Finished, but eBay returned no sold data for any of the ' + total + ' models. The proxy may not be returning sold listings.';
+    } else {
+      col = 'var(--green)';
+      msg = '✅ Updated ' + priced + ' of ' + total + ' models from eBay sold medians · ⚪ ' + noData + ' had no data · ⚠️ ' + errors + ' errors' + (saved ? '' : ' · ⚠️ Redis save FAILED (kept in memory only)');
+    }
+    status.innerHTML = '<div style="font-size:12px;color:' + col + ';line-height:1.5;">' + msg + '</div>';
+  }
+  if (typeof toast === 'function') {
+    toast(priced ? ('✅ Kaido prices updated (' + priced + ' models)') : '⚠️ No eBay sold prices found — see the panel', priced ? 'green' : 'yellow');
+  }
+}
+
+async function loadKaidoPrices() {
+  try { const v = await kvGet('s64_kaido_prices'); if (v && typeof v === 'object' && !Array.isArray(v)) kaidoPrices = v; } catch (e) {}
+  renderKaido();
+}
+document.addEventListener('DOMContentLoaded', loadKaidoPrices);
 </script>
 
 <!-- BUYER PROFILE MODAL (Whatnot Intel leaderboard drill-in) -->
@@ -8594,7 +8790,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <div id="imgPreview" onclick="if(event.target===this)closeImagePreview()">
   <div class="imgprev-box">
     <button class="imgprev-close" onclick="closeImagePreview()" aria-label="Close">✕</button>
-    <img id="imgPreviewImg" referrerpolicy="no-referrer" src="" alt="Listing image"/>
+    <img id="imgPreviewImg" src="" alt="Listing image"/>
     <div class="imgprev-title" id="imgPreviewTitle"></div>
   </div>
 </div>
@@ -8791,4 +8987,13 @@ initHelpTips();
   if (chatForm) chatForm.addEventListener('submit', function(e){ e.preventDefault(); return false; });
 
   // Auto-Source button (Eversen tab).
-  const autoBtn = document.getEl
+  const autoBtn = document.getElementById('evAutoSourceBtn');
+  if (autoBtn) autoBtn.addEventListener('click', function(e){ e.preventDefault(); if (typeof evAutoSource === 'function') evAutoSource(); });
+
+  // Negotiate vendor dropdown: populate on first load and whenever the Outreach tab is opened.
+  if (typeof loadNegoVendors === 'function') loadNegoVendors();
+})();
+</script>
+
+</body>
+</html>
