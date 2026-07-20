@@ -325,10 +325,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   #catalogsContainer table th:nth-child(3), #catalogsContainer table td:nth-child(3),
   #catalogsContainer table th:nth-child(6), #catalogsContainer table td:nth-child(6) { display: none !important; }
 
-  /* 5: Auction watchlist — hide Est Tax(7), Avg Sold(9), Max Bid(11) */
-  #auctWatchlist table th:nth-child(7), #auctWatchlist table td:nth-child(7),
-  #auctWatchlist table th:nth-child(9), #auctWatchlist table td:nth-child(9),
-  #auctWatchlist table th:nth-child(11), #auctWatchlist table td:nth-child(11) { display: none !important; }
+  /* 5: Auction watchlist — hide Est Tax(8), Avg Sold(10), Max Bid(12) */
+  #auctWatchlist table th:nth-child(8), #auctWatchlist table td:nth-child(8),
+  #auctWatchlist table th:nth-child(10), #auctWatchlist table td:nth-child(10),
+  #auctWatchlist table th:nth-child(12), #auctWatchlist table td:nth-child(12) { display: none !important; }
 
   /* 9: Eric & Khai collection tables — hide Scale(3) + Notes(14) */
   #eric .tbl-wrap table th:nth-child(3), #eric .tbl-wrap table td:nth-child(3),
@@ -3401,7 +3401,9 @@ async function kvGet(key) {
   return d.value; // may be null if not stored
 }
 
+let _dataLoaded = false;
 async function saveData() {
+  if (!_dataLoaded) { console.log('[save] skipped — initial Redis load not complete'); return; }
   // localStorage always written as a fallback
   try {
     localStorage.setItem('s64_items', JSON.stringify(allItems));
@@ -3499,6 +3501,7 @@ async function loadData() {
   if (scrapeMeta && typeof scrapeMeta === 'object' && !Array.isArray(scrapeMeta)) vendorScrapeMeta = scrapeMeta;
   if (Array.isArray(auctWatch)) auctionWatchlist = auctWatch;
   if (auctSettings && typeof auctSettings === 'object' && !Array.isArray(auctSettings)) auctionSettings = Object.assign(auctionSettings, auctSettings);
+  _dataLoaded = true; // initial Redis load complete — saves may now persist
   if (allItems.length) renderResults();
   if (ericColl.length) renderCollection('eric');
   if (khaiColl.length) renderCollection('khai');
@@ -3889,7 +3892,10 @@ function renderAuctionSearchResults() {
     const btn = onWatch
       ? `<button disabled style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--border);color:var(--gray);border:none;border-radius:7px;white-space:nowrap;">✓ Added</button>`
       : `<button onclick="addToWatchlist(${idx})" style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:7px;cursor:pointer;white-space:nowrap;">+ Watchlist</button>`;
-    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">${img}<div style="flex:1;min-width:0;"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(a.title)}</div><div style="font-size:11px;color:var(--gray);">$${a.currentBid.toFixed(2)} · ${bids}${ends}${a.shipping != null ? ' · +$' + a.shipping.toFixed(2) + ' ship' : ''}</div></div>${btn}</div>`;
+    const viewLink = a.url
+      ? `<a class="auc-ebay-link" href="${escAttr(a.url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="padding:8px 10px;font-size:12px;font-weight:600;color:var(--gray);text-decoration:none;white-space:nowrap;flex-shrink:0;">eBay ↗</a>`
+      : '';
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;">${img}<div style="flex:1;min-width:0;"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtmlA(a.title)}</div><div style="font-size:11px;color:var(--gray);">$${a.currentBid.toFixed(2)} · ${bids}${ends}${a.shipping != null ? ' · +$' + a.shipping.toFixed(2) + ' ship' : ''}</div></div>${viewLink}${btn}</div>`;
   }).join('') + '</div>';
 }
 
@@ -3901,7 +3907,7 @@ async function addToWatchlist(idx) {
     id: Date.now() + '_' + Math.floor(Math.random() * 1000),
     title: a.title, url: a.url, img: a.img,
     currentBid: a.currentBid, bidCount: a.bidCount, endDate: a.endDate, shipping: a.shipping,
-    avgSold: null, maxBid: null
+    avgSold: null, maxBid: null, myBid: null
   };
   auctionWatchlist.push(item);
   renderWatchlist();
@@ -3979,6 +3985,14 @@ function setAuctionMaxBid(id, val) {
   if (!it) return;
   const v = parseFloat(val);
   it.maxBid = isNaN(v) ? null : v;
+  renderWatchlist();
+  saveData();
+}
+function setAuctionMyBid(id, val) {
+  const it = auctionWatchlist.find(w => w.id === id);
+  if (!it) return;
+  const v = parseFloat(val);
+  it.myBid = isNaN(v) ? null : v;
   renderWatchlist();
   saveData();
 }
@@ -4072,6 +4086,7 @@ function renderWatchlist() {
       <td style="padding:8px;">${img}</td>
       <td style="padding:8px;max-width:220px;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;">${titleCell}</div>${flagsHtml ? `<div style="margin-top:4px;">${flagsHtml}</div>` : ''}</td>
       <td style="padding:8px;white-space:nowrap;">$${d.bid.toFixed(2)}</td>
+      <td style="padding:8px;"><input type="number" step="0.01" value="${it.myBid != null ? it.myBid : ''}" placeholder="—" onchange="setAuctionMyBid('${it.id}', this.value)" style="width:72px;padding:5px;font-size:12px;background:#12151b;border:1px solid var(--border);border-radius:5px;color:inherit;"/></td>
       <td style="padding:8px;white-space:nowrap;">${bidBadge}</td>
       <td style="padding:8px;white-space:nowrap;color:${timeColor};font-weight:600;">${d.tl.label}</td>
       <td style="padding:8px;white-space:nowrap;">${d.shipping ? '$' + d.shipping.toFixed(2) : 'Free'}</td>
@@ -4085,7 +4100,7 @@ function renderWatchlist() {
   }).join('');
   cont.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
     <thead><tr style="text-align:left;color:var(--gray);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border);">
-      <th style="padding:8px;">Img</th><th style="padding:8px;">Item / Flags</th><th style="padding:8px;">Bid</th><th style="padding:8px;">Bids</th><th style="padding:8px;">Time Left</th><th style="padding:8px;">Ship</th><th style="padding:8px;">Est Tax</th><th style="padding:8px;">True Total</th><th style="padding:8px;">Avg Sold</th><th style="padding:8px;">Flip %</th><th style="padding:8px;">Max Bid</th><th style="padding:8px;"></th>
+      <th style="padding:8px;">Img</th><th style="padding:8px;">Item / Flags</th><th style="padding:8px;">Bid</th><th style="padding:8px;">My Bid</th><th style="padding:8px;">Bids</th><th style="padding:8px;">Time Left</th><th style="padding:8px;">Ship</th><th style="padding:8px;">Est Tax</th><th style="padding:8px;">True Total</th><th style="padding:8px;">Avg Sold</th><th style="padding:8px;">Flip %</th><th style="padding:8px;">Max Bid</th><th style="padding:8px;"></th>
     </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
