@@ -115,7 +115,7 @@ export default async function handler(req, res) {
       const { query } = req.body;
       const token = await getEbayToken();
       if (!token) return res.status(200).json({ error: 'eBay auth failed - check EBAY_APP_ID / EBAY_CLIENT_SECRET', itemSummaries: [] });
-      const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=10&filter=buyingOptions:{FIXED_PRICE}`;
+      const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&limit=10&filter=${encodeURIComponent('buyingOptions:{FIXED_PRICE}')}`;
       const r = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' }
       });
