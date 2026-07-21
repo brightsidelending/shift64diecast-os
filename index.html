@@ -3487,7 +3487,13 @@ async function reloadWantsFromCloud() {
 }
 // On mobile PWA, reopening restores from bfcache (pageshow.persisted) rather than a full load —
 // force a fresh Redis fetch so items added in a previous session always appear.
-window.addEventListener('pageshow', function (e) { if (e.persisted) reloadWantsFromCloud(); });
+window.addEventListener('pageshow', function (e) {
+  if (!e.persisted) return;
+  reloadWantsFromCloud();
+  kvGet('s64_auction_watch').then(function(v) {
+    if (Array.isArray(v)) { auctionWatchlist = v; renderWatchlist(); }
+  }).catch(function(){});
+});
 async function loadData() {
   const [items, eric, khai, ericW, khaiW, catalogs, scrapeMeta, auctWatch, auctSettings, whatnot, buyRep, eversen] = await Promise.all([
     loadKey('s64_items'), loadKey('s64_eric'), loadKey('s64_khai'), loadKey('s64_ericW'), loadKey('s64_khaiW'), loadKey('s64_catalogs'), loadKey('s64_scrape_meta'), loadKey('s64_auction_watch'), loadKey('s64_auction_settings'), loadKey('s64_whatnot_shows'), loadKey('s64_buy_report'), loadKey('s64_eversen_brands')
