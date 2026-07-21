@@ -8518,7 +8518,7 @@ KHMG_DB.forEach(function (e) {
   e.isChase = false;
 });
 
-// Live eBay sold medians, keyed by KHMG id: { KHMG050: { median, count, updatedAt } }
+// Live eBay medians, keyed by KHMG id: { KHMG050: { stdMedian, stdCount, stdQuery, chaseMedian, chaseCount, chaseQuery, scope, updatedAt } }
 let kaidoPrices = {};
 
 function kEsc(s) {
@@ -8534,13 +8534,17 @@ function kaidoNormNum(str) {
   return m ? parseInt(m[0], 10) : null;
 }
 
-// Estimated value used for the bid guide: live eBay median first, then hallsguide standard, then chase.
+// Estimated values for the bid guides: separate standard and chase, live eBay median first then seed.
 function kaidoEstValue(entry) {
   const live = kaidoPrices[entry.khmg];
-  if (live && live.median > 0) return { value: live.median, source: 'eBay median · ' + live.count + ' sold' + (live.scope === 'casting' ? ' (casting avg)' : '') };
-  if (entry.stdValue != null) return { value: entry.stdValue, source: 'hallsguide standard est.' };
-  if (entry.chaseValue != null) return { value: entry.chaseValue, source: 'hallsguide chase est.' };
-  return { value: null, source: null };
+  const stdLive = live && live.stdMedian > 0 ? live.stdMedian : null;
+  const chaseLive = live && live.chaseMedian > 0 ? live.chaseMedian : null;
+  return {
+    stdValue: stdLive || entry.stdValue || null,
+    chaseValue: chaseLive || entry.chaseValue || null,
+    stdSource: stdLive ? ('eBay median · ' + live.stdCount + ' sold' + (live.scope === 'casting' ? ' (casting avg)' : '')) : (entry.stdValue ? 'hallsguide est.' : null),
+    chaseSource: chaseLive ? ('eBay median · ' + live.chaseCount + ' sold') : (entry.chaseValue ? 'hallsguide est.' : null)
+  };
 }
 
 function kaidoEbayUrl(entry, soldOnly) {
@@ -8574,39 +8578,48 @@ function kaidoBidRow(label, amount, color, note) {
 
 function kaidoCard(e) {
   const est = kaidoEstValue(e);
-  const V = est.value;
+  const VS = est.stdValue;
+  const VC = est.chaseValue;
   const green = { bg: 'rgba(46,204,113,.14)', fg: '#69E29B' };
   const yellow = { bg: 'rgba(241,196,15,.14)', fg: '#F1C40F' };
   const orange = { bg: 'rgba(230,126,34,.14)', fg: '#E8935A' };
   const red = { bg: 'rgba(224,43,43,.14)', fg: '#F0A8A8' };
   const img = e.imageUrl ? '<img class="kaido-thumb" src="' + kEsc(e.imageUrl) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'"/>' : '';
   const lim = e.isLimited ? ' <span class="chip-limited">LIMITED</span>' : '';
-  let bidGuide;
-  if (V != null && V > 0) {
-    bidGuide =
-      kaidoBidRow('🟢 Strong Buy', V * 0.70, green, '≤70%') +
-      kaidoBidRow('🟢 Good Buy', V * 0.85, green, '≤85%') +
-      kaidoBidRow('🟡 Fair Price', V * 1.00, yellow, '100%') +
-      kaidoBidRow('🟠 Max Bid', V * 1.10, orange, '110%') +
-      kaidoBidRow('🔴 Overpriced', V * 1.20, red, '>120%');
-  } else {
-    bidGuide = '<div style="font-size:12px;color:var(--gray);padding:6px 0;">No estimated value yet — hit <b>Refresh Prices</b> or check eBay sold.</div>';
+  function buildGuide(V) {
+    if (V != null && V > 0) {
+      return kaidoBidRow('\uD83D\uDFE2 Strong Buy', V * 0.70, green, '\u226470%') +
+        kaidoBidRow('\uD83D\uDFE2 Good Buy', V * 0.85, green, '\u226485%') +
+        kaidoBidRow('\uD83D\uDFE1 Fair Price', V * 1.00, yellow, '100%') +
+        kaidoBidRow('\uD83D\uDFE0 Max Bid', V * 1.10, orange, '110%') +
+        kaidoBidRow('\uD83D\uDD34 Overpriced', V * 1.20, red, '>120%');
+    }
+    return '<div style="font-size:12px;color:var(--gray);padding:6px 0;">No estimated value yet \u2014 hit <b>Refresh Prices</b> or check eBay sold.</div>';
   }
-  const std = e.stdValue != null ? '$' + e.stdValue : '—';
-  const chase = e.chaseValue != null ? '$' + e.chaseValue : '—';
+  const stdBidGuide = buildGuide(VS);
+  const chaseBidGuide = (VC != null && VC > 0) ? buildGuide(VC) : null;
+  const std = e.stdValue != null ? '$' + e.stdValue : '\u2014';
+  const chase = e.chaseValue != null ? '$' + e.chaseValue : '\u2014';
+  const labelStyle = 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);margin-top:6px;';
+  const srcStyle = 'font-size:10px;color:var(--gray);margin-top:-1px;';
   return '<div class="kaido-card">' + img +
     '<div style="padding:14px;display:flex;flex-direction:column;gap:8px;">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span class="kaido-badge">' + kEsc(e.khmg) + '</span><span style="font-size:11px;color:var(--gray);">' + kEsc(e.releaseDate || '') + '</span></div>' +
       '<div style="font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:700;line-height:1.2;">' + kEsc(e.name) + lim + '</div>' +
-      '<div style="font-size:12px;color:var(--gray);">' + kEsc(e.casting) + (e.description ? ' · ' + kEsc(e.description) : '') + (e.quantity ? ' · qty ' + kEsc(e.quantity) : '') + '</div>' +
+      '<div style="font-size:12px;color:var(--gray);">' + kEsc(e.casting) + (e.description ? ' \u00b7 ' + kEsc(e.description) : '') + (e.quantity ? ' \u00b7 qty ' + kEsc(e.quantity) : '') + '</div>' +
       '<div style="display:flex;gap:18px;font-size:12px;padding:6px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);">' +
         '<div><span style="color:var(--gray);">Standard</span><br><b style="font-size:15px;">' + std + '</b></div>' +
         '<div><span style="color:var(--gray);">Chase</span><br><b style="font-size:15px;color:var(--gold);">' + chase + '</b></div>' +
-        '<div><span style="color:var(--gray);">Est. basis</span><br><b style="font-size:15px;">' + (V != null ? '$' + Math.round(V) : '—') + '</b></div>' +
       '</div>' +
-      (est.source ? '<div style="font-size:10px;color:var(--gray);margin-top:-3px;">Bid guide based on ' + kEsc(est.source) + '</div>' : '') +
-      '<div style="margin-top:2px;">' + bidGuide + '</div>' +
-      '<a href="' + kaidoEbayUrl(e, true) + '" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;background:var(--gold);color:#000;padding:9px;border-radius:7px;text-decoration:none;font-weight:700;font-size:13px;margin-top:4px;">🔗 Check eBay Sold</a>' +
+      '<div style="' + labelStyle + '">Standard</div>' +
+      '<div style="margin-top:2px;">' + stdBidGuide + '</div>' +
+      (est.stdSource ? '<div style="' + srcStyle + '">' + kEsc(est.stdSource) + '</div>' : '') +
+      (chaseBidGuide ? (
+        '<div style="' + labelStyle + '">Chase</div>' +
+        '<div style="margin-top:2px;">' + chaseBidGuide + '</div>' +
+        (est.chaseSource ? '<div style="' + srcStyle + '">' + kEsc(est.chaseSource) + '</div>' : '')
+      ) : '') +
+      '<a href="' + kaidoEbayUrl(e, true) + '" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;background:var(--gold);color:#000;padding:9px;border-radius:7px;text-decoration:none;font-weight:700;font-size:13px;margin-top:4px;">\uD83D\uDD17 Check eBay Sold</a>' +
     '</div>' +
   '</div>';
 }
@@ -8649,11 +8662,30 @@ function kaidoSoldVariants(e) {
   return res;
 }
 
+// Same query variants as kaidoSoldVariants, but with "chase" appended so eBay returns chase examples.
+function kaidoChaseSoldVariants(e) {
+  const clean = function (s) { return String(s || '').replace(/[()\/]/g, ' ').replace(/\s+/g, ' ').trim(); };
+  const nameClean = clean(e.name);
+  const castClean = clean(e.casting);
+  const out = [
+    { q: 'Kaido House ' + nameClean + ' chase', scope: 'model' },
+    { q: 'Kaidohouse ' + e.khmg + ' chase', scope: 'model' },
+    { q: 'Kaido House ' + e.khmg + ' chase', scope: 'model' },
+    { q: 'Kaido House ' + castClean + ' chase', scope: 'casting' }
+  ];
+  const seen = new Set(), res = [];
+  for (const v of out) { const k = v.q.toLowerCase(); if (v.q && !seen.has(k)) { seen.add(k); res.push(v); } }
+  return res;
+}
+
 // Median eBay ACTIVE price for ONE query, with outlier filtering. Returns { count, median }.
-// Throws propagate to the caller so real failures are visible (no silent swallow).
-async function kaidoSoldMedian(query) {
+// When excludeChase is true, listings whose title mentions "chase" are dropped first so the
+// standard median is not inflated by chase variants. Throws propagate so real failures are visible.
+async function kaidoSoldMedian(query, excludeChase) {
   const raw = await fetchEbayItems('ebay_active', query);
-  let prices = mapActiveItems(raw || []).map(function (m) { return m.price; }).filter(function (p) { return p > 0; }).sort(function (a, b) { return a - b; });
+  let items = mapActiveItems(raw || []);
+  if (excludeChase) items = items.filter(function (m) { return !/chase/i.test(m.title || ''); });
+  let prices = items.map(function (m) { return m.price; }).filter(function (p) { return p > 0; }).sort(function (a, b) { return a - b; });
   if (prices.length < 3) return { count: prices.length, median: null };
   // Remove outliers by trimming the bottom and top 20% of prices, then take the median of the rest.
   const cut = Math.floor(prices.length * 0.2);
@@ -8663,14 +8695,25 @@ async function kaidoSoldMedian(query) {
   return { count: use.length, median: Math.round(median * 100) / 100 };
 }
 
-// Try each query variant broadest-last; return the first with >=3 sold results.
-async function kaidoBestSold(e) {
-  const variants = kaidoSoldVariants(e);
+// Try each query variant broadest-last; return the first with >=3 results.
+async function kaidoBestFor(variants, excludeChase) {
   for (const v of variants) {
-    const r = await kaidoSoldMedian(v.q); // may throw -> handled by refreshKaidoPrices
+    const r = await kaidoSoldMedian(v.q, excludeChase); // may throw -> handled by refreshKaidoPrices
     if (r.median != null) return { median: r.median, count: r.count, query: v.q, scope: v.scope };
   }
   return { median: null, count: 0, query: null, scope: null };
+}
+
+// Run the standard and chase lookups in parallel and return both medians.
+async function kaidoBestSold(e) {
+  const [std, chase] = await Promise.all([
+    kaidoBestFor(kaidoSoldVariants(e), true),
+    kaidoBestFor(kaidoChaseSoldVariants(e), false)
+  ]);
+  return {
+    stdMedian: std.median, stdCount: std.count, stdQuery: std.query, stdScope: std.scope,
+    chaseMedian: chase.median, chaseCount: chase.count, chaseQuery: chase.query, chaseScope: chase.scope
+  };
 }
 
 function kaidoProgressHTML(done, total, priced, noData, errors, label) {
@@ -8700,8 +8743,8 @@ async function refreshKaidoPrices() {
       const e = queue.shift();
       try {
         const r = await kaidoBestSold(e);
-        if (r.median != null) {
-          kaidoPrices[e.khmg] = { median: r.median, count: r.count, query: r.query, scope: r.scope, updatedAt: Date.now() };
+        if (r.stdMedian != null || r.chaseMedian != null) {
+          kaidoPrices[e.khmg] = { stdMedian: r.stdMedian, stdCount: r.stdCount, stdQuery: r.stdQuery, chaseMedian: r.chaseMedian, chaseCount: r.chaseCount, chaseQuery: r.chaseQuery, scope: r.stdScope || r.chaseScope, updatedAt: Date.now() };
           priced++;
         } else {
           noData++;
