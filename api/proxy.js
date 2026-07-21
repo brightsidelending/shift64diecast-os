@@ -141,44 +141,72 @@ export default async function handler(req, res) {
     }
   }
 
-  // eBay Finding API - Sold/Completed Listings (findCompletedItems with SoldItemsOnly=true).
-  // The Browse API only returns ACTIVE listings, which is why Sold previously mirrored Active.
-  // findCompletedItems returns genuinely sold items; we transform them into the Browse-style
-  // itemSummaries shape the frontend already maps, so the Sold column displays correctly.
+  // eBay Sold/Completed Listings via HTML scrape of eBay's public sold-search page.
+  // The Finding API (findCompletedItems) is retired, so we fetch the rendered sold
+  // results page with a browser User-Agent and parse the item cards out of the HTML,
+  // returning the same Browse-style itemSummaries shape the frontend already maps.
   if (type === 'ebay_sold') {
     try {
       const { query } = req.body;
-      const appId = process.env.EBAY_APP_ID;
-      const params = new URLSearchParams({
-        'OPERATION-NAME': 'findCompletedItems',
-        'SERVICE-VERSION': '1.13.0',
-        'SECURITY-APPNAME': appId || '',
-        'GLOBAL-ID': 'EBAY-US',
-        'RESPONSE-DATA-FORMAT': 'JSON',
-        'REST-PAYLOAD': 'true',
-        'keywords': query || '',
-        'itemFilter(0).name': 'SoldItemsOnly',
-        'itemFilter(0).value': 'true',
-        'sortOrder': 'EndTimeSoonest',
-        'paginationInput.entriesPerPage': '10'
+      const url = 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(query || '') +
+        '&LH_Sold=1&LH_Complete=1&_sop=13&_ipg=60';
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9'
+        }
       });
-      const r = await fetch('https://svcs.ebay.com/services/search/FindingService/v1?' + params.toString());
-      const data = await r.json();
-      const resp = (data && data.findCompletedItemsResponse && data.findCompletedItemsResponse[0]) || {};
-      const rawItems = (resp.searchResult && resp.searchResult[0] && resp.searchResult[0].item) || [];
-      const itemSummaries = rawItems.map(it => {
-        const price = it.sellingStatus && it.sellingStatus[0] && it.sellingStatus[0].currentPrice && it.sellingStatus[0].currentPrice[0];
-        const ship = it.shippingInfo && it.shippingInfo[0] && it.shippingInfo[0].shippingServiceCost && it.shippingInfo[0].shippingServiceCost[0];
-        return {
-          title: (it.title && it.title[0]) || '',
-          price: price ? { value: price.__value__, currency: price['@currencyId'] } : undefined,
-          condition: (it.condition && it.condition[0] && it.condition[0].conditionDisplayName && it.condition[0].conditionDisplayName[0]) || 'Used',
-          itemWebUrl: (it.viewItemURL && it.viewItemURL[0]) || null,
-          image: { imageUrl: (it.galleryURL && it.galleryURL[0]) || null },
-          itemEndDate: (it.listingInfo && it.listingInfo[0] && it.listingInfo[0].endTime && it.listingInfo[0].endTime[0]) || null,
-          shippingOptions: ship ? [{ shippingCost: { value: ship.__value__ } }] : []
-        };
-      });
+      const html = await r.text();
+
+      const stripTags = (s) => (s || '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#0?39;/g, "'")
+        .replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&lt;/g, '<')
+        .replace(/\s+/g, ' ').trim();
+
+      // Split into individual result cards. Each result is an <li class="s-item ...">.
+      const chunks = html.split(/<li[^>]+class="[^"]*s-item[^"]*"/i).slice(1);
+      const itemSummaries = [];
+      for (const chunk of chunks) {
+        if (itemSummaries.length >= 30) break;
+
+        const titleM = chunk.match(/class="s-item__title"[^>]*>([\s\S]*?)<\/(?:div|h3)>/i);
+        const title = titleM ? stripTags(titleM[1]).replace(/^New Listing/i, '').trim() : '';
+        if (!title || /^shop on ebay$/i.test(title)) continue;
+
+        const priceM = chunk.match(/class="s-item__price"[^>]*>([\s\S]*?)<\/span>/i);
+        const priceText = priceM ? stripTags(priceM[1]) : '';
+        const priceNum = parseFloat((priceText.match(/[0-9][0-9,]*(?:\.[0-9]{2})?/) || [''])[0].replace(/,/g, ''));
+        if (!priceNum || isNaN(priceNum)) continue;
+
+        const linkM = chunk.match(/href="(https:\/\/www\.ebay\.com\/itm\/[^"]+)"/i);
+        const itemWebUrl = linkM ? linkM[1].replace(/&amp;/g, '&') : null;
+
+        const imgM = chunk.match(/<img[^>]+(?:data-src|src)="(https:\/\/i\.ebayimg\.com\/[^"]+)"/i);
+        const imageUrl = imgM ? imgM[1] : null;
+
+        const soldM = chunk.match(/s-item__caption--signal[^>]*>([\s\S]*?)<\/span>/i) ||
+          chunk.match(/s-item__title--tagblock[^>]*>([\s\S]*?)<\/span>/i);
+        const soldText = soldM ? stripTags(soldM[1]) : null;
+
+        const shipM = chunk.match(/class="[^"]*s-item__(?:shipping|logisticsCost)[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+        const shipText = shipM ? stripTags(shipM[1]) : '';
+        let shipVal = null;
+        if (/free/i.test(shipText)) shipVal = 0;
+        else { const sm = shipText.match(/[0-9][0-9,]*(?:\.[0-9]{2})?/); if (sm) shipVal = parseFloat(sm[0].replace(/,/g, '')); }
+
+        itemSummaries.push({
+          title,
+          price: { value: String(priceNum), currency: 'USD' },
+          condition: 'Used',
+          itemWebUrl,
+          image: { imageUrl },
+          itemEndDate: soldText,
+          shippingOptions: shipVal != null ? [{ shippingCost: { value: String(shipVal) } }] : []
+        });
+      }
+
       return res.status(200).json({ itemSummaries });
     } catch(err) {
       return res.status(200).json({ error: err.message, itemSummaries: [] });
