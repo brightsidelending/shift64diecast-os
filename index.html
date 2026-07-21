@@ -8629,16 +8629,16 @@ function kaidoSoldVariants(e) {
   return res;
 }
 
-// Median eBay SOLD price for ONE query, with outlier filtering. Returns { count, median }.
+// Median eBay ACTIVE price for ONE query, with outlier filtering. Returns { count, median }.
 // Throws propagate to the caller so real failures are visible (no silent swallow).
 async function kaidoSoldMedian(query) {
-  const raw = await fetchEbayItems('ebay_sold', query);
-  let prices = mapSoldItems(raw || [], query).map(function (m) { return m.price; }).filter(function (p) { return p > 0; }).sort(function (a, b) { return a - b; });
+  const raw = await fetchEbayItems('ebay_active', query);
+  let prices = mapActiveItems(raw || []).map(function (m) { return m.price; }).filter(function (p) { return p > 0; }).sort(function (a, b) { return a - b; });
   if (prices.length < 3) return { count: prices.length, median: null };
-  const md = prices[Math.floor(prices.length / 2)];
-  let use = prices.filter(function (p) { return p >= md * 0.4 && p <= md * 3; }); // trim wrong-item extremes
-  if (use.length < 3) use = prices;
-  use.sort(function (a, b) { return a - b; });
+  // Remove outliers by trimming the bottom and top 20% of prices, then take the median of the rest.
+  const cut = Math.floor(prices.length * 0.2);
+  let use = prices.slice(cut, prices.length - cut);
+  if (use.length < 1) use = prices;
   const median = use[Math.floor(use.length / 2)];
   return { count: use.length, median: Math.round(median * 100) / 100 };
 }
