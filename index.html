@@ -8141,6 +8141,34 @@ function epAdd() {
   toast('✅ Added to pipeline.', 'green');
 }
 function epRemove(id) { epPipeline = epPipeline.filter(x => x.id !== id); epSave(); epRender(); }
+async function epSendNow(id) {
+  const r = epPipeline.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm('Send cold email to ' + r.brand + ' now?')) return;
+  const btn = document.querySelector('[onclick="epSendNow(\'' + id + '\')"]');
+  if (btn) { btn.textContent = 'Sending…'; btn.disabled = true; }
+  try {
+    const res = await fetch(PROXY_URL + '?action=triggerSendNow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brand: r.brand, website: r.website || '' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast('✅ Email sent to ' + data.contactEmail + ' for ' + r.brand, 'green');
+      r.status = 'Contacted';
+      r.notes = 'Email sent to ' + data.contactEmail;
+      epRender();
+      epSave();
+    } else {
+      toast('⚠️ Send failed: ' + (data.error || 'unknown error'), 'red');
+      if (btn) { btn.textContent = 'Send Now'; btn.disabled = false; }
+    }
+  } catch(e) {
+    toast('⚠️ Network error: ' + e.message, 'red');
+    if (btn) { btn.textContent = 'Send Now'; btn.disabled = false; }
+  }
+}
 
 const EP_STATUS = {
   'Queued':       { label: '🔵 Queued', style: 'background:#1A1D24;color:var(--gray);' },
@@ -8256,6 +8284,7 @@ function epRender() {
       <td style="padding:10px 12px;font-size:12px;color:var(--gray);">${escHtmlA(r.lastActivity || '—')}</td>
       <td style="padding:10px 12px;font-size:12px;color:var(--gray);max-width:180px;">${escHtmlA(r.notes || '')}</td>
       <td style="padding:10px 12px;white-space:nowrap;">
+        ${r.status === 'Queued' ? `<button onclick="epSendNow('${r.id}')" style="padding:4px 10px;font-size:11px;font-weight:700;background:var(--gold);color:#000;border:none;border-radius:6px;cursor:pointer;margin-right:4px;">Send Now</button>` : ''}
         <button onclick="epEdit('${r.id}')" style="padding:5px 10px;font-size:11px;font-weight:600;background:var(--card);color:var(--gold);border:1px solid var(--border);border-radius:6px;cursor:pointer;margin-right:4px;">Edit</button>
         <button onclick="epRemove('${r.id}')" style="padding:5px 10px;font-size:11px;font-weight:600;background:var(--card);color:var(--red);border:1px solid var(--border);border-radius:6px;cursor:pointer;">Remove</button>
       </td>

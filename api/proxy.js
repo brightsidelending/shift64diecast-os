@@ -45,6 +45,52 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     } catch (err) { return res.status(200).json({ success: false, error: err.message }); }
   }
+  if (action === 'triggerSendNow') {
+    try {
+      const { brand, website } = req.body || {};
+      if (!brand) return res.status(400).json({ success: false, error: 'Missing brand' });
+      // Step 1: Use Claude to generate the cold email
+      const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          system: 'You are Eversen Chan, a wholesale procurement agent for Shift64 Diecast, a US-based premium 1/64 diecast reseller. Find the best wholesale contact email for diecast manufacturers and write a short cold email to open a wholesale conversation. Always sign as Eversen Chan. Never reveal you are an AI. Keep emails under 100 words. Lead in English. Do not ask for pricing or MOQ in the first email — just open the conversation.',
+          messages: [{ role: 'user', content: 'Find the wholesale/trade contact email for ' + brand + ' diecast manufacturer (website: ' + (website || 'unknown') + '). Then write a cold email introducing Shift64 Diecast as a US wholesale buyer. Return ONLY valid JSON: { "contactEmail": "email@example.com", "subject": "subject here", "body": "full email body here" }' }]
+        })
+      });
+      const claudeData = await claudeRes.json();
+      let rawText = '';
+      if (claudeData && Array.isArray(claudeData.content)) rawText = claudeData.content.filter(c => c.type === 'text').map(c => c.text).join('');
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return res.status(200).json({ success: false, error: 'Claude could not generate email' });
+      const emailData = JSON.parse(jsonMatch[0]);
+      if (!emailData.contactEmail || emailData.contactEmail === 'email@example.com') return res.status(200).json({ success: false, error: 'No contact email found for ' + brand });
+      // Step 2: Send via Gmail SMTP using nodemailer + App Password
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.default.createTransport({
+        service: 'gmail',
+        auth: { user: 'shift64diecast@gmail.com', pass: process.env.GMAIL_APP_PASSWORD }
+      });
+      await transporter.sendMail({
+        from: '"Eversen Chan" <shift64diecast@gmail.com>',
+        to: emailData.contactEmail,
+        subject: emailData.subject,
+        text: emailData.body
+      });
+      // Step 3: Update brand status in Redis
+      const pipeline = await orLoadArray('eversenPipeline');
+      const idx = pipeline.findIndex(b => String(b.brand || '').toLowerCase().trim() === String(brand).toLowerCase().trim());
+      if (idx >= 0) {
+        pipeline[idx].status = 'Contacted';
+        pipeline[idx].notes = 'Email sent to ' + emailData.contactEmail;
+        pipeline[idx].contactedAt = new Date().toISOString();
+        await orKvCmd(['SET', 'eversenPipeline', JSON.stringify(pipeline)]);
+      }
+      return res.status(200).json({ success: true, contactEmail: emailData.contactEmail, subject: emailData.subject });
+    } catch (err) { return res.status(200).json({ success: false, error: err.message }); }
+  }
   if (action === 'updateEversenBrand') {
     try {
       const { brand, updates } = req.body || {};
