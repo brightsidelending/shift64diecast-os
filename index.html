@@ -1174,6 +1174,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button type="button" onclick="evQuickFill('email')" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">📧 Write Cold Email</button>
       <button type="button" onclick="evQuickFill('research')" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">🔍 Research Brand</button>
       <button type="button" onclick="evQuickFill('wechat')" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">📱 WeChat Script</button>
+      <button type="button" onclick="evLoadStatus()" style="padding:6px 12px;font-size:12px;font-weight:600;background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;cursor:pointer;">📊 Load Status</button>
     </div>
     <form onsubmit="return false;" style="display:flex;gap:8px;">
       <input class="text-input" id="evChatInput" placeholder="Ask Eversen about sourcing, brands, pricing…" style="flex:1;min-width:180px;" onkeydown="if(event.key==='Enter'){event.preventDefault();evChatSend();}"/>
@@ -8321,6 +8322,20 @@ const EV_QUICK = {
   research: 'Research everything you know about [brand] — supply chain, factory, distributors, contact strategy',
   wechat: 'Write me a WeChat opening message for [brand] in both English and Simplified Chinese side by side'
 };
+function evLoadStatus() {
+  if (typeof epPipeline === 'undefined' || !Array.isArray(epPipeline) || !epPipeline.length) {
+    toast('No pipeline data loaded yet.', 'yellow');
+    return;
+  }
+  const total = epPipeline.length;
+  const contacted = epPipeline.filter(x => ['Contacted','Positive','Needs Review','Call Requested'].indexOf(x.status) >= 0).length;
+  const positive = epPipeline.filter(x => x.status === 'Positive').length;
+  const needsReview = epPipeline.filter(x => x.status === 'Needs Review').length;
+  const rows = epPipeline.map(x => x.brand + ' \u2014 ' + (x.status || 'Researching') + (x.notes ? ' (' + x.notes + ')' : '')).join('\n');
+  const summary = 'Here is the current Eversen pipeline status:\n\nTotal brands: ' + total + '\nContacted: ' + contacted + '\nPositive responses: ' + positive + '\nNeeds review: ' + needsReview + '\n\nFull pipeline:\n' + rows + '\n\nBased on this, what should we prioritize next?';
+  const input = document.getElementById('evChatInput');
+  if (input) { input.value = summary; input.focus(); }
+}
 function evQuickFill(kind) {
   const tpl = EV_QUICK[kind];
   if (!tpl) return;
