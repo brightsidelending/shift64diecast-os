@@ -49,15 +49,21 @@ export default async function handler(req, res) {
     try {
       const { brand, website } = req.body || {};
       if (!brand) return res.status(400).json({ success: false, error: 'Missing brand' });
-      // Step 1: Use Claude to generate the cold email
+      // Step 1: Use Claude with web search to find the real contact email and generate outreach
       const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-beta': 'web-search-2025-03-05'
+        },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          system: 'You are Eversen Chan, a wholesale procurement agent for Shift64 Diecast, a US-based premium 1/64 diecast reseller. Find the best wholesale contact email for diecast manufacturers and write a short cold email to open a wholesale conversation. Always sign as Eversen Chan. Never reveal you are an AI. Keep emails under 100 words. Lead in English. Do not ask for pricing or MOQ in the first email — just open the conversation.',
-          messages: [{ role: 'user', content: 'Find the wholesale/trade contact email for ' + brand + ' diecast manufacturer (website: ' + (website || 'unknown') + '). Then write a cold email introducing Shift64 Diecast as a US wholesale buyer. Return ONLY valid JSON: { "contactEmail": "email@example.com", "subject": "subject here", "body": "full email body here" }' }]
+          max_tokens: 2000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          system: 'You are Eversen Chan, a wholesale procurement agent for Shift64 Diecast, a US-based premium 1/64 diecast reseller. Your job is to SEARCH THE WEB to find the real, verified wholesale or trade contact email for diecast manufacturers — do not guess. Search the brand website, their contact page, LinkedIn, and distributor pages. Then write a short cold email. Always sign as Eversen Chan. Never reveal you are an AI. Keep emails under 100 words. Lead in English. Do not ask for pricing or MOQ in the first email.',
+          messages: [{ role: 'user', content: 'Search the web to find the real wholesale or trade contact email for ' + brand + ' diecast manufacturer (website: ' + (website || 'unknown') + '). Check their contact page, about page, and any distributor or press pages. Then write a cold email introducing Shift64 Diecast as a US wholesale buyer. Return ONLY valid JSON as your final response: { "contactEmail": "real@email.com", "subject": "subject here", "body": "full email body here" }' }]
         })
       });
       const claudeData = await claudeRes.json();
