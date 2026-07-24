@@ -8833,10 +8833,10 @@ function kaidoSoldVariants(e) {
   const castClean = clean(e.casting);
   // scope: 'model' = specific to this exact release, 'casting' = whole-casting average (flagged in UI).
   const out = [
-    { q: 'Kaido House ' + nameClean, scope: 'model' },   // full model + variant (most specific)
-    { q: 'Kaidohouse ' + e.khmg, scope: 'model' },       // by KHMG number (collectors put it in titles) — model-specific
-    { q: 'Kaido House ' + e.khmg, scope: 'model' },
-    { q: 'Kaido House ' + castClean, scope: 'casting' }   // last resort: casting-wide avg, flagged as such
+    { q: 'Mini GT Kaido House ' + nameClean, scope: 'model' },   // full model + variant (most specific)
+    { q: 'Mini GT Kaidohouse ' + e.khmg, scope: 'model' },       // by KHMG number (collectors put it in titles) — model-specific
+    { q: 'Mini GT Kaido House ' + e.khmg, scope: 'model' },
+    { q: 'Mini GT Kaido House ' + castClean, scope: 'casting' }   // last resort: casting-wide avg, flagged as such
   ];
   const seen = new Set(), res = [];
   for (const v of out) { const k = v.q.toLowerCase(); if (v.q && !seen.has(k)) { seen.add(k); res.push(v); } }
@@ -8849,10 +8849,10 @@ function kaidoChaseSoldVariants(e) {
   const nameClean = clean(e.name);
   const castClean = clean(e.casting);
   const out = [
-    { q: 'Kaido House ' + nameClean + ' chase', scope: 'model' },
-    { q: 'Kaidohouse ' + e.khmg + ' chase', scope: 'model' },
-    { q: 'Kaido House ' + e.khmg + ' chase', scope: 'model' },
-    { q: 'Kaido House ' + castClean + ' chase', scope: 'casting' }
+    { q: 'Mini GT Kaido House ' + nameClean + ' chase', scope: 'model' },
+    { q: 'Mini GT Kaidohouse ' + e.khmg + ' chase', scope: 'model' },
+    { q: 'Mini GT Kaido House ' + e.khmg + ' chase', scope: 'model' },
+    { q: 'Mini GT Kaido House ' + castClean + ' chase', scope: 'casting' }
   ];
   const seen = new Set(), res = [];
   for (const v of out) { const k = v.q.toLowerCase(); if (v.q && !seen.has(k)) { seen.add(k); res.push(v); } }
