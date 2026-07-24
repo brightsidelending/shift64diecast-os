@@ -5051,7 +5051,7 @@ function openSiteSearch(site) {
   const urls = {
     horizon: 'https://horizondiecast.com/search?q=' + enc,
     carbromc: 'https://carbromc.com/search?q=' + enc,
-    rcmart: 'https://www.rcmart.com/product-search?search=' + enc,   // same clean short term as the others
+    rcmart: 'https://www.google.com/search?q=site:rcmart.com+' + enc,   // same clean short term as the others
     pablo: 'https://www.google.com/search?q=site:pablosdiecastgarage.com+' + enc
   };
   if (urls[site]) window.open(urls[site], '_blank', 'noopener');
