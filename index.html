@@ -8721,8 +8721,8 @@ function kaidoEstValue(entry) {
   const stdLive = live && live.stdMedian > 0 ? live.stdMedian : null;
   const chaseLive = live && live.chaseMedian > 0 ? live.chaseMedian : null;
   return {
-    stdValue: stdLive != null ? stdLive : (entry.stdValue || null),
-    chaseValue: chaseLive != null ? chaseLive : (entry.chaseValue || null),
+    stdValue: stdLive != null ? (entry.stdValue ? Math.max(stdLive, entry.stdValue) : stdLive) : (entry.stdValue || null),
+    chaseValue: chaseLive != null ? (entry.chaseValue ? Math.max(chaseLive, entry.chaseValue) : chaseLive) : (entry.chaseValue || null),
     stdSource: stdLive ? ('eBay median · ' + live.stdCount + ' sold' + (live.scope === 'casting' ? ' (casting avg)' : '')) : (entry.stdValue ? 'hallsguide est.' : null),
     chaseSource: chaseLive ? ('eBay median · ' + live.chaseCount + ' sold') : (entry.chaseValue ? 'hallsguide est.' : null)
   };
