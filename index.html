@@ -8866,7 +8866,7 @@ async function kaidoSoldMedian(query, excludeChase) {
   const raw = await fetchEbayItems('ebay_active', query);
   let items = mapActiveItems(raw || []);
   if (excludeChase) items = items.filter(function (m) { return !/chase/i.test(m.title || ''); });
-  let prices = items.map(function (m) { return m.price; }).filter(function (p) { return p > 0; }).sort(function (a, b) { return a - b; });
+  let prices = items.map(function (m) { return m.price; }).filter(function (p) { return p >= 30; }).sort(function (a, b) { return a - b; });
   if (prices.length < 2) return { count: prices.length, median: null };
   // Remove outliers by trimming the bottom and top 20% of prices, then take the median of the rest.
   const cut = Math.floor(prices.length * 0.2);
