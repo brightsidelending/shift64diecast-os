@@ -8849,10 +8849,10 @@ function kaidoChaseSoldVariants(e) {
   const nameClean = clean(e.name);
   const castClean = clean(e.casting);
   const out = [
-    { q: 'Mini GT Kaido House ' + nameClean + ' secret', scope: 'model' },
-    { q: 'Mini GT Kaidohouse ' + e.khmg + ' secret', scope: 'model' },
-    { q: 'Mini GT Kaido House ' + e.khmg + ' secret', scope: 'model' },
-    { q: 'Mini GT Kaido House ' + castClean + ' secret', scope: 'casting' }
+    { q: 'Mini GT Kaido House ' + nameClean + ' chase', scope: 'model' },
+    { q: 'Mini GT Kaidohouse ' + e.khmg + ' chase', scope: 'model' },
+    { q: 'Mini GT Kaido House ' + e.khmg + ' chase', scope: 'model' },
+    { q: 'Mini GT Kaido House ' + castClean + ' chase', scope: 'casting' }
   ];
   const seen = new Set(), res = [];
   for (const v of out) { const k = v.q.toLowerCase(); if (v.q && !seen.has(k)) { seen.add(k); res.push(v); } }
